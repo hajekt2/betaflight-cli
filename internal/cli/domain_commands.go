@@ -169,6 +169,21 @@ func (a *app) profilesCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List profile selectors found in dump output", func(doc bfconfig.Document) any {
 		return map[string]any{"profiles": filterProfiles(doc.Profiles, "profile"), "rateprofiles": filterProfiles(doc.Profiles, "rateprofile"), "lines": doc.Sections["profiles"]}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read active PID, rate, and battery profile selections over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				profiles, err := bfcommands.ReadProfileStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"profiles": profiles,
+				})
+			})
+		},
+	})
 	var profileFlags changeFlags
 	profile := &cobra.Command{
 		Use:   "select INDEX",

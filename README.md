@@ -67,6 +67,7 @@ betaflight-cli modes list --port /dev/tty.usbmodem01
 betaflight-cli modes active --port /dev/tty.usbmodem01
 betaflight-cli resources list --port /dev/tty.usbmodem01
 betaflight-cli profiles list --port /dev/tty.usbmodem01
+betaflight-cli profiles status --port /dev/tty.usbmodem01
 betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
 betaflight-cli vtxtable list --port /dev/tty.usbmodem01
 betaflight-cli leds list --port /dev/tty.usbmodem01
@@ -109,6 +110,7 @@ These commands read from parsed `dump all` output and use Betaflight CLI text li
 It also includes CLI-row table commands for VTX tables, LED strips, servos, adjustment ranges, and receiver channel ranges.
 It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.
+`profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch plan` validates without connecting.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.

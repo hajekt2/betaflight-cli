@@ -134,6 +134,9 @@ The object includes a paged mode definition catalog and mode range rows with per
 `features status` returns a `features` object decoded from `MSP_FEATURE_CONFIG`.
 The object includes the raw feature mask, enabled feature names, per-feature bit catalog, and an unknown mask for future firmware bits this binary does not yet name.
 
+`profiles status` returns a `profiles` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
+The object includes active PID, rate, and battery profile indexes, profile counts when supplied by firmware, native CLI selector commands, and reboot-required state when supplied by firmware.
+
 `receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, and `MSP_RC`.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, and live RC channel values.
 

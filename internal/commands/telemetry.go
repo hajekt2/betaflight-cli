@@ -35,19 +35,22 @@ type Telemetry struct {
 }
 
 type Status struct {
-	Source             string   `json:"source"`
-	CycleTimeUS        uint16   `json:"cycle_time_us"`
-	I2CErrors          uint16   `json:"i2c_errors"`
-	ActiveSensors      uint16   `json:"active_sensors"`
-	ModeFlags          uint32   `json:"mode_flags"`
-	Profile            uint8    `json:"profile"`
-	CPULoad            *uint16  `json:"cpu_load,omitempty"`
-	ProfileCount       *uint8   `json:"profile_count,omitempty"`
-	RateProfile        *uint8   `json:"rate_profile,omitempty"`
-	ArmingDisableCount *uint8   `json:"arming_disable_count,omitempty"`
-	ArmingDisableFlags *uint32  `json:"arming_disable_flags,omitempty"`
-	ConfigStateFlag    *uint8   `json:"config_state_flag,omitempty"`
-	CPUTemperatureC    *float64 `json:"cpu_temperature_c,omitempty"`
+	Source              string   `json:"source"`
+	CycleTimeUS         uint16   `json:"cycle_time_us"`
+	I2CErrors           uint16   `json:"i2c_errors"`
+	ActiveSensors       uint16   `json:"active_sensors"`
+	ModeFlags           uint32   `json:"mode_flags"`
+	Profile             uint8    `json:"profile"`
+	CPULoad             *uint16  `json:"cpu_load,omitempty"`
+	ProfileCount        *uint8   `json:"profile_count,omitempty"`
+	RateProfile         *uint8   `json:"rate_profile,omitempty"`
+	RateProfileCount    *uint8   `json:"rate_profile_count,omitempty"`
+	BatteryProfileCount *uint8   `json:"battery_profile_count,omitempty"`
+	BatteryProfile      *uint8   `json:"battery_profile,omitempty"`
+	ArmingDisableCount  *uint8   `json:"arming_disable_count,omitempty"`
+	ArmingDisableFlags  *uint32  `json:"arming_disable_flags,omitempty"`
+	ConfigStateFlag     *uint8   `json:"config_state_flag,omitempty"`
+	CPUTemperatureC     *float64 `json:"cpu_temperature_c,omitempty"`
 }
 
 type Attitude struct {
@@ -227,6 +230,15 @@ func decodeStatus(payload []byte, extended bool) (*Status, error) {
 	if temp, err := r.U16(); err == nil {
 		v := float64(temp) / 10
 		status.CPUTemperatureC = &v
+	}
+	if count, err := r.U8(); err == nil {
+		status.RateProfileCount = &count
+	}
+	if count, err := r.U8(); err == nil {
+		status.BatteryProfileCount = &count
+	}
+	if battery, err := r.U8(); err == nil {
+		status.BatteryProfile = &battery
 	}
 	return status, nil
 }

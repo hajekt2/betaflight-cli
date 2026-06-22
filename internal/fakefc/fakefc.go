@@ -216,6 +216,7 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU32(payload, 0x1234)
 		payload = append(payload, 0)
 		payload = appendU16(payload, 425)
+		payload = append(payload, 6, 3, 1)
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPAttitude:
 		payload := appendS16(nil, -10)

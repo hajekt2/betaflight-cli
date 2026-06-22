@@ -570,6 +570,36 @@ func TestRateprofilesListWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestProfilesStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"profiles", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	profiles := data["profiles"].(map[string]any)
+	if profiles["source"] != "MSP_STATUS_EX" {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+	pid := profiles["pid_profile"].(map[string]any)
+	if pid["index"] != float64(0) || pid["count"] != float64(4) || pid["cli_command"] != "profile 0" {
+		t.Fatalf("pid profile = %+v", pid)
+	}
+	rate := profiles["rate_profile"].(map[string]any)
+	if rate["index"] != float64(0) || rate["count"] != float64(6) || rate["cli_command"] != "rateprofile 0" {
+		t.Fatalf("rate profile = %+v", rate)
+	}
+	battery := profiles["battery_profile"].(map[string]any)
+	if battery["index"] != float64(1) || battery["count"] != float64(3) || battery["cli_command"] != "battery_profile 1" {
+		t.Fatalf("battery profile = %+v", battery)
+	}
+	if profiles["reboot_required"] != false {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+}
+
 func TestDomainSaveRequiresYesDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply", "--save"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

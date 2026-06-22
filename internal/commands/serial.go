@@ -1,0 +1,149 @@
+package commands
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hajekt2/betaflight-cli/internal/bfserial"
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
+)
+
+type SerialPortStatus struct {
+	Source string       `json:"source"`
+	Ports  []SerialPort `json:"ports"`
+}
+
+type SerialPort struct {
+	Identifier         uint8    `json:"identifier"`
+	IdentifierName     string   `json:"identifier_name,omitempty"`
+	FunctionMask       uint32   `json:"function_mask"`
+	Functions          []string `json:"functions"`
+	MSPBaudRateIndex   uint8    `json:"msp_baudrate_index"`
+	MSPBaudRate        string   `json:"msp_baudrate,omitempty"`
+	GPSBaudRateIndex   uint8    `json:"gps_baudrate_index"`
+	GPSBaudRate        string   `json:"gps_baudrate,omitempty"`
+	TelemetryBaudIndex uint8    `json:"telemetry_baudrate_index"`
+	TelemetryBaudRate  string   `json:"telemetry_baudrate,omitempty"`
+	BlackboxBaudIndex  uint8    `json:"blackbox_baudrate_index"`
+	BlackboxBaudRate   string   `json:"blackbox_baudrate,omitempty"`
+}
+
+func ReadSerialPortStatus(ctx context.Context, client *connection.Client) (*SerialPortStatus, []string, error) {
+	frame, err := client.Request(ctx, msp.MSP2CommonSerialConfig, nil)
+	if err == nil {
+		ports, decodeErr := DecodeSerialPortConfigV2(frame.Payload)
+		if decodeErr != nil {
+			return nil, nil, fmt.Errorf("serial config decode failed: %w", decodeErr)
+		}
+		return &SerialPortStatus{Source: "MSP2_COMMON_SERIAL_CONFIG", Ports: ports}, nil, nil
+	}
+	warnings := []string{fmt.Sprintf("MSP2_COMMON_SERIAL_CONFIG unavailable: %v", err)}
+	frame, err = client.Request(ctx, msp.MSPCFSerialConfig, nil)
+	if err != nil {
+		return nil, warnings, fmt.Errorf("legacy serial config unavailable: %w", err)
+	}
+	ports, decodeErr := DecodeSerialPortConfigV1(frame.Payload)
+	if decodeErr != nil {
+		return nil, warnings, fmt.Errorf("legacy serial config decode failed: %w", decodeErr)
+	}
+	return &SerialPortStatus{Source: "MSP_CF_SERIAL_CONFIG", Ports: ports}, warnings, nil
+}
+
+func DecodeSerialPortConfigV2(payload []byte) ([]SerialPort, error) {
+	r := msp.NewPayloadReader(payload)
+	count, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return []SerialPort{}, nil
+	}
+	if r.Remaining()%int(count) != 0 {
+		return nil, fmt.Errorf("payload has %d bytes for %d serial ports", r.Remaining(), count)
+	}
+	size := r.Remaining() / int(count)
+	if size < 9 {
+		return nil, fmt.Errorf("serial port entry size %d is smaller than MSPv2 minimum 9", size)
+	}
+	ports := make([]SerialPort, 0, count)
+	for i := 0; i < int(count); i++ {
+		startRemaining := r.Remaining()
+		identifier, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		mask, err := r.U32()
+		if err != nil {
+			return nil, err
+		}
+		port, err := readSerialPortBauds(r, identifier, mask)
+		if err != nil {
+			return nil, err
+		}
+		for startRemaining-r.Remaining() < size && r.Remaining() > 0 {
+			if _, err := r.U8(); err != nil {
+				return nil, err
+			}
+		}
+		ports = append(ports, port)
+	}
+	return ports, nil
+}
+
+func DecodeSerialPortConfigV1(payload []byte) ([]SerialPort, error) {
+	if len(payload)%7 != 0 {
+		return nil, fmt.Errorf("payload length %d is not a multiple of legacy serial port size 7", len(payload))
+	}
+	r := msp.NewPayloadReader(payload)
+	ports := make([]SerialPort, 0, len(payload)/7)
+	for r.Remaining() > 0 {
+		identifier, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		mask, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		port, err := readSerialPortBauds(r, identifier, uint32(mask))
+		if err != nil {
+			return nil, err
+		}
+		ports = append(ports, port)
+	}
+	return ports, nil
+}
+
+func readSerialPortBauds(r *msp.PayloadReader, identifier uint8, mask uint32) (SerialPort, error) {
+	mspBaud, err := r.U8()
+	if err != nil {
+		return SerialPort{}, err
+	}
+	gpsBaud, err := r.U8()
+	if err != nil {
+		return SerialPort{}, err
+	}
+	telemetryBaud, err := r.U8()
+	if err != nil {
+		return SerialPort{}, err
+	}
+	blackboxBaud, err := r.U8()
+	if err != nil {
+		return SerialPort{}, err
+	}
+	return SerialPort{
+		Identifier:         identifier,
+		IdentifierName:     bfserial.PortIdentifierName(identifier),
+		FunctionMask:       mask,
+		Functions:          bfserial.FunctionNames(mask),
+		MSPBaudRateIndex:   mspBaud,
+		MSPBaudRate:        bfserial.BaudRateName(mspBaud),
+		GPSBaudRateIndex:   gpsBaud,
+		GPSBaudRate:        bfserial.BaudRateName(gpsBaud),
+		TelemetryBaudIndex: telemetryBaud,
+		TelemetryBaudRate:  bfserial.BaudRateName(telemetryBaud),
+		BlackboxBaudIndex:  blackboxBaud,
+		BlackboxBaudRate:   bfserial.BaudRateName(blackboxBaud),
+	}, nil
+}

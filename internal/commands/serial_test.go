@@ -1,0 +1,39 @@
+package commands
+
+import "testing"
+
+func TestDecodeSerialPortConfigV2(t *testing.T) {
+	payload := []byte{2}
+	payload = append(payload, 20)
+	payload = appendU32Test(payload, 1)
+	payload = append(payload, 5, 0, 0, 5)
+	payload = append(payload, 51)
+	payload = appendU32Test(payload, 64|2)
+	payload = append(payload, 5, 4, 0, 0)
+	ports, err := DecodeSerialPortConfigV2(payload)
+	if err != nil {
+		t.Fatalf("DecodeSerialPortConfigV2() error = %v", err)
+	}
+	if len(ports) != 2 {
+		t.Fatalf("ports = %+v", ports)
+	}
+	if ports[0].IdentifierName != "USB_VCP" || ports[0].Functions[0] != "MSP" || ports[0].MSPBaudRate != "115200" {
+		t.Fatalf("port 0 = %+v", ports[0])
+	}
+	if ports[1].IdentifierName != "UART1" || ports[1].FunctionMask != 66 || ports[1].GPSBaudRate != "57600" {
+		t.Fatalf("port 1 = %+v", ports[1])
+	}
+}
+
+func TestDecodeSerialPortConfigV1(t *testing.T) {
+	payload := []byte{51}
+	payload = appendU16Test(payload, 64)
+	payload = append(payload, 5, 4, 0, 0)
+	ports, err := DecodeSerialPortConfigV1(payload)
+	if err != nil {
+		t.Fatalf("DecodeSerialPortConfigV1() error = %v", err)
+	}
+	if len(ports) != 1 || ports[0].IdentifierName != "UART1" || ports[0].Functions[0] != "RX_SERIAL" {
+		t.Fatalf("ports = %+v", ports)
+	}
+}

@@ -59,6 +59,22 @@ func (a *app) serialCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List serial CLI rows", func(doc bfconfig.Document) any {
 		return map[string]any{"serial": doc.Serial, "lines": doc.Sections["serial"]}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read serial port configuration over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				serial, warnings, err := bfcommands.ReadSerialPortStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"serial":   serial,
+					"warnings": warnings,
+				})
+			})
+		},
+	})
 	var flags changeFlags
 	set := &cobra.Command{
 		Use:   "set PORT FUNCTION_MASK MSP_BAUD GPS_BAUD TELEMETRY_BAUD BLACKBOX_BAUD",

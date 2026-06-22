@@ -4,6 +4,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/hajekt2/betaflight-cli/internal/bfserial"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
 )
 
@@ -284,7 +285,7 @@ func parseSerial(line string, fields []string) Serial {
 		if mask, err := strconv.ParseUint(fields[2], 0, 32); err == nil {
 			value := uint32(mask)
 			serial.FunctionMaskValue = &value
-			serial.Functions = serialFunctionNames(value)
+			serial.Functions = bfserial.FunctionNames(value)
 		}
 	}
 	if len(fields) > 3 {
@@ -303,44 +304,6 @@ func parseSerial(line string, fields []string) Serial {
 		serial.BlackboxBaudRate = fields[6]
 	}
 	return serial
-}
-
-func serialFunctionNames(mask uint32) []string {
-	defs := []struct {
-		bit  uint32
-		name string
-	}{
-		{1 << 0, "MSP"},
-		{1 << 1, "GPS"},
-		{1 << 2, "TELEMETRY_FRSKY_HUB"},
-		{1 << 3, "TELEMETRY_HOTT"},
-		{1 << 4, "TELEMETRY_LTM"},
-		{1 << 5, "TELEMETRY_SMARTPORT"},
-		{1 << 6, "RX_SERIAL"},
-		{1 << 7, "BLACKBOX"},
-		{1 << 9, "TELEMETRY_MAVLINK"},
-		{1 << 10, "ESC_SENSOR"},
-		{1 << 11, "VTX_SMARTAUDIO"},
-		{1 << 12, "TELEMETRY_IBUS"},
-		{1 << 13, "VTX_TRAMP"},
-		{1 << 14, "RCDEVICE"},
-		{1 << 15, "LIDAR_TF"},
-		{1 << 16, "FRSKY_OSD"},
-		{1 << 17, "VTX_MSP"},
-		{1 << 18, "GIMBAL"},
-		{1 << 19, "LIDAR_NL"},
-		{1 << 20, "OSD_CUSTOM_TEXT"},
-	}
-	out := []string{}
-	for _, def := range defs {
-		if mask&def.bit != 0 {
-			out = append(out, def.name)
-		}
-	}
-	if len(out) == 0 && mask == 0 {
-		return []string{"NONE"}
-	}
-	return out
 }
 
 func parseAux(line string, fields []string) AuxRange {

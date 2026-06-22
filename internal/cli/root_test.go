@@ -777,6 +777,34 @@ func TestSerialListIncludesDecodedFunctions(t *testing.T) {
 	}
 }
 
+func TestSerialStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"serial", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	status := data["serial"].(map[string]any)
+	if status["source"] != "MSP2_COMMON_SERIAL_CONFIG" {
+		t.Fatalf("serial status = %+v", status)
+	}
+	ports := status["ports"].([]any)
+	if len(ports) != 2 {
+		t.Fatalf("ports = %+v", ports)
+	}
+	first := ports[0].(map[string]any)
+	if first["identifier_name"] != "USB_VCP" || first["msp_baudrate"] != "115200" {
+		t.Fatalf("first = %+v", first)
+	}
+	second := ports[1].(map[string]any)
+	functions := second["functions"].([]any)
+	if second["identifier_name"] != "UART1" || second["function_mask"] != float64(66) || functions[0] != "GPS" || functions[1] != "RX_SERIAL" {
+		t.Fatalf("second = %+v", second)
+	}
+}
+
 func TestVTXTableListIncludesSummary(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtxtable", "list"}, nil)
 	if err != nil {

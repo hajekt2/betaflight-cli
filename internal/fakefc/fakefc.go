@@ -398,6 +398,15 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 5662)
 		payload = append(payload, 1, 5, 8, 3)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSP2CommonSerialConfig:
+		payload := []byte{2}
+		payload = append(payload, 20)
+		payload = appendU32(payload, 1)
+		payload = append(payload, 5, 0, 0, 5)
+		payload = append(payload, 51)
+		payload = appendU32(payload, 64|2)
+		payload = append(payload, 5, 4, 0, 0)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPOSDConfig:
 		payload := []byte{0x31, 3, 1, 20}
 		payload = appendU16(payload, 1500)

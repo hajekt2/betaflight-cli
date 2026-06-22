@@ -28,6 +28,21 @@ func (a *app) featuresCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List configured features", func(doc bfconfig.Document) any {
 		return map[string]any{"features": doc.Features}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read active feature mask over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				features, err := bfcommands.ReadFeatureStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"features": features,
+				})
+			})
+		},
+	})
 	var enableFlags changeFlags
 	enable := &cobra.Command{
 		Use:   "enable NAME",

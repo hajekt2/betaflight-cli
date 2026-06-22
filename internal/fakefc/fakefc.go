@@ -202,6 +202,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendPString(payload, "FAKEF405")
 		payload = appendPString(payload, "FAKE")
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPFeatureConfig:
+		f.out.Write(response(frame.Code, appendU32(nil, 0x00040488), false))
 	case msp.MSPStatusEx:
 		payload := make([]byte, 0, 32)
 		payload = appendU16(payload, 250)

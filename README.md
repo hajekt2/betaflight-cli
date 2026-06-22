@@ -59,6 +59,7 @@ betaflight-cli servos status --port /dev/tty.usbmodem01
 betaflight-cli settings get gyro_lpf1_static_hz --port /dev/tty.usbmodem01
 betaflight-cli settings set gyro_lpf1_static_hz 0 --port /dev/tty.usbmodem01 --apply
 betaflight-cli features list --port /dev/tty.usbmodem01
+betaflight-cli features status --port /dev/tty.usbmodem01
 betaflight-cli features enable GPS --port /dev/tty.usbmodem01
 betaflight-cli features enable GPS --port /dev/tty.usbmodem01 --apply
 betaflight-cli serial list --port /dev/tty.usbmodem01
@@ -104,6 +105,7 @@ Configurator parity should be exposed as focused command families rather than on
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
 The current CLI includes first domain commands for features, serial ports, AUX modes, resources, and profile selectors.
 These commands read from parsed `dump all` output and use Betaflight CLI text lines for plan/apply writes.
+`features status` reads the active feature mask over MSP and returns decoded feature names with a bit catalog for agent reasoning.
 It also includes CLI-row table commands for VTX tables, LED strips, servos, adjustment ranges, and receiver channel ranges.
 It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.

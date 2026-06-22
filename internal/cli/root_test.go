@@ -454,6 +454,35 @@ func TestFeaturesListWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestFeaturesStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"features", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	features := data["features"].(map[string]any)
+	if features["source"] != "MSP_FEATURE_CONFIG" || features["mask"] != float64(0x00040488) {
+		t.Fatalf("features = %+v", features)
+	}
+	enabled := features["enabled_names"].([]any)
+	want := []string{"RX_SERIAL", "GPS", "TELEMETRY", "OSD"}
+	if len(enabled) != len(want) {
+		t.Fatalf("enabled = %+v", enabled)
+	}
+	for i, name := range want {
+		if enabled[i] != name {
+			t.Fatalf("enabled = %+v, want %v", enabled, want)
+		}
+	}
+	catalog := features["catalog"].([]any)
+	if len(catalog) != 24 {
+		t.Fatalf("catalog length = %d", len(catalog))
+	}
+}
+
 func TestFeatureEnablePlanDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"features", "enable", "gps"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

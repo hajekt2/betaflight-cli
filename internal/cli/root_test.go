@@ -805,6 +805,41 @@ func TestSerialStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestLEDStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"leds", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	status := data["leds"].(map[string]any)
+	strip := status["strip"].(map[string]any)
+	if strip["advanced_supported"] != true || strip["profile"] != float64(0) {
+		t.Fatalf("strip = %+v", strip)
+	}
+	leds := strip["leds"].([]any)
+	if len(leds) != 2 {
+		t.Fatalf("leds = %+v", leds)
+	}
+	first := leds[0].(map[string]any)
+	directions := first["directions"].([]any)
+	overlays := first["overlays"].([]any)
+	if first["cli_syntax"] != "1,2:ne:Ct:3" || directions[0] != "n" || directions[1] != "e" || overlays[0] != "t" {
+		t.Fatalf("first = %+v", first)
+	}
+	colors := status["colors"].([]any)
+	secondColor := colors[1].(map[string]any)
+	if secondColor["hue"] != float64(120) || secondColor["sat"] != float64(255) {
+		t.Fatalf("colors = %+v", colors)
+	}
+	values := status["values"].(map[string]any)
+	if values["brightness"] != float64(50) || values["rainbow_freq"] != float64(120) {
+		t.Fatalf("values = %+v", values)
+	}
+}
+
 func TestVTXTableListIncludesSummary(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtxtable", "list"}, nil)
 	if err != nil {

@@ -35,6 +35,22 @@ func (a *app) ledsCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List LED strip rows", func(doc bfconfig.Document) any {
 		return map[string]any{"leds": doc.LEDs, "lines": doc.Sections["leds"]}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read LED strip layout and colors over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				leds, warnings, err := bfcommands.ReadLEDStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"leds":     leds,
+					"warnings": warnings,
+				})
+			})
+		},
+	})
 	var flags changeFlags
 	set := &cobra.Command{
 		Use:   "set INDEX CONFIG",

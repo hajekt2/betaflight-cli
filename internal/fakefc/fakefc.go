@@ -398,6 +398,24 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 5662)
 		payload = append(payload, 1, 5, 8, 3)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPLedStripConfig:
+		payload := appendU32(nil, fakeLEDConfigRaw(1, 2, 0, 1, 3, 0x03))
+		payload = appendU32(payload, fakeLEDConfigRaw(3, 4, 1, 1<<3, 5, 0x04))
+		payload = append(payload, 1, 0)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPLedColors:
+		payload := appendU16(nil, 0)
+		payload = append(payload, 0, 255)
+		payload = appendU16(payload, 120)
+		payload = append(payload, 255, 255)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPLedStripModecolor:
+		f.out.Write(response(frame.Code, []byte{0, 0, 3, 1, 2, 5}, false))
+	case msp.MSP2GetLedStripConfigValues:
+		payload := []byte{50}
+		payload = appendU16(payload, 20)
+		payload = appendU16(payload, 120)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSP2CommonSerialConfig:
 		payload := []byte{2}
 		payload = append(payload, 20)
@@ -493,6 +511,15 @@ func appendU32(dst []byte, v uint32) []byte {
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], v)
 	return append(dst, buf[:]...)
+}
+
+func fakeLEDConfigRaw(x, y, function uint8, overlays uint16, color, directions uint8) uint32 {
+	return uint32(y&0x0f) |
+		uint32(x&0x0f)<<4 |
+		uint32(function&0x0f)<<8 |
+		uint32(overlays&0x03ff)<<12 |
+		uint32(color&0x0f)<<22 |
+		uint32(directions&0x3f)<<26
 }
 
 func modeNamePage(payload []byte) []byte {

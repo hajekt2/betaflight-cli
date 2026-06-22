@@ -281,6 +281,14 @@ func TestReceiverStatusWithFakeFC(t *testing.T) {
 	if len(rcMapNames) != 4 || rcMapNames[2] != "THROTTLE" || rcMapNames[3] != "YAW" {
 		t.Fatalf("rc map names = %+v", rcMapNames)
 	}
+	failsafe := receiver["failsafe"].([]any)
+	if len(failsafe) != 4 {
+		t.Fatalf("failsafe = %+v", failsafe)
+	}
+	row := failsafe[2].(map[string]any)
+	if row["mode_name"] != "SET" || row["value"] != float64(1100) || row["cli_command"] != "rxfail 2 s 1100" {
+		t.Fatalf("failsafe row = %+v", row)
+	}
 }
 
 func TestGPSStatusWithFakeFC(t *testing.T) {

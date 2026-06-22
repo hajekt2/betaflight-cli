@@ -121,7 +121,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
-`receiver status` reads receiver configuration, channel map, RSSI channel, and live RC channels over MSP.
+`receiver status` reads receiver configuration, channel map, RSSI channel, RX failsafe rows, and live RC channels over MSP.
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `battery status` reads battery profile thresholds, runtime battery state, and voltage/current meter readings and calibration over MSP.
 `failsafe status` reads failsafe configuration, arming configuration, board alignment, and active arming-disable flags over MSP.

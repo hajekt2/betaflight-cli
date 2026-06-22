@@ -81,6 +81,37 @@ func TestRCMapNames(t *testing.T) {
 	}
 }
 
+func TestDecodeRXFailConfig(t *testing.T) {
+	payload := []byte{0}
+	payload = appendU16Test(payload, 1000)
+	payload = append(payload, 1)
+	payload = appendU16Test(payload, 1500)
+	payload = append(payload, 2)
+	payload = appendU16Test(payload, 1100)
+	rows, err := DecodeRXFailConfig(payload)
+	if err != nil {
+		t.Fatalf("DecodeRXFailConfig() error = %v", err)
+	}
+	if len(rows) != 3 {
+		t.Fatalf("rows = %+v", rows)
+	}
+	if rows[0].Name != "ROLL" || rows[0].ModeName != "AUTO" || rows[0].CLICommand != "rxfail 0 a" {
+		t.Fatalf("row 0 = %+v", rows[0])
+	}
+	if rows[1].ModeName != "HOLD" || rows[1].CLICommand != "rxfail 1 h" {
+		t.Fatalf("row 1 = %+v", rows[1])
+	}
+	if rows[2].ModeName != "SET" || !rows[2].RequiresValue || rows[2].CLICommand != "rxfail 2 s 1100" {
+		t.Fatalf("row 2 = %+v", rows[2])
+	}
+}
+
+func TestDecodeRXFailConfigRejectsPartialRow(t *testing.T) {
+	if _, err := DecodeRXFailConfig([]byte{0, 1}); err == nil {
+		t.Fatal("DecodeRXFailConfig() error = nil, want partial row error")
+	}
+}
+
 func appendU16Test(dst []byte, v uint16) []byte {
 	return append(dst, byte(v), byte(v>>8))
 }

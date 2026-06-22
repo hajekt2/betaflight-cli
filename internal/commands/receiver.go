@@ -14,6 +14,7 @@ type ReceiverStatus struct {
 	RCMapNames  []string        `json:"rc_map_names,omitempty"`
 	RSSIChannel *uint8          `json:"rssi_channel,omitempty"`
 	Channels    []uint16        `json:"channels,omitempty"`
+	Failsafe    []RXFailChannel `json:"failsafe,omitempty"`
 }
 
 type ReceiverConfig struct {
@@ -44,6 +45,17 @@ type ReceiverConfig struct {
 	DeprecatedRCSmoothingDerivative uint8   `json:"deprecated_rc_smoothing_derivative_type"`
 }
 
+type RXFailChannel struct {
+	Index         int    `json:"index"`
+	Name          string `json:"name"`
+	Mode          uint8  `json:"mode"`
+	ModeName      string `json:"mode_name,omitempty"`
+	ModeChar      string `json:"mode_char,omitempty"`
+	Value         uint16 `json:"value"`
+	RequiresValue bool   `json:"requires_value"`
+	CLICommand    string `json:"cli_command,omitempty"`
+}
+
 func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*ReceiverStatus, []string, error) {
 	status := &ReceiverStatus{}
 	warnings := []string{}
@@ -69,6 +81,11 @@ func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*Receiv
 	}
 	if channels, err := readRC(ctx, client); err == nil {
 		status.Channels = channels
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if failsafe, err := readRXFailConfig(ctx, client); err == nil {
+		status.Failsafe = failsafe
 	} else {
 		warnings = append(warnings, err.Error())
 	}
@@ -241,6 +258,35 @@ func readRSSIChannel(ctx context.Context, client *connection.Client) (uint8, err
 	return channel, nil
 }
 
+func DecodeRXFailConfig(payload []byte) ([]RXFailChannel, error) {
+	const rowSize = 3
+	if len(payload)%rowSize != 0 {
+		return nil, fmt.Errorf("payload length %d is not divisible by MSP_RXFAIL_CONFIG row size %d", len(payload), rowSize)
+	}
+	r := msp.NewPayloadReader(payload)
+	rows := make([]RXFailChannel, 0, len(payload)/rowSize)
+	for index := 0; r.Remaining() > 0; index++ {
+		mode, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		value, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, rxFailChannel(index, mode, value))
+	}
+	return rows, nil
+}
+
+func readRXFailConfig(ctx context.Context, client *connection.Client) ([]RXFailChannel, error) {
+	frame, err := client.Request(ctx, msp.MSPRxfailConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("receiver failsafe unavailable: %w", err)
+	}
+	return DecodeRXFailConfig(frame.Payload)
+}
+
 func rcMapNames(mapping []uint8) []string {
 	names := []string{"ROLL", "PITCH", "YAW", "THROTTLE"}
 	out := make([]string, len(mapping))
@@ -252,4 +298,46 @@ func rcMapNames(mapping []uint8) []string {
 		out[i] = fmt.Sprintf("AUX%d", int(mapped)-len(names)+1)
 	}
 	return out
+}
+
+func rxFailChannel(index int, mode uint8, value uint16) RXFailChannel {
+	modeName, modeChar := rxFailMode(mode)
+	row := RXFailChannel{
+		Index:         index,
+		Name:          rcChannelName(index),
+		Mode:          mode,
+		ModeName:      modeName,
+		ModeChar:      modeChar,
+		Value:         value,
+		RequiresValue: mode == 2,
+	}
+	if modeChar != "" {
+		if row.RequiresValue {
+			row.CLICommand = fmt.Sprintf("rxfail %d %s %d", index, modeChar, value)
+		} else {
+			row.CLICommand = fmt.Sprintf("rxfail %d %s", index, modeChar)
+		}
+	}
+	return row
+}
+
+func rxFailMode(mode uint8) (string, string) {
+	switch mode {
+	case 0:
+		return "AUTO", "a"
+	case 1:
+		return "HOLD", "h"
+	case 2:
+		return "SET", "s"
+	default:
+		return "", ""
+	}
+}
+
+func rcChannelName(index int) string {
+	names := []string{"ROLL", "PITCH", "YAW", "THROTTLE"}
+	if index < len(names) {
+		return names[index]
+	}
+	return fmt.Sprintf("AUX%d", index-len(names)+1)
 }

@@ -299,6 +299,16 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte{0, 1, 3, 2}, false))
 	case msp.MSPRSSIConfig:
 		f.out.Write(response(frame.Code, []byte{8}, false))
+	case msp.MSPRxfailConfig:
+		payload := []byte{0}
+		payload = appendU16(payload, 1000)
+		payload = append(payload, 1)
+		payload = appendU16(payload, 1500)
+		payload = append(payload, 2)
+		payload = appendU16(payload, 1100)
+		payload = append(payload, 1)
+		payload = appendU16(payload, 1500)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPGPSConfig:
 		f.out.Write(response(frame.Code, []byte{1, 0, 1, 1, 1, 1}, false))
 	case msp.MSPRawGPS:

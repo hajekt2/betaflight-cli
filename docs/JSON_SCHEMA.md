@@ -137,8 +137,8 @@ The object includes the raw feature mask, enabled feature names, per-feature bit
 `profiles status` returns a `profiles` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes active PID, rate, and battery profile indexes, profile counts when supplied by firmware, native CLI selector commands, and reboot-required state when supplied by firmware.
 
-`receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, and `MSP_RC`.
-The object includes receiver configuration, channel map indexes and names, RSSI channel, and live RC channel values.
+`receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
+The object includes receiver configuration, channel map indexes and names, RSSI channel, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 
 `gps status` returns a `gps` object decoded from `MSP_GPS_CONFIG`, `MSP_RAW_GPS`, `MSP_COMP_GPS`, `MSP_GPS_RESCUE`, `MSP_GPS_RESCUE_PIDS`, and `MSP_GPSSVINFO`.
 The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.

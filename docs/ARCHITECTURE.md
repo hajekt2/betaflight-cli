@@ -154,20 +154,26 @@ Unknown or unsupported messages should return structured errors with raw payload
 ### Settings Layer
 
 The settings layer owns Betaflight CLI setting metadata.
-It should eventually be generated from upstream `settings.c` and related headers.
+It is generated from upstream `settings.c`, `settings.h`, and `parameter_names.h`.
+The checked-in generated registry is currently pinned to Betaflight `2025.12.0`.
 
-The first generated model should capture:
+The generated model captures:
 
 - Setting name.
 - Value type.
 - Scope.
+- Mode.
 - Lookup table values.
 - Minimum and maximum values when available.
+- Macro range expressions when numeric values are not locally resolvable.
 - Bitset position when available.
+- String length bounds when available.
+- Parameter group.
+- Upstream source file and line.
 - Upstream firmware tag or commit.
 
 Typed settings can come later.
-The metadata registry itself should come early because it supports validation and safer writes.
+The metadata registry supports local validation and safer CLI-backed writes.
 
 ### Blackbox Layer
 
@@ -187,6 +193,8 @@ It should not generate the public command UX wholesale.
 Generated metadata for supported Betaflight versions should be compiled into the binary.
 The tool should not need network access or a mutable local cache for normal setting validation.
 Optional external metadata loading can be added later as an advanced feature.
+The current generator command is `internal/generate/cmd/bfmeta`.
+The `go generate` entrypoint is attached to `pkg/msp` because it produces both MSP metadata and settings metadata from the same upstream Betaflight source checkout.
 
 ## Compatibility Strategy
 

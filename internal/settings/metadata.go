@@ -16,14 +16,23 @@ const (
 )
 
 type Metadata struct {
-	Name        string    `json:"name"`
-	Type        ValueType `json:"type"`
-	Scope       string    `json:"scope,omitempty"`
-	Min         *int64    `json:"min,omitempty"`
-	Max         *int64    `json:"max,omitempty"`
-	Lookup      []string  `json:"lookup,omitempty"`
-	Description string    `json:"description,omitempty"`
-	Source      string    `json:"source"`
+	Name          string    `json:"name"`
+	Type          ValueType `json:"type"`
+	Scope         string    `json:"scope,omitempty"`
+	Mode          string    `json:"mode,omitempty"`
+	Min           *int64    `json:"min,omitempty"`
+	Max           *int64    `json:"max,omitempty"`
+	MinExpression string    `json:"min_expression,omitempty"`
+	MaxExpression string    `json:"max_expression,omitempty"`
+	LookupTable   string    `json:"lookup_table,omitempty"`
+	Lookup        []string  `json:"lookup,omitempty"`
+	BitPosition   *int64    `json:"bit_position,omitempty"`
+	MinLength     *int64    `json:"min_length,omitempty"`
+	MaxLength     *int64    `json:"max_length,omitempty"`
+	PG            string    `json:"pg,omitempty"`
+	Line          int       `json:"line,omitempty"`
+	Description   string    `json:"description,omitempty"`
+	Source        string    `json:"source"`
 }
 
 type Registry struct {
@@ -70,20 +79,28 @@ var DefaultRegistry = newRegistry([]Metadata{
 })
 
 func newRegistry(settings []Metadata) Registry {
+	return newRegistryWithSource("2025.12.x", []string{
+		"src/main/cli/settings.c",
+		"src/main/cli/settings.h",
+	}, false, settings)
+}
+
+func newRegistryWithSource(sourceFirmware string, sourceFiles []string, generated bool, settings []Metadata) Registry {
 	reg := Registry{
-		SourceFirmware: "2025.12.x",
-		SourceFiles: []string{
-			"src/main/cli/settings.c",
-			"src/main/cli/settings.h",
-		},
-		Generated: false,
-		Settings:  settings,
-		byName:    map[string]Metadata{},
+		SourceFirmware: sourceFirmware,
+		SourceFiles:    sourceFiles,
+		Generated:      generated,
+		Settings:       settings,
+		byName:         map[string]Metadata{},
 	}
 	for _, setting := range settings {
 		reg.byName[strings.ToLower(setting.Name)] = setting
 	}
 	return reg
+}
+
+func int64Ptr(value int64) *int64 {
+	return &value
 }
 
 func (r Registry) Lookup(name string) (Metadata, bool) {
@@ -96,6 +113,13 @@ func (m Metadata) Validate(value string) error {
 	case TypeString:
 		if value == "" {
 			return fmt.Errorf("%s cannot be empty", m.Name)
+		}
+		length := int64(len(value))
+		if m.MinLength != nil && length < *m.MinLength {
+			return fmt.Errorf("%s length must be >= %d", m.Name, *m.MinLength)
+		}
+		if m.MaxLength != nil && length > *m.MaxLength {
+			return fmt.Errorf("%s length must be <= %d", m.Name, *m.MaxLength)
 		}
 		return nil
 	case TypeLookup:

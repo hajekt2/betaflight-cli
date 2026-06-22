@@ -50,10 +50,32 @@ Configurator files are useful when payload interpretation or workflow behavior i
 8. Run unit tests and command contract tests.
 9. Update docs that mention supported Betaflight versions.
 
+The current generated registries are produced from official Betaflight `2025.12.0`.
+Use a pinned upstream tag, not a moving branch, when updating checked-in generated files.
+
+Example:
+
+```sh
+export BETAFLIGHT_VERSION=2025.12.0
+export BETAFLIGHT_SRC="$(opensrc path betaflight/betaflight@${BETAFLIGHT_VERSION})"
+go generate ./pkg/msp
+go test ./...
+```
+
+`go generate ./pkg/msp` writes both generated files:
+
+- `pkg/msp/codes_generated.go`
+- `internal/settings/metadata_generated.go`
+
+Do not edit generated files by hand.
+Fix parser or writer code under `internal/generate/`, regenerate, and review the generated diff.
+
 ## MSP Updates
 
 MSP command code changes should flow into one generated registry.
 The registry should include command name, numeric code, protocol version preference, direction, source file, and source line when available.
+The generator reads `msp_protocol.h`, `msp_protocol_v2_common.h`, and `msp_protocol_v2_betaflight.h`.
+Generated constants are the source of truth for known MSP command codes.
 
 When a new code appears, add a decoder only if the CLI needs typed output.
 Otherwise the request layer can expose raw payloads for advanced debugging while the typed command remains unsupported.
@@ -85,6 +107,8 @@ The generated diff should make these changes visible:
 
 If the generator cannot resolve a macro-backed range, it should mark the range unresolved instead of inventing a value.
 Human review can then decide whether to add a resolver.
+The first generator extracts literal setting names, `PARAM_NAME_*` names from `parameter_names.h`, value type, scope, mode, parameter group, source line, numeric ranges, macro range expressions, bit positions, string length bounds, and simple lookup tables.
+Lookup tables backed by symbols outside `settings.c` are preserved by table name even when their values are not resolved yet.
 
 ## Compatibility Policy
 

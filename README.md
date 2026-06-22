@@ -11,6 +11,7 @@ Agents can call the binary directly and parse JSON.
 
 This repository now has an executable CLI foundation.
 Implemented functionality includes version output, port listing, read-only doctor diagnostics, MSP handshake, read-only info, telemetry snapshot, framed CLI exec, backup diff/create wrappers, settings change planning, safety-gated apply/save paths, and raw MSP diagnostics.
+The repository also has generated MSP command metadata and generated Betaflight `2025.12.0` setting metadata compiled into the binary.
 Full non-graphical Configurator parity remains the product target and will be filled in by adding typed domain command families over this foundation.
 
 The product target is full non-graphical Betaflight Configurator parity.
@@ -171,3 +172,10 @@ Generated files should include the upstream Betaflight tag or commit they came f
 The update process is documented in [docs/UPDATING.md](docs/UPDATING.md).
 Generated metadata for supported Betaflight versions should be compiled into the static binary.
 Optional external metadata updates can be added later, but runtime network access or a mutable cache must not be required for normal operation.
+For the current generated registry refresh:
+
+```sh
+export BETAFLIGHT_VERSION=2025.12.0
+export BETAFLIGHT_SRC="$(opensrc path betaflight/betaflight@${BETAFLIGHT_VERSION})"
+go generate ./pkg/msp
+```

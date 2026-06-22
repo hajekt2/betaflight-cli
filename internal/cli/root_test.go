@@ -840,6 +840,61 @@ func TestLEDStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestPIDStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"pid", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	pid := data["pid"].(map[string]any)
+	controller := pid["controller"].(map[string]any)
+	if controller["name"] != "BETAFLIGHT" {
+		t.Fatalf("controller = %+v", controller)
+	}
+	gains := pid["gains"].([]any)
+	first := gains[0].(map[string]any)
+	if first["name"] != "ROLL" || first["p"] != float64(45) || first["i"] != float64(80) || first["d"] != float64(30) {
+		t.Fatalf("first gain = %+v", first)
+	}
+	advanced := pid["advanced"].(map[string]any)
+	if advanced["anti_gravity_gain"] != float64(3500) || advanced["feedforward_pitch"] != float64(125) {
+		t.Fatalf("advanced = %+v", advanced)
+	}
+	rateProfile := pid["rate_profile"].(map[string]any)
+	if rateProfile["rates_type_name"] != "ACTUAL" {
+		t.Fatalf("rate profile = %+v", rateProfile)
+	}
+}
+
+func TestRatesStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"rates", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	rates := data["rates"].(map[string]any)
+	rateProfile := rates["rate_profile"].(map[string]any)
+	axes := rateProfile["axes"].([]any)
+	roll := axes[0].(map[string]any)
+	if roll["axis"] != "roll" || roll["rc_rate"] != float64(7) || roll["rate_limit_dps"] != float64(900) {
+		t.Fatalf("roll = %+v", roll)
+	}
+	throttle := rateProfile["throttle"].(map[string]any)
+	if throttle["limit_type_name"] != "SCALE" || throttle["hover_value"] != float64(0.45) {
+		t.Fatalf("throttle = %+v", throttle)
+	}
+	tpa := rates["tpa"].(map[string]any)
+	if tpa["mode"] != float64(2) || tpa["rate"] != float64(15) || tpa["breakpoint"] != float64(1350) {
+		t.Fatalf("tpa = %+v", tpa)
+	}
+}
+
 func TestVTXTableListIncludesSummary(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtxtable", "list"}, nil)
 	if err != nil {

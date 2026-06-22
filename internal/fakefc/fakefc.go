@@ -333,6 +333,29 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 3)
 		payload = appendU32(payload, 0x00000202)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPPID:
+		f.out.Write(response(frame.Code, []byte{
+			45, 80, 30,
+			47, 84, 34,
+			45, 80, 0,
+			50, 50, 75,
+			40, 0, 0,
+		}, false))
+	case msp.MSPPidnames:
+		f.out.Write(response(frame.Code, []byte("ROLL;PITCH;YAW;LEVEL;MAG;"), false))
+	case msp.MSPPIDController:
+		f.out.Write(response(frame.Code, []byte{0}, false))
+	case msp.MSPRCTuning:
+		payload := []byte{7, 10, 70, 72, 65, 0, 50, 20}
+		payload = appendU16(payload, 0)
+		payload = append(payload, 5, 8, 7, 9, 1, 80)
+		payload = appendU16(payload, 900)
+		payload = appendU16(payload, 850)
+		payload = appendU16(payload, 800)
+		payload = append(payload, 3, 45)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPPIDAdvanced:
+		f.out.Write(response(frame.Code, fakePIDAdvancedPayload(), false))
 	case msp.MSPMotorConfig:
 		payload := appendU16(nil, 0)
 		payload = appendU16(payload, 2000)
@@ -520,6 +543,26 @@ func fakeLEDConfigRaw(x, y, function uint8, overlays uint16, color, directions u
 		uint32(overlays&0x03ff)<<12 |
 		uint32(color&0x0f)<<22 |
 		uint32(directions&0x3f)<<26
+}
+
+func fakePIDAdvancedPayload() []byte {
+	payload := appendU16(nil, 0)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 0)
+	payload = append(payload, 0, 0, 20, 0, 0, 0, 0)
+	payload = appendU16(payload, 100)
+	payload = appendU16(payload, 120)
+	payload = append(payload, 55, 0)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 3500)
+	payload = appendU16(payload, 0)
+	payload = append(payload, 1, 0, 2, 1, 0, 5, 20)
+	payload = appendU16(payload, 120)
+	payload = appendU16(payload, 125)
+	payload = appendU16(payload, 120)
+	payload = append(payload, 0, 40, 42, 0, 35, 50, 0, 20, 15, 95, 0, 30, 2, 10, 20, 30, 90, 5, 10, 2, 15)
+	payload = appendU16(payload, 1350)
+	return payload
 }
 
 func modeNamePage(payload []byte) []byte {

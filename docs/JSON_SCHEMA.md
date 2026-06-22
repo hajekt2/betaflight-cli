@@ -119,6 +119,12 @@ The object includes support status, device index and name, rate fields, optional
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
 
+`pid status` returns a `pid` object decoded from `MSP_PID`, `MSP_PIDNAMES`, `MSP_PID_CONTROLLER`, `MSP_RC_TUNING`, and `MSP_PID_ADVANCED`.
+The object includes active PID gain triplets, PID names, controller identity, the active rate profile, advanced PID tuning fields, and source metadata for each MSP message.
+
+`rates status` returns a `rates` object decoded from `MSP_RC_TUNING` and `MSP_PID_ADVANCED`.
+The object includes per-axis RC rates, expo, super rate values, rate limits, throttle curve fields, rates type, throttle limit mode, and TPA settings.
+
 `modes active` returns a `modes` object decoded from `MSP_BOXNAMES`, `MSP_BOXIDS`, `MSP_MODE_RANGES`, and `MSP_MODE_RANGES_EXTRA`.
 The object includes a paged mode definition catalog and mode range rows with permanent IDs, names, AUX channel indexes, microsecond ranges, logic, and linked mode names when supplied by firmware.
 

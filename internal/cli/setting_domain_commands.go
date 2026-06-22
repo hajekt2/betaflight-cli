@@ -58,6 +58,12 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
 	}
+	if domain.use == "pid" {
+		cmd.AddCommand(a.pidStatusCommand())
+	}
+	if domain.use == "rates" {
+		cmd.AddCommand(a.ratesStatusCommand())
+	}
 	return cmd
 }
 
@@ -111,6 +117,44 @@ func (a *app) osdStatusCommand() *cobra.Command {
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"osd":      osd,
+					"warnings": warnings,
+				})
+			})
+		},
+	}
+}
+
+func (a *app) pidStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read active PID gains, rate profile, and advanced tuning over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				pid, warnings, err := bfcommands.ReadPIDStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"pid":      pid,
+					"warnings": warnings,
+				})
+			})
+		},
+	}
+}
+
+func (a *app) ratesStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read active rate profile and TPA settings over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				rates, warnings, err := bfcommands.ReadRateStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"rates":    rates,
 					"warnings": warnings,
 				})
 			})

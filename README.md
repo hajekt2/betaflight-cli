@@ -120,6 +120,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `pid status` reads active PID gain triplets, rate profile data, and advanced PID tuning over MSP.
 `rates status` reads active rate profile fields and TPA settings over MSP.
+`filters status` reads loop timing, motor protocol, gyro, D-term, dynamic notch, and RPM filter configuration over MSP.
 `sensors status` reads configured and active sensor hardware, raw IMU data, sensor alignment, active sensor flags, and compass declination over MSP.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.

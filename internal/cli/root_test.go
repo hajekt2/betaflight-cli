@@ -895,6 +895,35 @@ func TestRatesStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestFiltersStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"filters", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	filters := data["filters"].(map[string]any)
+	advanced := filters["advanced_config"].(map[string]any)
+	if advanced["pid_process_denom"] != float64(4) || advanced["motor_protocol_name"] != "DSHOT600" || advanced["gyro_check_overflow_name"] != "ALL" {
+		t.Fatalf("advanced = %+v", advanced)
+	}
+	config := filters["filter_config"].(map[string]any)
+	if config["gyro_lpf1_static_hz"] != float64(150) || config["gyro_lpf2_type_name"] != "PT2" {
+		t.Fatalf("filter config = %+v", config)
+	}
+	dynamicNotch := config["dynamic_notch"].(map[string]any)
+	if dynamicNotch["q"] != float64(300) || dynamicNotch["max_hz"] != float64(600) {
+		t.Fatalf("dynamic notch = %+v", dynamicNotch)
+	}
+	rpmFilter := config["rpm_filter"].(map[string]any)
+	weights := rpmFilter["weights"].([]any)
+	if rpmFilter["harmonics"] != float64(3) || weights[2] != float64(60) {
+		t.Fatalf("rpm filter = %+v", rpmFilter)
+	}
+}
+
 func TestVTXTableListIncludesSummary(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtxtable", "list"}, nil)
 	if err != nil {

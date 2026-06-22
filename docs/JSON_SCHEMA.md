@@ -125,6 +125,9 @@ The object includes active PID gain triplets, PID names, controller identity, th
 `rates status` returns a `rates` object decoded from `MSP_RC_TUNING` and `MSP_PID_ADVANCED`.
 The object includes per-axis RC rates, expo, super rate values, rate limits, throttle curve fields, rates type, throttle limit mode, and TPA settings.
 
+`filters status` returns a `filters` object decoded from `MSP_ADVANCED_CONFIG` and `MSP_FILTER_CONFIG`.
+The object includes loop and motor protocol fields, gyro calibration and overflow settings, gyro and D-term lowpass filters, static notches, dynamic lowpass fields, dynamic notch fields, and RPM filter fields.
+
 `modes active` returns a `modes` object decoded from `MSP_BOXNAMES`, `MSP_BOXIDS`, `MSP_MODE_RANGES`, and `MSP_MODE_RANGES_EXTRA`.
 The object includes a paged mode definition catalog and mode range rows with permanent IDs, names, AUX channel indexes, microsecond ranges, logic, and linked mode names when supplied by firmware.
 

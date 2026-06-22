@@ -356,6 +356,10 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPPIDAdvanced:
 		f.out.Write(response(frame.Code, fakePIDAdvancedPayload(), false))
+	case msp.MSPAdvancedConfig:
+		f.out.Write(response(frame.Code, fakeAdvancedConfigPayload(), false))
+	case msp.MSPFilterConfig:
+		f.out.Write(response(frame.Code, fakeFilterConfigPayload(), false))
 	case msp.MSPMotorConfig:
 		payload := appendU16(nil, 0)
 		payload = appendU16(payload, 2000)
@@ -562,6 +566,49 @@ func fakePIDAdvancedPayload() []byte {
 	payload = appendU16(payload, 120)
 	payload = append(payload, 0, 40, 42, 0, 35, 50, 0, 20, 15, 95, 0, 30, 2, 10, 20, 30, 90, 5, 10, 2, 15)
 	payload = appendU16(payload, 1350)
+	return payload
+}
+
+func fakeAdvancedConfigPayload() []byte {
+	payload := []byte{1, 4, 0, 7}
+	payload = appendU16(payload, 480)
+	payload = appendU16(payload, 550)
+	payload = append(payload, 0, 1, 0, 1, 32)
+	payload = appendU16(payload, 125)
+	payload = appendU16(payload, 10)
+	payload = append(payload, 2, 5, 80)
+	return payload
+}
+
+func fakeFilterConfigPayload() []byte {
+	payload := []byte{90}
+	payload = appendU16(payload, 100)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 0)
+	payload = appendU16(payload, 0)
+	payload = append(payload, 0, 1, 0)
+	payload = appendU16(payload, 150)
+	payload = appendU16(payload, 500)
+	payload = append(payload, 0, 2)
+	payload = appendU16(payload, 150)
+	payload = append(payload, 2)
+	payload = appendU16(payload, 100)
+	payload = appendU16(payload, 400)
+	payload = appendU16(payload, 80)
+	payload = appendU16(payload, 200)
+	payload = append(payload, 0, 0)
+	payload = appendU16(payload, 300)
+	payload = appendU16(payload, 100)
+	payload = append(payload, 3, 100)
+	payload = appendU16(payload, 600)
+	payload = append(payload, 5, 3)
+	payload = appendU16(payload, 50)
+	payload = appendU16(payload, 500)
+	payload = append(payload, 100, 80, 60)
 	return payload
 }
 

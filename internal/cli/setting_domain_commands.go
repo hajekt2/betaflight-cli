@@ -70,6 +70,9 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "battery" {
 		cmd.AddCommand(a.batteryStatusCommand())
 	}
+	if domain.use == "failsafe" {
+		cmd.AddCommand(a.failsafeStatusCommand())
+	}
 	return cmd
 }
 
@@ -199,6 +202,25 @@ func (a *app) batteryStatusCommand() *cobra.Command {
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"battery":  battery,
+					"warnings": warnings,
+				})
+			})
+		},
+	}
+}
+
+func (a *app) failsafeStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read failsafe, arming, and board-alignment safety state over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				safety, warnings, err := bfcommands.ReadSafetyStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"failsafe": safety,
 					"warnings": warnings,
 				})
 			})

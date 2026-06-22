@@ -140,6 +140,9 @@ The object includes GPS configuration, live position, distance and direction to 
 `battery status` returns a `battery` object decoded from `MSP_BATTERY_CONFIG`, `MSP2_BATTERY_PROFILE`, `MSP_BATTERY_STATE`, `MSP_VOLTAGE_METERS`, `MSP_CURRENT_METERS`, `MSP_VOLTAGE_METER_CONFIG`, and `MSP_CURRENT_METER_CONFIG`.
 The object includes active battery profile thresholds, runtime battery state, voltage and current meter readings, voltage meter calibration, current meter calibration, and meter source names when known.
 
+`failsafe status` returns a `failsafe` object decoded from `MSP_ARMING_CONFIG`, `MSP_FAILSAFE_CONFIG`, `MSP_BOARD_ALIGNMENT_CONFIG`, and `MSP_STATUS_EX`.
+The object includes arming configuration, failsafe stage and procedure configuration, board alignment, active arming-disable flags, a firmware-reported arming flag catalog, and source metadata for each MSP message.
+
 `sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.
 The object includes configured hardware IDs, active hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
 

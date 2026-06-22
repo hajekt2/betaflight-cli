@@ -958,6 +958,38 @@ func TestBatteryStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestFailsafeStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"failsafe", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	failsafeStatus := data["failsafe"].(map[string]any)
+	armingConfig := failsafeStatus["arming_config"].(map[string]any)
+	if armingConfig["auto_disarm_delay_s"] != float64(5) || armingConfig["small_angle_degrees"] != float64(25) || armingConfig["gyro_cal_on_first_arm"] != true {
+		t.Fatalf("arming config = %+v", armingConfig)
+	}
+	failsafe := failsafeStatus["failsafe_config"].(map[string]any)
+	if failsafe["switch_mode_name"] != "STAGE2" || failsafe["procedure_name"] != "DROP" {
+		t.Fatalf("failsafe = %+v", failsafe)
+	}
+	board := failsafeStatus["board_alignment"].(map[string]any)
+	if board["roll_degrees"] != float64(-2) || board["yaw_degrees"] != float64(90) {
+		t.Fatalf("board = %+v", board)
+	}
+	arming := failsafeStatus["arming"].(map[string]any)
+	if arming["flag_count"] != float64(29) || arming["disabled"] != true {
+		t.Fatalf("arming = %+v", arming)
+	}
+	activeNames := arming["active_names"].([]any)
+	if activeNames[0] != "RXLOSS" || activeNames[len(activeNames)-1] != "CALIB" {
+		t.Fatalf("active names = %+v", activeNames)
+	}
+}
+
 func TestVTXTableListIncludesSummary(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtxtable", "list"}, nil)
 	if err != nil {

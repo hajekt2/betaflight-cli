@@ -210,7 +210,7 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU32(payload, 2)
 		payload = append(payload, 0)
 		payload = appendU16(payload, 42)
-		payload = append(payload, 4, 0, 0, 29)
+		payload = append(payload, 4, 0, 4, 0, 0, 0, 0, 29)
 		payload = appendU32(payload, 0x1234)
 		payload = append(payload, 0)
 		payload = appendU16(payload, 425)
@@ -246,6 +246,20 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload := []byte{1, 6, 10, 1}
 		payload = appendS16(payload, 400)
 		payload = appendS16(payload, -10)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPArmingConfig:
+		f.out.Write(response(frame.Code, []byte{5, 0, 25, 1}, false))
+	case msp.MSPFailsafeConfig:
+		payload := []byte{15, 60}
+		payload = appendU16(payload, 1000)
+		payload = append(payload, 2)
+		payload = appendU16(payload, 100)
+		payload = append(payload, 1)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPBoardAlignmentConfig:
+		payload := appendS16(nil, -2)
+		payload = appendS16(payload, 3)
+		payload = appendS16(payload, 90)
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBlackboxConfig:
 		payload := []byte{1, 2, 1, 4}

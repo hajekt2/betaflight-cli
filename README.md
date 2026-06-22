@@ -73,6 +73,7 @@ betaflight-cli pid set p_roll 46 --port /dev/tty.usbmodem01
 betaflight-cli rates list --port /dev/tty.usbmodem01
 betaflight-cli filters list --port /dev/tty.usbmodem01
 betaflight-cli receiver list --port /dev/tty.usbmodem01
+betaflight-cli receiver status --port /dev/tty.usbmodem01
 betaflight-cli vtx list --port /dev/tty.usbmodem01
 betaflight-cli vtx config --port /dev/tty.usbmodem01
 betaflight-cli osd list --port /dev/tty.usbmodem01
@@ -110,6 +111,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
+`receiver status` reads receiver configuration, channel map, RSSI channel, and live RC channels over MSP.
 `blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, and a capped candidate frame index.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.

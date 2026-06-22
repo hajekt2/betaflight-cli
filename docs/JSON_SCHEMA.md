@@ -122,6 +122,9 @@ The object includes VTX device type, band, channel, power, pit mode, frequency, 
 `modes active` returns a `modes` object decoded from `MSP_BOXNAMES`, `MSP_BOXIDS`, `MSP_MODE_RANGES`, and `MSP_MODE_RANGES_EXTRA`.
 The object includes a paged mode definition catalog and mode range rows with permanent IDs, names, AUX channel indexes, microsecond ranges, logic, and linked mode names when supplied by firmware.
 
+`receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, and `MSP_RC`.
+The object includes receiver configuration, channel map indexes and names, RSSI channel, and live RC channel values.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

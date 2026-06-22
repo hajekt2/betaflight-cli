@@ -256,6 +256,33 @@ func TestModesActiveWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestReceiverStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	receiver := data["receiver"].(map[string]any)
+	config := receiver["config"].(map[string]any)
+	if config["serial_provider"] != float64(2) || config["stick_center"] != float64(1500) || config["rx_min_usec"] != float64(885) {
+		t.Fatalf("config = %+v", config)
+	}
+	if receiver["rssi_channel"] != float64(8) {
+		t.Fatalf("receiver = %+v", receiver)
+	}
+	channels := receiver["channels"].([]any)
+	if len(channels) != 6 || channels[3] != float64(1000) {
+		t.Fatalf("channels = %+v", channels)
+	}
+	rcMapNames := receiver["rc_map_names"].([]any)
+	if len(rcMapNames) != 4 || rcMapNames[2] != "THROTTLE" || rcMapNames[3] != "YAW" {
+		t.Fatalf("rc map names = %+v", rcMapNames)
+	}
+}
+
 func TestFeaturesListWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "list"}, nil)
 	if err != nil {

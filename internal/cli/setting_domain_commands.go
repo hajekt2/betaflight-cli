@@ -7,6 +7,8 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hajekt2/betaflight-cli/internal/bfconfig"
+	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
+	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
 )
@@ -47,7 +49,29 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "vtx" {
 		cmd.AddCommand(a.vtxConfigCommand())
 	}
+	if domain.use == "receiver" {
+		cmd.AddCommand(a.receiverStatusCommand())
+	}
 	return cmd
+}
+
+func (a *app) receiverStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read receiver configuration and live channels over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				receiver, warnings, err := bfcommands.ReadReceiverStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"receiver": receiver,
+					"warnings": warnings,
+				})
+			})
+		},
+	}
 }
 
 func currentDomainSettings(doc bfconfig.Document, matches func(settings.Metadata) bool) []bfconfig.Setting {

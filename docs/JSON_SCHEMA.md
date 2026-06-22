@@ -80,6 +80,30 @@ The parsed configuration is a best-effort agent view over the same lines.
 It includes settings, features, serial commands, AUX ranges, resources, selected profiles, VTX table commands, OSD commands, comments, unknown lines, and compatibility section buckets.
 Known settings include metadata hints from the compiled Betaflight setting registry.
 
+## Batch Plans
+
+`batch plan` and `batch apply` accept either plain CLI lines or a JSON plan.
+Plain line plans ignore blank lines and comments that start with `#`.
+
+JSON plan shape:
+
+```json
+{
+  "schema_version": "1.0",
+  "kind": "cli_batch",
+  "cli_lines": [
+    "feature GPS",
+    "set small_angle = 25"
+  ],
+  "save": false
+}
+```
+
+Batch commands validate all lines before connecting.
+Only supported configuration-changing CLI commands are accepted.
+Dangerous commands such as `save`, `defaults`, motor output, reboot, bootloader, and erase are rejected.
+`batch apply --save` persists after applying and requires global `--yes`.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

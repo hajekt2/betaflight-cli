@@ -3,11 +3,14 @@ package cli
 import (
 	"context"
 	"fmt"
+	"io"
+	"os"
 	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
 
+	"github.com/hajekt2/betaflight-cli/internal/batch"
 	"github.com/hajekt2/betaflight-cli/internal/bfconfig"
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
@@ -170,6 +173,52 @@ func (a *app) rateprofilesCommand() *cobra.Command {
 	return cmd
 }
 
+func (a *app) batchCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "batch", Short: "Plan and apply multi-line Betaflight CLI changes"}
+	var planFile string
+	planCmd := &cobra.Command{
+		Use:   "plan",
+		Short: "Validate and print a batch change plan without connecting",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			plan, err := a.readBatchPlan(planFile)
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			env, ok := a.validateBatchPlan(cmd, plan)
+			if !ok {
+				return a.render(env)
+			}
+			return a.render(output.Success(commandPath(cmd), nil, batchPlanData(plan, false)))
+		},
+	}
+	planCmd.Flags().StringVar(&planFile, "file", "-", "batch plan file path or - for stdin")
+
+	var applyFile string
+	var save bool
+	applyCmd := &cobra.Command{
+		Use:   "apply",
+		Short: "Apply a validated batch change plan",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			plan, err := a.readBatchPlan(applyFile)
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			if plan.Save {
+				save = true
+			}
+			env, ok := a.validateBatchPlan(cmd, plan)
+			if !ok {
+				return a.render(env)
+			}
+			return a.planOrApplyCLI(cmd, plan.CLILines, plan.Kind, changeFlags{apply: true, save: save})
+		},
+	}
+	applyCmd.Flags().StringVar(&applyFile, "file", "-", "batch plan file path or - for stdin")
+	applyCmd.Flags().BoolVar(&save, "save", false, "persist after applying; requires --yes")
+	cmd.AddCommand(planCmd, applyCmd)
+	return cmd
+}
+
 func filterProfiles(profiles []bfconfig.Profile, kind string) []bfconfig.Profile {
 	out := []bfconfig.Profile{}
 	for _, profile := range profiles {
@@ -178,6 +227,97 @@ func filterProfiles(profiles []bfconfig.Profile, kind string) []bfconfig.Profile
 		}
 	}
 	return out
+}
+
+func (a *app) readBatchPlan(path string) (batch.Plan, error) {
+	var reader io.Reader
+	if path == "" || path == "-" {
+		reader = a.in
+		if reader == nil {
+			reader = os.Stdin
+		}
+	} else {
+		file, err := os.Open(path)
+		if err != nil {
+			return batch.Plan{}, err
+		}
+		defer file.Close()
+		reader = file
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return batch.Plan{}, err
+	}
+	return batch.Parse(data)
+}
+
+func (a *app) validateBatchPlan(cmd *cobra.Command, plan batch.Plan) (output.Envelope, bool) {
+	if len(plan.CLILines) == 0 {
+		return output.Failure(commandPath(cmd), nil, "validation_error", "batch plan has no CLI lines"), false
+	}
+	for _, line := range plan.CLILines {
+		class := classifyCLI(line)
+		if class == cliReadOnly {
+			return output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("%q is read-only and does not belong in a change batch", line)), false
+		}
+		if class == cliDangerous {
+			return output.Failure(commandPath(cmd), nil, "dangerous_action_blocked", fmt.Sprintf("%q is dangerous and cannot be run through batch apply", line)), false
+		}
+		if !isBatchAllowed(line) {
+			return output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("%q is not a supported batch configuration command", line)), false
+		}
+		if err := validateSetLine(line); err != nil {
+			return output.Failure(commandPath(cmd), nil, "validation_error", err.Error()), false
+		}
+	}
+	return output.Envelope{}, true
+}
+
+func isBatchAllowed(line string) bool {
+	fields := strings.Fields(strings.ToLower(strings.TrimSpace(line)))
+	if len(fields) == 0 {
+		return false
+	}
+	switch fields[0] {
+	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "vtxtable", "mode_color", "color":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateSetLine(line string) error {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(strings.ToLower(trimmed), "set ") {
+		return nil
+	}
+	body := strings.TrimSpace(trimmed[4:])
+	parts := strings.SplitN(body, "=", 2)
+	if len(parts) != 2 {
+		return fmt.Errorf("%q is not a valid set line", line)
+	}
+	name := strings.TrimSpace(parts[0])
+	value := strings.TrimSpace(parts[1])
+	metadata, ok := settings.DefaultRegistry.Lookup(name)
+	if !ok {
+		return nil
+	}
+	if err := metadata.Validate(value); err != nil {
+		return err
+	}
+	return nil
+}
+
+func batchPlanData(plan batch.Plan, applied bool) map[string]any {
+	return map[string]any{
+		"schema_version": plan.SchemaVersion,
+		"kind":           plan.Kind,
+		"cli_lines":      plan.CLILines,
+		"source_format":  plan.SourceFormat,
+		"save_requested": plan.Save,
+		"applied":        applied,
+		"saved":          false,
+	}
 }
 
 func (a *app) configListCommand(use, short string, selectData func(bfconfig.Document) any) *cobra.Command {

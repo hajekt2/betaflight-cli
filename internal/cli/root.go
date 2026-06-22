@@ -31,6 +31,7 @@ type app struct {
 	build   BuildInfo
 	opts    options
 	out     io.Writer
+	in      io.Reader
 	connect connectFunc
 }
 
@@ -53,7 +54,7 @@ func (e exitError) Error() string {
 }
 
 func Execute(build BuildInfo) int {
-	a := &app{build: build, out: os.Stdout, connect: connection.Connect}
+	a := &app{build: build, out: os.Stdout, in: os.Stdin, connect: connection.Connect}
 	root := a.rootCommand()
 	if err := root.Execute(); err != nil {
 		var ee exitError
@@ -96,6 +97,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.resourcesCommand())
 	root.AddCommand(a.profilesCommand())
 	root.AddCommand(a.rateprofilesCommand())
+	root.AddCommand(a.batchCommand())
 	root.AddCommand(a.saveCommand())
 	root.AddCommand(a.mspCommand())
 	return root

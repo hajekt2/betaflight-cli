@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -266,6 +267,72 @@ func TestDomainSaveRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestBatchPlanFromStdinDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 2 || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for batch plan")
+	}
+}
+
+func TestBatchPlanRejectsDangerousLine(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "save\n", nil)
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "dangerous_action_blocked" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
+func TestBatchPlanValidatesSetMetadata(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "set small_angle = 181\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after batch validation failure")
+	}
+}
+
+func TestBatchApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"batch", "apply"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 2 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestSettingsSetValidationFailureDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"settings", "set", "small_angle", "181", "--apply"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
@@ -306,6 +373,10 @@ func TestSaveRefusalDoesNotConnect(t *testing.T) {
 }
 
 func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.Envelope, error) {
+	return runTestCommandWithInput(t, args, "", connect)
+}
+
+func runTestCommandWithInput(t *testing.T, args []string, input string, connect connectFunc) (output.Envelope, error) {
 	t.Helper()
 	var buf bytes.Buffer
 	if connect == nil {
@@ -325,6 +396,7 @@ func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.En
 	a := &app{
 		build:   BuildInfo{Version: "test", Commit: "test", Date: "test"},
 		out:     &buf,
+		in:      strings.NewReader(input),
 		connect: connect,
 	}
 	root := a.rootCommand()

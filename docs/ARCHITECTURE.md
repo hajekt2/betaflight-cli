@@ -248,6 +248,9 @@ Prompting is allowed only in explicit interactive mode.
 Multi-setting writes should support plan files and stdin batches.
 Those batch plans should show all CLI lines and validation warnings before applying.
 Preset application is a batch configuration change and should follow the same rules.
+The initial batch implementation accepts plain CLI-line plans or JSON plans with `cli_lines`.
+It validates all lines locally before opening a serial connection.
+It accepts only reviewed configuration-changing CLI command families and rejects dangerous commands.
 
 Dangerous actions include motor output, DShot commands, receiver override, reset, erase, reboot, bootloader, and mass defaults.
 Raw MSP writes are dangerous when they bypass reviewed domain workflows.

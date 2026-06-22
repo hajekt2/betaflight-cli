@@ -39,6 +39,17 @@ func TestInspectHeaderAndFieldDefinitions(t *testing.T) {
 	if inspection.FrameMarkerCountsApprox["I"] != 1 || inspection.FrameMarkerCountsApprox["P"] != 2 || inspection.FrameMarkerCountsApprox["E"] != 1 {
 		t.Fatalf("frame counts = %+v", inspection.FrameMarkerCountsApprox)
 	}
+	if inspection.FrameSummaryApprox.CandidateCount != 4 || inspection.FrameSummaryApprox.IndexedCount != 4 {
+		t.Fatalf("frame summary = %+v", inspection.FrameSummaryApprox)
+	}
+	first := inspection.FrameSummaryApprox.Candidates[0]
+	if first.Type != "I" || first.DataOffset != 0 || first.BytesToNext != 2 {
+		t.Fatalf("first candidate = %+v", first)
+	}
+	pStats := inspection.FrameSummaryApprox.ByType["P"]
+	if pStats.Count != 2 || pStats.MinSpan != 2 || pStats.MaxSpan != 2 {
+		t.Fatalf("P stats = %+v", pStats)
+	}
 	if len(inspection.Warnings) != 0 {
 		t.Fatalf("warnings = %+v", inspection.Warnings)
 	}
@@ -67,5 +78,18 @@ func TestInspectWarnsOnIncompleteDefinitions(t *testing.T) {
 	}
 	if len(inspection.Warnings) == 0 {
 		t.Fatalf("warnings = %+v", inspection.Warnings)
+	}
+}
+
+func TestSummarizeFrameCandidatesTruncatesIndex(t *testing.T) {
+	summary := summarizeFrameCandidates([]byte("IPGSEIPGSE"), 10, 3)
+	if summary.CandidateCount != 10 || summary.IndexedCount != 3 || !summary.Truncated {
+		t.Fatalf("summary = %+v", summary)
+	}
+	if len(summary.Candidates) != 3 || summary.Candidates[0].Offset != 10 || summary.Candidates[2].Type != "G" {
+		t.Fatalf("candidates = %+v", summary.Candidates)
+	}
+	if summary.ByType["I"].Count != 2 || summary.ByType["E"].Count != 2 {
+		t.Fatalf("stats = %+v", summary.ByType)
 	}
 }

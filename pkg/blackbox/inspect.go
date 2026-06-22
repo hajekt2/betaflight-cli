@@ -22,6 +22,7 @@ type Inspection struct {
 	HeaderOrder             []string                   `json:"header_order,omitempty"`
 	FieldDefinitions        map[string]FieldDefinition `json:"field_definitions"`
 	FrameMarkerCountsApprox map[string]int             `json:"frame_marker_counts_approx"`
+	FrameSummaryApprox      FrameSummary               `json:"frame_summary_approx"`
 	Warnings                []string                   `json:"warnings,omitempty"`
 }
 
@@ -31,6 +32,29 @@ type FieldDefinition struct {
 	Signed    []string `json:"signed,omitempty"`
 	Predictor []string `json:"predictor,omitempty"`
 	Encoding  []string `json:"encoding,omitempty"`
+}
+
+type FrameSummary struct {
+	CandidateCount int                  `json:"candidate_count"`
+	IndexedCount   int                  `json:"indexed_count"`
+	Truncated      bool                 `json:"truncated"`
+	ByType         map[string]FrameStat `json:"by_type"`
+	Candidates     []FrameCandidate     `json:"candidates,omitempty"`
+}
+
+type FrameStat struct {
+	Count       int   `json:"count"`
+	FirstOffset int64 `json:"first_offset"`
+	LastOffset  int64 `json:"last_offset"`
+	MinSpan     int64 `json:"min_span,omitempty"`
+	MaxSpan     int64 `json:"max_span,omitempty"`
+}
+
+type FrameCandidate struct {
+	Type        string `json:"type"`
+	Offset      int64  `json:"offset"`
+	DataOffset  int64  `json:"data_offset"`
+	BytesToNext int64  `json:"bytes_to_next,omitempty"`
 }
 
 func Inspect(r io.Reader) (Inspection, error) {
@@ -54,6 +78,7 @@ func Inspect(r io.Reader) (Inspection, error) {
 	out.HeaderBytes = int64(headerEnd)
 	out.DataBytes = int64(len(data) - headerEnd)
 	out.FrameMarkerCountsApprox = countFrameMarkers(data[headerEnd:])
+	out.FrameSummaryApprox = summarizeFrameCandidates(data[headerEnd:], int64(headerEnd), 200)
 	out.Warnings = validationWarnings(out)
 	return out, nil
 }
@@ -172,6 +197,55 @@ func countFrameMarkers(data []byte) map[string]int {
 		}
 	}
 	return counts
+}
+
+func summarizeFrameCandidates(data []byte, headerBytes int64, maxIndex int) FrameSummary {
+	types := map[byte]bool{'I': true, 'P': true, 'G': true, 'H': true, 'S': true, 'E': true}
+	summary := FrameSummary{
+		ByType: map[string]FrameStat{},
+	}
+	var previousIndex int
+	previousCandidateIndex := -1
+	for i, b := range data {
+		if !types[b] {
+			continue
+		}
+		summary.CandidateCount++
+		if previousCandidateIndex >= 0 {
+			span := int64(i - previousIndex)
+			summary.Candidates[previousCandidateIndex].BytesToNext = span
+			stat := summary.ByType[summary.Candidates[previousCandidateIndex].Type]
+			if stat.MinSpan == 0 || span < stat.MinSpan {
+				stat.MinSpan = span
+			}
+			if span > stat.MaxSpan {
+				stat.MaxSpan = span
+			}
+			summary.ByType[summary.Candidates[previousCandidateIndex].Type] = stat
+		}
+		candidate := FrameCandidate{
+			Type:       string(b),
+			Offset:     headerBytes + int64(i),
+			DataOffset: int64(i),
+		}
+		if summary.IndexedCount < maxIndex {
+			summary.Candidates = append(summary.Candidates, candidate)
+			previousCandidateIndex = len(summary.Candidates) - 1
+		} else {
+			previousCandidateIndex = -1
+			summary.Truncated = true
+		}
+		summary.IndexedCount = len(summary.Candidates)
+		stat := summary.ByType[candidate.Type]
+		if stat.Count == 0 {
+			stat.FirstOffset = candidate.Offset
+		}
+		stat.Count++
+		stat.LastOffset = candidate.Offset
+		summary.ByType[candidate.Type] = stat
+		previousIndex = i
+	}
+	return summary
 }
 
 func validationWarnings(in Inspection) []string {

@@ -109,8 +109,9 @@ Restore and local preset commands emit the same change-plan fields plus `skipped
 When `include_defaults` is true, exact `defaults nosave` lines are included in `cli_lines`; applying such a plan requires global `--yes`.
 
 `blackbox inspect` returns an `inspection` object.
-The object includes file sizes, header metadata, ordered header names, parsed field definitions, warnings, and `frame_marker_counts_approx`.
-The marker counts are approximate until full binary frame decoding is implemented.
+The object includes file sizes, header metadata, ordered header names, parsed field definitions, warnings, `frame_marker_counts_approx`, and `frame_summary_approx`.
+`frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.
+The marker counts and candidate frame index are approximate until full binary frame decoding is implemented.
 
 ## Error Codes
 

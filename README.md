@@ -103,7 +103,7 @@ Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `restore plan` and `presets plan` convert local Betaflight CLI text into audited change plans without connecting.
 They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosave` lines are included only with `--include-defaults`.
 `restore apply --include-defaults` and `presets apply --include-defaults` require `--yes` because defaults reset configuration before applying later lines.
-`blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, and approximate frame marker counts.
+`blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, and a capped candidate frame index.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.
 Network preset fetching is opt-in and must report source metadata.

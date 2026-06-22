@@ -398,6 +398,30 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 5662)
 		payload = append(payload, 1, 5, 8, 3)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPOSDConfig:
+		payload := []byte{0x31, 3, 1, 20}
+		payload = appendU16(payload, 1500)
+		payload = append(payload, 0, 3)
+		payload = appendU16(payload, 120)
+		payload = appendU16(payload, 0x0800|10|(2<<5))
+		payload = appendU16(payload, 5|(3<<5))
+		payload = appendU16(payload, 0x0800|20|(4<<5))
+		payload = append(payload, 2, 1, 0, 2)
+		payload = appendU16(payload, 0x0123)
+		payload = appendU16(payload, 0x0456)
+		payload = appendU16(payload, 0x0005)
+		payload = append(payload, 4)
+		payload = appendU32(payload, 0x00000005)
+		payload = append(payload, 3, 2, 1, 24, 18)
+		payload = appendU16(payload, 70)
+		payload = appendS16(payload, -95)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPOSDCanvas:
+		f.out.Write(response(frame.Code, []byte{53, 20}, false))
+	case msp.MSP2GetOSDWarnings:
+		payload := []byte{2}
+		payload = appendPString(payload, "LOW BATTERY")
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPRC:
 		var payload []byte
 		for _, v := range []uint16{1500, 1500, 1500, 1000, 2000, 1500} {

@@ -311,6 +311,34 @@ func TestGPSStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestOSDStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	osd := data["osd"].(map[string]any)
+	config := osd["config"].(map[string]any)
+	if config["video_system_name"] != "HD" || config["units_name"] != "METRIC" {
+		t.Fatalf("config = %+v", config)
+	}
+	flags := config["flags"].(map[string]any)
+	if flags["feature_enabled"] != true || flags["hardware_max7456"] != true || flags["device_detected"] != true {
+		t.Fatalf("flags = %+v", flags)
+	}
+	canvas := osd["canvas"].(map[string]any)
+	if canvas["columns"] != float64(53) || canvas["rows"] != float64(20) {
+		t.Fatalf("canvas = %+v", canvas)
+	}
+	warnings := osd["warnings"].(map[string]any)
+	if warnings["text"] != "LOW BATTERY" {
+		t.Fatalf("warnings = %+v", warnings)
+	}
+}
+
 func TestSensorsStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"sensors", "status"}, nil)
 	if err != nil {

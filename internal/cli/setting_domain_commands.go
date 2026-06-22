@@ -55,6 +55,9 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
 	}
+	if domain.use == "osd" {
+		cmd.AddCommand(a.osdStatusCommand())
+	}
 	return cmd
 }
 
@@ -89,6 +92,25 @@ func (a *app) gpsStatusCommand() *cobra.Command {
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"gps":      gps,
+					"warnings": warnings,
+				})
+			})
+		},
+	}
+}
+
+func (a *app) osdStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read OSD configuration, canvas, and active warning text over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				osd, warnings, err := bfcommands.ReadOSDStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"osd":      osd,
 					"warnings": warnings,
 				})
 			})

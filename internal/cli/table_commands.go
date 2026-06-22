@@ -6,6 +6,9 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/hajekt2/betaflight-cli/internal/bfconfig"
+	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/internal/output"
 )
 
 func (a *app) vtxTableCommand() *cobra.Command {
@@ -54,6 +57,22 @@ func (a *app) servosCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List servo rows and reverse mixer rows", func(doc bfconfig.Document) any {
 		return map[string]any{"servos": doc.Servos, "smix": doc.SMix, "lines": append(doc.Sections["servos"], doc.Sections["smix"]...)}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read servo outputs, configurations, and mix rules over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				servos, warnings, err := bfcommands.ReadServoStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"servos":   servos,
+					"warnings": warnings,
+				})
+			})
+		},
+	})
 	var setFlags changeFlags
 	set := &cobra.Command{
 		Use:   "set INDEX MIN MAX MIDDLE RATE FORWARD",

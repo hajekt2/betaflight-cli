@@ -96,6 +96,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.blackboxCommand())
 	root.AddCommand(a.sensorsCommand())
 	root.AddCommand(a.beeperCommand())
+	root.AddCommand(a.motorsCommand())
 	root.AddCommand(a.settingsCommand())
 	root.AddCommand(a.featuresCommand())
 	root.AddCommand(a.serialCommand())
@@ -224,6 +225,27 @@ func (a *app) beeperCommand() *cobra.Command {
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"beeper": beeper,
+				})
+			})
+		},
+	})
+	return cmd
+}
+
+func (a *app) motorsCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "motors", Short: "Inspect motor configuration and live outputs"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read motor configuration, outputs, and telemetry over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				motors, warnings, err := bfcommands.ReadMotorStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"motors":   motors,
+					"warnings": warnings,
 				})
 			})
 		},

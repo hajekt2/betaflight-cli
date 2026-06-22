@@ -54,6 +54,8 @@ betaflight-cli blackbox config --port /dev/tty.usbmodem01
 betaflight-cli blackbox inspect flight.bbl
 betaflight-cli sensors status --port /dev/tty.usbmodem01
 betaflight-cli beeper config --port /dev/tty.usbmodem01
+betaflight-cli motors status --port /dev/tty.usbmodem01
+betaflight-cli servos status --port /dev/tty.usbmodem01
 betaflight-cli settings get gyro_lpf1_static_hz --port /dev/tty.usbmodem01
 betaflight-cli settings set gyro_lpf1_static_hz 0 --port /dev/tty.usbmodem01 --apply
 betaflight-cli features list --port /dev/tty.usbmodem01
@@ -118,6 +120,8 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `sensors status` reads configured and active sensor hardware, raw IMU data, sensor alignment, active sensor flags, and compass declination over MSP.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
+`motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
+`servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, and a capped candidate frame index.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.

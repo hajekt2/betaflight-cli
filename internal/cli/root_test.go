@@ -359,6 +359,57 @@ func TestBeeperConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestMotorsStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"motors", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	motors := data["motors"].(map[string]any)
+	config := motors["config"].(map[string]any)
+	if config["max_throttle"] != float64(2000) || config["motor_count"] != float64(4) {
+		t.Fatalf("config = %+v", config)
+	}
+	outputs := motors["outputs"].([]any)
+	if len(outputs) != 8 || outputs[3] != float64(1003) {
+		t.Fatalf("outputs = %+v", outputs)
+	}
+	telemetry := motors["telemetry"].([]any)
+	first := telemetry[0].(map[string]any)
+	if first["rpm"] != float64(12500) || first["voltage_v"] != 16.8 {
+		t.Fatalf("telemetry = %+v", telemetry)
+	}
+}
+
+func TestServosStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"servos", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	servos := data["servos"].(map[string]any)
+	outputs := servos["outputs"].([]any)
+	if len(outputs) != 4 || outputs[1] != float64(1501) {
+		t.Fatalf("outputs = %+v", outputs)
+	}
+	configs := servos["configurations"].([]any)
+	first := configs[0].(map[string]any)
+	if first["min"] != float64(1000) || first["reversed_sources_mask"] != float64(5) {
+		t.Fatalf("configs = %+v", configs)
+	}
+	rules := servos["mix_rules"].([]any)
+	rule := rules[0].(map[string]any)
+	if rule["active"] != true || rule["rate"] != float64(100) {
+		t.Fatalf("rules = %+v", rules)
+	}
+}
+
 func TestFeaturesListWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "list"}, nil)
 	if err != nil {

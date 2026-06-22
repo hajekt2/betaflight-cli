@@ -55,9 +55,18 @@ type APIVersion struct {
 }
 
 type Client struct {
-	port    serial.Port
+	port    Port
 	timeout time.Duration
 	target  TargetInfo
+}
+
+type Port interface {
+	io.Reader
+	io.Writer
+	ResetInputBuffer() error
+	ResetOutputBuffer() error
+	SetReadTimeout(time.Duration) error
+	Close() error
 }
 
 type CodedError struct {
@@ -225,6 +234,10 @@ func open(name string, baud int, timeout time.Duration) (*Client, error) {
 	if err != nil {
 		return nil, err
 	}
+	return NewClient(port, timeout)
+}
+
+func NewClient(port Port, timeout time.Duration) (*Client, error) {
 	client := &Client{port: port, timeout: timeout}
 	if err := port.SetReadTimeout(timeout); err != nil {
 		port.Close()

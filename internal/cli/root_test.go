@@ -1,6 +1,16 @@
 package cli
 
-import "testing"
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"testing"
+	"time"
+
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/internal/fakefc"
+	"github.com/hajekt2/betaflight-cli/internal/output"
+)
 
 func TestClassifyCLI(t *testing.T) {
 	tests := []struct {
@@ -52,4 +62,116 @@ func TestRedactLines(t *testing.T) {
 	if len(classes) != 1 || classes[0] != "pilot_name" {
 		t.Fatalf("classes = %+v", classes)
 	}
+}
+
+func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"telemetry", "snapshot"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data, ok := env.Data.(map[string]any)
+	if !ok || data["attitude"] == nil || data["battery"] == nil || data["rc"] == nil {
+		t.Fatalf("unexpected telemetry data: %+v", env.Data)
+	}
+}
+
+func TestSettingsApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"settings", "set", "gyro_lpf1_static_hz", "0", "--apply", "--auto-port"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "cli_command" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSettingsListMetadata(t *testing.T) {
+	env, err := runTestCommand(t, []string{"settings", "metadata", "dshot_bidir"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["name"] != "dshot_bidir" {
+		t.Fatalf("metadata = %+v", data)
+	}
+}
+
+func TestSettingsSetValidationFailureDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"settings", "set", "small_angle", "181", "--apply"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after validation failure")
+	}
+}
+
+func TestSaveRefusalDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"save"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	var ee exitError
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if _, ok := err.(exitError); !ok {
+		t.Fatalf("command error = %T %v, want exitError", err, err)
+	}
+	_ = ee
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called for refused save")
+	}
+}
+
+func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.Envelope, error) {
+	t.Helper()
+	var buf bytes.Buffer
+	if connect == nil {
+		connect = func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+			client, err := connection.NewClient(fakefc.New(), time.Second)
+			if err != nil {
+				return nil, connection.TargetInfo{}, err
+			}
+			target, err := client.Handshake(context.Background())
+			if err != nil {
+				return nil, connection.TargetInfo{}, err
+			}
+			target.Port = "fake"
+			return client, target, nil
+		}
+	}
+	a := &app{
+		build:   BuildInfo{Version: "test", Commit: "test", Date: "test"},
+		out:     &buf,
+		connect: connect,
+	}
+	root := a.rootCommand()
+	root.SetArgs(args)
+	err := root.Execute()
+	var env output.Envelope
+	if decodeErr := json.Unmarshal(buf.Bytes(), &env); decodeErr != nil {
+		t.Fatalf("invalid JSON %q: %v", buf.String(), decodeErr)
+	}
+	return env, err
 }

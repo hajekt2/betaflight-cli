@@ -79,7 +79,7 @@ func readV1(r io.Reader) (Frame, error) {
 	size := int(header[1])
 	code := uint16(header[2])
 	checksumBytes := []byte{header[1], header[2]}
-	if direction != '>' && direction != '!' {
+	if direction != '<' && direction != '>' && direction != '!' {
 		return Frame{}, fmt.Errorf("unexpected MSPv1 direction %q", direction)
 	}
 	if size == 255 {
@@ -123,7 +123,7 @@ func readV2(r io.Reader) (Frame, error) {
 		return Frame{}, err
 	}
 	direction := header[0]
-	if direction != '>' && direction != '!' {
+	if direction != '<' && direction != '>' && direction != '!' {
 		return Frame{}, fmt.Errorf("unexpected MSPv2 direction %q", direction)
 	}
 	flag := header[1]

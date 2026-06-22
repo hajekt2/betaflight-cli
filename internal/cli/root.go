@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
+	"github.com/hajekt2/betaflight-cli/internal/settings"
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
@@ -25,9 +27,13 @@ type BuildInfo struct {
 }
 
 type app struct {
-	build BuildInfo
-	opts  options
+	build   BuildInfo
+	opts    options
+	out     io.Writer
+	connect connectFunc
 }
+
+type connectFunc func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error)
 
 type options struct {
 	port             string
@@ -46,7 +52,7 @@ func (e exitError) Error() string {
 }
 
 func Execute(build BuildInfo) int {
-	a := &app{build: build}
+	a := &app{build: build, out: os.Stdout, connect: connection.Connect}
 	root := a.rootCommand()
 	if err := root.Execute(); err != nil {
 		var ee exitError
@@ -265,6 +271,48 @@ func (a *app) backupDiffCommand() *cobra.Command {
 
 func (a *app) settingsCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "settings", Short: "Plan and apply setting changes"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List compiled setting metadata",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.render(output.Success(commandPath(cmd), nil, settings.DefaultRegistry))
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "metadata NAME",
+		Short: "Show compiled metadata for one setting",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			setting, ok := settings.DefaultRegistry.Lookup(args[0])
+			if !ok {
+				return a.render(output.Failure(commandPath(cmd), nil, "unknown_setting", fmt.Sprintf("no compiled metadata for %q", args[0])))
+			}
+			return a.render(output.Success(commandPath(cmd), nil, setting))
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "get NAME",
+		Short: "Read a setting through Betaflight CLI get",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				lines, err := client.ExecCLI(cmd.Context(), "get "+name)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				data := map[string]any{
+					"setting": name,
+					"lines":   lines,
+					"raw":     strings.Join(lines, "\n"),
+				}
+				if setting, ok := settings.DefaultRegistry.Lookup(name); ok {
+					data["metadata"] = setting
+				}
+				return output.Success(commandPath(cmd), &target, data)
+			})
+		},
+	})
 	var apply bool
 	var save bool
 	set := &cobra.Command{
@@ -273,6 +321,12 @@ func (a *app) settingsCommand() *cobra.Command {
 		Args:  cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			name, value := args[0], args[1]
+			setting, known := settings.DefaultRegistry.Lookup(name)
+			if known {
+				if err := setting.Validate(value); err != nil {
+					return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+				}
+			}
 			line := fmt.Sprintf("set %s = %s", name, value)
 			plan := map[string]any{
 				"setting":   name,
@@ -281,8 +335,15 @@ func (a *app) settingsCommand() *cobra.Command {
 				"applied":   false,
 				"saved":     false,
 			}
+			if known {
+				plan["metadata"] = setting
+			}
 			if !apply {
-				return a.render(output.Success(commandPath(cmd), nil, plan))
+				env := output.Success(commandPath(cmd), nil, plan)
+				if !known {
+					env.Warnings = append(env.Warnings, output.Warning{Code: "metadata_missing", Message: fmt.Sprintf("no compiled metadata for %q; validation skipped", name)})
+				}
+				return a.render(env)
 			}
 			if save && !a.opts.yes {
 				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--save requires --yes because it persists and usually reboots the flight controller"))
@@ -410,7 +471,11 @@ func (a *app) runBackupCommand(cmd *cobra.Command, cliLine string, redact bool) 
 }
 
 func (a *app) withClient(ctx context.Context, command string, op connection.OperationClass, fn func(*connection.Client, output.Target) output.Envelope) error {
-	client, targetInfo, err := connection.Connect(ctx, a.connectionConfig(), op)
+	connect := a.connect
+	if connect == nil {
+		connect = connection.Connect
+	}
+	client, targetInfo, err := connect(ctx, a.connectionConfig(), op)
 	target := toOutputTarget(targetInfo)
 	if err != nil {
 		return a.render(a.failure(command, &target, err))
@@ -430,7 +495,11 @@ func (a *app) connectionConfig() connection.Config {
 }
 
 func (a *app) render(env output.Envelope) error {
-	if err := output.Render(os.Stdout, a.opts.format, env); err != nil {
+	out := a.out
+	if out == nil {
+		out = os.Stdout
+	}
+	if err := output.Render(out, a.opts.format, env); err != nil {
 		return err
 	}
 	if !env.OK {

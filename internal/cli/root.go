@@ -123,6 +123,21 @@ func (a *app) rootCommand() *cobra.Command {
 func (a *app) blackboxCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "blackbox", Short: "Inspect and analyze Blackbox logs"}
 	cmd.AddCommand(&cobra.Command{
+		Use:   "config",
+		Short: "Read Blackbox configuration over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				config, err := bfcommands.ReadBlackboxConfig(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"blackbox": config,
+				})
+			})
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "inspect FILE",
 		Short: "Inspect a Blackbox log file without connecting to hardware",
 		Args:  cobra.ExactArgs(1),

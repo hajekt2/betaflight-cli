@@ -113,6 +113,9 @@ The object includes file sizes, header metadata, ordered header names, parsed fi
 `frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.
 The marker counts and candidate frame index are approximate until full binary frame decoding is implemented.
 
+`blackbox config` returns a `blackbox` object decoded from `MSP_BLACKBOX_CONFIG`.
+The object includes support status, device index and name, rate fields, optional sample-rate metadata, and optional enabled or disabled Blackbox field selections when the firmware supplies the mask.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

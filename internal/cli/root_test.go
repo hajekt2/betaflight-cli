@@ -186,6 +186,25 @@ func TestBlackboxInspectReportsParseError(t *testing.T) {
 	}
 }
 
+func TestBlackboxConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"blackbox", "config"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	config := data["blackbox"].(map[string]any)
+	if config["supported"] != true || config["device_name"] != "SDCARD" || config["sample_rate_name"] != "1/4" {
+		t.Fatalf("config = %+v", config)
+	}
+	disabled := config["disabled_fields"].([]any)
+	if len(disabled) != 2 || disabled[0] != "PID" || disabled[1] != "GPS" {
+		t.Fatalf("disabled = %+v", disabled)
+	}
+}
+
 func TestFeaturesListWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "list"}, nil)
 	if err != nil {

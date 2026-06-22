@@ -227,6 +227,12 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 0)
 		payload = appendU16(payload, 1599)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPBlackboxConfig:
+		payload := []byte{1, 2, 1, 4}
+		payload = appendU16(payload, 16)
+		payload = append(payload, 2)
+		payload = appendU32(payload, 0x1001)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPRC:
 		var payload []byte
 		for _, v := range []uint16{1500, 1500, 1500, 1000, 2000, 1500} {

@@ -311,6 +311,54 @@ func TestGPSStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestSensorsStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	sensors := data["sensors"].(map[string]any)
+	active := sensors["active"].([]any)
+	if len(active) != 6 {
+		t.Fatalf("active = %+v", active)
+	}
+	imu := sensors["imu"].(map[string]any)
+	accRaw := imu["accelerometer_raw"].([]any)
+	if accRaw[0] != float64(2048) || accRaw[1] != float64(-1024) {
+		t.Fatalf("imu = %+v", imu)
+	}
+	alignment := sensors["alignment"].(map[string]any)
+	if alignment["gyro_enabled_mask"] != float64(3) {
+		t.Fatalf("alignment = %+v", alignment)
+	}
+	compass := sensors["compass"].(map[string]any)
+	if compass["declination_degrees"] != 12.3 {
+		t.Fatalf("compass = %+v", compass)
+	}
+}
+
+func TestBeeperConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"beeper", "config"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	beeper := data["beeper"].(map[string]any)
+	if beeper["dshot_beacon_tone"] != float64(3) || beeper["disabled_mask"] != float64(0x12) {
+		t.Fatalf("beeper = %+v", beeper)
+	}
+	disabled := beeper["disabled"].([]any)
+	if len(disabled) != 2 || disabled[0] != "RX_LOST" || disabled[1] != "ARMING" {
+		t.Fatalf("disabled = %+v", disabled)
+	}
+}
+
 func TestFeaturesListWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "list"}, nil)
 	if err != nil {

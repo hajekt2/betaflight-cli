@@ -1,0 +1,263 @@
+package commands
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
+)
+
+var sensorOrder = []string{"gyro", "accelerometer", "barometer", "magnetometer", "rangefinder", "opticalflow"}
+
+type SensorStatus struct {
+	Config        []SensorHardware `json:"config,omitempty"`
+	Active        []SensorHardware `json:"active,omitempty"`
+	IMU           *RawIMU          `json:"imu,omitempty"`
+	Alignment     *SensorAlignment `json:"alignment,omitempty"`
+	Compass       *CompassConfig   `json:"compass,omitempty"`
+	ActiveSensors *uint16          `json:"active_sensors,omitempty"`
+	ActiveNames   []string         `json:"active_names,omitempty"`
+}
+
+type SensorHardware struct {
+	Name       string `json:"name"`
+	HardwareID uint8  `json:"hardware_id"`
+	Available  bool   `json:"available"`
+}
+
+type RawIMU struct {
+	AccelerometerRaw []int16   `json:"accelerometer_raw"`
+	GyroscopeRaw     []int16   `json:"gyroscope_raw"`
+	MagnetometerRaw  []int16   `json:"magnetometer_raw"`
+	AccelerometerG   []float64 `json:"accelerometer_g"`
+	GyroscopeDPS     []float64 `json:"gyroscope_dps"`
+}
+
+type SensorAlignment struct {
+	GyroAlignment      uint8     `json:"gyro_alignment"`
+	AccelerometerAlign uint8     `json:"accelerometer_alignment"`
+	MagnetometerAlign  uint8     `json:"magnetometer_alignment"`
+	GyroDetectionFlags uint8     `json:"gyro_detection_flags"`
+	GyroEnabledMask    *uint8    `json:"gyro_enabled_mask,omitempty"`
+	MagCustomAlignment *Axis3i16 `json:"mag_custom_alignment,omitempty"`
+}
+
+type Axis3i16 struct {
+	Roll  int16 `json:"roll"`
+	Pitch int16 `json:"pitch"`
+	Yaw   int16 `json:"yaw"`
+}
+
+type CompassConfig struct {
+	DeclinationDeciDegrees int16   `json:"declination_deci_degrees"`
+	DeclinationDegrees     float64 `json:"declination_degrees"`
+}
+
+func ReadSensorStatus(ctx context.Context, client *connection.Client) (*SensorStatus, []string, error) {
+	status := &SensorStatus{}
+	warnings := []string{}
+	if activeSensors, activeNames, err := readStatusSensors(ctx, client); err == nil {
+		status.ActiveSensors = &activeSensors
+		status.ActiveNames = activeNames
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	frame, err := client.Request(ctx, msp.MSPSensorConfig, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("sensor config unavailable: %w", err)
+	}
+	config, err := DecodeSensorHardware(frame.Payload, sensorOrder[1:])
+	if err != nil {
+		return nil, nil, fmt.Errorf("sensor config decode failed: %w", err)
+	}
+	status.Config = config
+	if active, err := readActiveSensorHardware(ctx, client); err == nil {
+		status.Active = active
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if imu, err := readRawIMU(ctx, client); err == nil {
+		status.IMU = imu
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if alignment, err := readSensorAlignment(ctx, client); err == nil {
+		status.Alignment = alignment
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if compass, err := readCompassConfig(ctx, client); err == nil {
+		status.Compass = compass
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	return status, warnings, nil
+}
+
+func DecodeSensorHardware(payload []byte, names []string) ([]SensorHardware, error) {
+	out := make([]SensorHardware, 0, len(payload))
+	for i, hardwareID := range payload {
+		name := fmt.Sprintf("sensor_%d", i)
+		if i < len(names) {
+			name = names[i]
+		}
+		out = append(out, SensorHardware{Name: name, HardwareID: hardwareID, Available: hardwareID != 0xff})
+	}
+	return out, nil
+}
+
+func DecodeRawIMU(payload []byte) (*RawIMU, error) {
+	r := msp.NewPayloadReader(payload)
+	acc, err := readS16Triple(r)
+	if err != nil {
+		return nil, err
+	}
+	gyro, err := readS16Triple(r)
+	if err != nil {
+		return nil, err
+	}
+	mag, err := readS16Triple(r)
+	if err != nil {
+		return nil, err
+	}
+	return &RawIMU{
+		AccelerometerRaw: acc,
+		GyroscopeRaw:     gyro,
+		MagnetometerRaw:  mag,
+		AccelerometerG:   scaleInt16(acc, 1.0/2048.0),
+		GyroscopeDPS:     scaleInt16(gyro, 4.0/16.4),
+	}, nil
+}
+
+func DecodeSensorAlignment(payload []byte) (*SensorAlignment, error) {
+	r := msp.NewPayloadReader(payload)
+	gyro, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	acc, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	mag, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	flags, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	alignment := &SensorAlignment{
+		GyroAlignment:      gyro,
+		AccelerometerAlign: acc,
+		MagnetometerAlign:  mag,
+		GyroDetectionFlags: flags,
+	}
+	if r.Remaining() >= 1 {
+		mask, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		alignment.GyroEnabledMask = &mask
+	}
+	if r.Remaining() >= 6 {
+		roll, err := r.S16()
+		if err != nil {
+			return nil, err
+		}
+		pitch, err := r.S16()
+		if err != nil {
+			return nil, err
+		}
+		yaw, err := r.S16()
+		if err != nil {
+			return nil, err
+		}
+		alignment.MagCustomAlignment = &Axis3i16{Roll: roll, Pitch: pitch, Yaw: yaw}
+	}
+	return alignment, nil
+}
+
+func DecodeCompassConfig(payload []byte) (*CompassConfig, error) {
+	r := msp.NewPayloadReader(payload)
+	declination, err := r.S16()
+	if err != nil {
+		return nil, err
+	}
+	return &CompassConfig{
+		DeclinationDeciDegrees: declination,
+		DeclinationDegrees:     float64(declination) / 10,
+	}, nil
+}
+
+func readActiveSensorHardware(ctx context.Context, client *connection.Client) ([]SensorHardware, error) {
+	frame, err := client.Request(ctx, msp.MSP2SensorConfigActive, nil)
+	if err != nil {
+		return nil, fmt.Errorf("active sensor config unavailable: %w", err)
+	}
+	return DecodeSensorHardware(frame.Payload, sensorOrder)
+}
+
+func readRawIMU(ctx context.Context, client *connection.Client) (*RawIMU, error) {
+	frame, err := client.Request(ctx, msp.MSPRawImu, nil)
+	if err != nil {
+		return nil, fmt.Errorf("raw imu unavailable: %w", err)
+	}
+	return DecodeRawIMU(frame.Payload)
+}
+
+func readSensorAlignment(ctx context.Context, client *connection.Client) (*SensorAlignment, error) {
+	frame, err := client.Request(ctx, msp.MSPSensorAlignment, nil)
+	if err != nil {
+		return nil, fmt.Errorf("sensor alignment unavailable: %w", err)
+	}
+	return DecodeSensorAlignment(frame.Payload)
+}
+
+func readCompassConfig(ctx context.Context, client *connection.Client) (*CompassConfig, error) {
+	frame, err := client.Request(ctx, msp.MSPCompassConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("compass config unavailable: %w", err)
+	}
+	return DecodeCompassConfig(frame.Payload)
+}
+
+func readStatusSensors(ctx context.Context, client *connection.Client) (uint16, []string, error) {
+	status, err := readStatus(ctx, client)
+	if err != nil {
+		return 0, nil, err
+	}
+	return status.ActiveSensors, activeSensorNames(status.ActiveSensors), nil
+}
+
+func activeSensorNames(mask uint16) []string {
+	names := []string{"accelerometer", "barometer", "magnetometer", "gps", "rangefinder", "gyro", "opticalflow"}
+	out := []string{}
+	for i, name := range names {
+		if mask&(1<<i) != 0 {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+func readS16Triple(r *msp.PayloadReader) ([]int16, error) {
+	out := make([]int16, 3)
+	for i := range out {
+		v, err := r.S16()
+		if err != nil {
+			return nil, err
+		}
+		out[i] = v
+	}
+	return out, nil
+}
+
+func scaleInt16(values []int16, factor float64) []float64 {
+	out := make([]float64, len(values))
+	for i, value := range values {
+		out[i] = float64(value) * factor
+	}
+	return out
+}

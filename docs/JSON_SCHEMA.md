@@ -128,6 +128,12 @@ The object includes receiver configuration, channel map indexes and names, RSSI 
 `gps status` returns a `gps` object decoded from `MSP_GPS_CONFIG`, `MSP_RAW_GPS`, `MSP_COMP_GPS`, `MSP_GPS_RESCUE`, `MSP_GPS_RESCUE_PIDS`, and `MSP_GPSSVINFO`.
 The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.
 
+`sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.
+The object includes configured hardware IDs, active hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
+
+`beeper config` returns a `beeper` object decoded from `MSP_BEEPER_CONFIG`.
+The object includes raw disable masks, decoded disabled beeper condition names, DShot beacon tone, and decoded DShot beacon disabled condition names.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

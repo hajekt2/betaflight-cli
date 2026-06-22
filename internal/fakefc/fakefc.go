@@ -304,6 +304,35 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPGpssvinfo:
 		f.out.Write(response(frame.Code, []byte{2, 0, 12, 4, 45, 1, 24, 3, 39}, false))
+	case msp.MSPSensorConfig:
+		f.out.Write(response(frame.Code, []byte{1, 2, 3, 4, 5}, false))
+	case msp.MSP2SensorConfigActive:
+		f.out.Write(response(frame.Code, []byte{10, 11, 12, 13, 14, 15}, false))
+	case msp.MSPRawImu:
+		payload := appendS16(nil, 2048)
+		payload = appendS16(payload, -1024)
+		payload = appendS16(payload, 512)
+		payload = appendS16(payload, 100)
+		payload = appendS16(payload, -50)
+		payload = appendS16(payload, 25)
+		payload = appendS16(payload, 300)
+		payload = appendS16(payload, -200)
+		payload = appendS16(payload, 100)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSensorAlignment:
+		payload := []byte{1, 1, 2, 3, 0x03}
+		payload = appendS16(payload, -10)
+		payload = appendS16(payload, 20)
+		payload = appendS16(payload, 900)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPCompassConfig:
+		payload := appendS16(nil, 123)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPBeeperConfig:
+		payload := appendU32(nil, 0x00000012)
+		payload = append(payload, 3)
+		payload = appendU32(payload, 0x00000202)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPVTXConfig:
 		payload := []byte{3, 5, 8, 2, 1}
 		payload = appendU16(payload, 5861)

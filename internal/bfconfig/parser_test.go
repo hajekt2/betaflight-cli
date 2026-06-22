@@ -18,6 +18,11 @@ func TestParseDocument(t *testing.T) {
 		"aux 0 0 0 1700 2100 0 0",
 		"resource MOTOR 1 A00",
 		"vtxtable bands 5",
+		"vtxtable channels 8",
+		"vtxtable band 1 RACEBAND R FACTORY 5658 5695 5732 5769 5806 5843 5880 5917",
+		"vtxtable powerlevels 2",
+		"vtxtable powervalues 25 200",
+		"vtxtable powerlabels 25 200",
 		"led 0 0,0::C:0",
 		"servo 0 1000 2000 1500 100 -1",
 		"smix reverse 0 2 r",
@@ -47,6 +52,12 @@ func TestParseDocument(t *testing.T) {
 	if len(doc.Serial) != 1 || doc.Serial[0].PortIdentifier != "UART1" || len(doc.Serial[0].BaudRates) != 4 {
 		t.Fatalf("serial = %+v", doc.Serial)
 	}
+	if doc.Serial[0].FunctionMaskValue == nil || *doc.Serial[0].FunctionMaskValue != 64 || len(doc.Serial[0].Functions) != 1 || doc.Serial[0].Functions[0] != "RX_SERIAL" {
+		t.Fatalf("serial functions = %+v", doc.Serial[0])
+	}
+	if doc.Serial[0].MSPBaudRate != "115200" || doc.Serial[0].TelemetryBaudRate != "0" {
+		t.Fatalf("serial baud rates = %+v", doc.Serial[0])
+	}
 	if len(doc.Aux) != 1 || doc.Aux[0].RangeStart == nil || *doc.Aux[0].RangeStart != 1700 {
 		t.Fatalf("aux = %+v", doc.Aux)
 	}
@@ -56,8 +67,17 @@ func TestParseDocument(t *testing.T) {
 	if len(doc.Profiles) != 2 {
 		t.Fatalf("profiles = %+v", doc.Profiles)
 	}
-	if len(doc.VTXTable) != 1 {
+	if len(doc.VTXTable) != 6 {
 		t.Fatalf("vtx = %+v", doc.VTXTable)
+	}
+	if doc.VTX == nil || doc.VTX.Bands == nil || *doc.VTX.Bands != 5 || doc.VTX.Channels == nil || *doc.VTX.Channels != 8 {
+		t.Fatalf("vtx summary = %+v", doc.VTX)
+	}
+	if len(doc.VTX.BandRows) != 1 || doc.VTX.BandRows[0].Name != "RACEBAND" || len(doc.VTX.BandRows[0].FrequenciesMHz) != 8 {
+		t.Fatalf("vtx bands = %+v", doc.VTX.BandRows)
+	}
+	if len(doc.VTX.PowerValues) != 2 || doc.VTX.PowerValues[1] != 200 || len(doc.VTX.PowerLabels) != 2 {
+		t.Fatalf("vtx power = %+v", doc.VTX)
 	}
 	if len(doc.LEDs) != 1 || doc.LEDs[0].Index != "0" || doc.LEDs[0].Value != "0,0::C:0" {
 		t.Fatalf("leds = %+v", doc.LEDs)

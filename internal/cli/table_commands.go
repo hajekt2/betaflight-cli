@@ -14,7 +14,7 @@ import (
 func (a *app) vtxTableCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "vtxtable", Short: "Inspect and change VTX table CLI rows"}
 	cmd.AddCommand(a.configListCommand("list", "List VTX table rows", func(doc bfconfig.Document) any {
-		return map[string]any{"vtx_table": doc.VTXTable, "lines": doc.Sections["vtx_table"]}
+		return map[string]any{"vtx_table": doc.VTXTable, "vtx": doc.VTX, "lines": doc.Sections["vtx_table"]}
 	}))
 	var flags changeFlags
 	set := &cobra.Command{

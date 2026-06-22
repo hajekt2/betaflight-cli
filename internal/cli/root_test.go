@@ -759,6 +759,50 @@ func TestTableDomainListsWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestSerialListIncludesDecodedFunctions(t *testing.T) {
+	env, err := runTestCommand(t, []string{"serial", "list"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	view := data["view"].(map[string]any)
+	serial := view["serial"].([]any)
+	first := serial[0].(map[string]any)
+	functions := first["functions"].([]any)
+	if first["function_mask_value"] != float64(64) || functions[0] != "RX_SERIAL" || first["msp_baudrate"] != "115200" {
+		t.Fatalf("serial view = %+v", first)
+	}
+}
+
+func TestVTXTableListIncludesSummary(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtxtable", "list"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	view := data["view"].(map[string]any)
+	vtx := view["vtx"].(map[string]any)
+	if vtx["bands"] != float64(1) || vtx["channels"] != float64(8) || vtx["power_levels"] != float64(2) {
+		t.Fatalf("vtx = %+v", vtx)
+	}
+	bands := vtx["band_rows"].([]any)
+	first := bands[0].(map[string]any)
+	frequencies := first["frequencies_mhz"].([]any)
+	if first["name"] != "RACEBAND" || first["factory"] != true || frequencies[0] != float64(5658) {
+		t.Fatalf("band = %+v", first)
+	}
+	powerValues := vtx["power_values"].([]any)
+	if len(powerValues) != 2 || powerValues[1] != float64(200) {
+		t.Fatalf("power values = %+v", powerValues)
+	}
+}
+
 func TestTableDomainSetPlansDoNotConnect(t *testing.T) {
 	tests := []struct {
 		args []string

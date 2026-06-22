@@ -17,6 +17,7 @@ type Document struct {
 	Resources []Resource          `json:"resources"`
 	Profiles  []Profile           `json:"profiles"`
 	VTXTable  []Command           `json:"vtx_table"`
+	VTX       *VTXTableSummary    `json:"vtx,omitempty"`
 	OSD       []Command           `json:"osd"`
 	LEDs      []IndexedCommand    `json:"leds"`
 	Servos    []Servo             `json:"servos"`
@@ -52,10 +53,35 @@ type Feature struct {
 }
 
 type Serial struct {
-	PortIdentifier string   `json:"port_identifier"`
-	FunctionMask   string   `json:"function_mask,omitempty"`
-	BaudRates      []string `json:"baud_rates,omitempty"`
-	Line           string   `json:"line"`
+	PortIdentifier    string   `json:"port_identifier"`
+	FunctionMask      string   `json:"function_mask,omitempty"`
+	FunctionMaskValue *uint32  `json:"function_mask_value,omitempty"`
+	Functions         []string `json:"functions,omitempty"`
+	BaudRates         []string `json:"baud_rates,omitempty"`
+	MSPBaudRate       string   `json:"msp_baudrate,omitempty"`
+	GPSBaudRate       string   `json:"gps_baudrate,omitempty"`
+	TelemetryBaudRate string   `json:"telemetry_baudrate,omitempty"`
+	BlackboxBaudRate  string   `json:"blackbox_baudrate,omitempty"`
+	Line              string   `json:"line"`
+}
+
+type VTXTableSummary struct {
+	Bands       *int      `json:"bands,omitempty"`
+	Channels    *int      `json:"channels,omitempty"`
+	PowerLevels *int      `json:"power_levels,omitempty"`
+	BandRows    []VTXBand `json:"band_rows,omitempty"`
+	PowerValues []int     `json:"power_values,omitempty"`
+	PowerLabels []string  `json:"power_labels,omitempty"`
+	Lines       []string  `json:"lines,omitempty"`
+}
+
+type VTXBand struct {
+	Index          *int   `json:"index,omitempty"`
+	Name           string `json:"name,omitempty"`
+	Letter         string `json:"letter,omitempty"`
+	Factory        *bool  `json:"factory,omitempty"`
+	FrequenciesMHz []int  `json:"frequencies_mhz,omitempty"`
+	Line           string `json:"line"`
 }
 
 type AuxRange struct {
@@ -157,6 +183,7 @@ func Parse(lines []string, registry settings.Registry) Document {
 		doc.Commands = append(doc.Commands, command)
 		classify(&doc, trimmed, fields, registry)
 	}
+	doc.VTX = parseVTXTableSummary(doc.VTXTable, doc.Sections["vtx_table"])
 	return doc
 }
 
@@ -254,11 +281,66 @@ func parseSerial(line string, fields []string) Serial {
 	}
 	if len(fields) > 2 {
 		serial.FunctionMask = fields[2]
+		if mask, err := strconv.ParseUint(fields[2], 0, 32); err == nil {
+			value := uint32(mask)
+			serial.FunctionMaskValue = &value
+			serial.Functions = serialFunctionNames(value)
+		}
 	}
 	if len(fields) > 3 {
 		serial.BaudRates = append(serial.BaudRates, fields[3:]...)
 	}
+	if len(fields) > 3 {
+		serial.MSPBaudRate = fields[3]
+	}
+	if len(fields) > 4 {
+		serial.GPSBaudRate = fields[4]
+	}
+	if len(fields) > 5 {
+		serial.TelemetryBaudRate = fields[5]
+	}
+	if len(fields) > 6 {
+		serial.BlackboxBaudRate = fields[6]
+	}
 	return serial
+}
+
+func serialFunctionNames(mask uint32) []string {
+	defs := []struct {
+		bit  uint32
+		name string
+	}{
+		{1 << 0, "MSP"},
+		{1 << 1, "GPS"},
+		{1 << 2, "TELEMETRY_FRSKY_HUB"},
+		{1 << 3, "TELEMETRY_HOTT"},
+		{1 << 4, "TELEMETRY_LTM"},
+		{1 << 5, "TELEMETRY_SMARTPORT"},
+		{1 << 6, "RX_SERIAL"},
+		{1 << 7, "BLACKBOX"},
+		{1 << 9, "TELEMETRY_MAVLINK"},
+		{1 << 10, "ESC_SENSOR"},
+		{1 << 11, "VTX_SMARTAUDIO"},
+		{1 << 12, "TELEMETRY_IBUS"},
+		{1 << 13, "VTX_TRAMP"},
+		{1 << 14, "RCDEVICE"},
+		{1 << 15, "LIDAR_TF"},
+		{1 << 16, "FRSKY_OSD"},
+		{1 << 17, "VTX_MSP"},
+		{1 << 18, "GIMBAL"},
+		{1 << 19, "LIDAR_NL"},
+		{1 << 20, "OSD_CUSTOM_TEXT"},
+	}
+	out := []string{}
+	for _, def := range defs {
+		if mask&def.bit != 0 {
+			out = append(out, def.name)
+		}
+	}
+	if len(out) == 0 && mask == 0 {
+		return []string{"NONE"}
+	}
+	return out
 }
 
 func parseAux(line string, fields []string) AuxRange {
@@ -354,4 +436,76 @@ func parseIntFields(fields []string, count int) []*int {
 		}
 	}
 	return parsed
+}
+
+func parseVTXTableSummary(commands []Command, lines []string) *VTXTableSummary {
+	if len(commands) == 0 && len(lines) == 0 {
+		return nil
+	}
+	summary := &VTXTableSummary{Lines: append([]string(nil), lines...)}
+	for _, command := range commands {
+		if len(command.Args) == 0 {
+			continue
+		}
+		switch command.Args[0] {
+		case "bands":
+			summary.Bands = firstInt(command.Args[1:])
+		case "channels":
+			summary.Channels = firstInt(command.Args[1:])
+		case "powerlevels":
+			summary.PowerLevels = firstInt(command.Args[1:])
+		case "band":
+			summary.BandRows = append(summary.BandRows, parseVTXBand(command))
+		case "powervalues":
+			summary.PowerValues = parseIntSlice(command.Args[1:])
+		case "powerlabels":
+			summary.PowerLabels = append([]string(nil), command.Args[1:]...)
+		}
+	}
+	return summary
+}
+
+func parseVTXBand(command Command) VTXBand {
+	band := VTXBand{Line: command.Line}
+	args := command.Args
+	if len(args) > 1 {
+		band.Index = firstInt(args[1:2])
+	}
+	if len(args) > 2 {
+		band.Name = args[2]
+	}
+	if len(args) > 3 {
+		band.Letter = args[3]
+	}
+	start := 4
+	if len(args) > 4 && (args[4] == "FACTORY" || args[4] == "CUSTOM") {
+		factory := args[4] == "FACTORY"
+		band.Factory = &factory
+		start = 5
+	}
+	if len(args) > start {
+		band.FrequenciesMHz = parseIntSlice(args[start:])
+	}
+	return band
+}
+
+func firstInt(fields []string) *int {
+	if len(fields) == 0 {
+		return nil
+	}
+	if n, err := strconv.Atoi(fields[0]); err == nil {
+		value := n
+		return &value
+	}
+	return nil
+}
+
+func parseIntSlice(fields []string) []int {
+	out := []int{}
+	for _, field := range fields {
+		if n, err := strconv.Atoi(field); err == nil {
+			out = append(out, n)
+		}
+	}
+	return out
 }

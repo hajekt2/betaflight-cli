@@ -50,6 +50,7 @@ betaflight-cli restore plan --file backup.txt
 betaflight-cli restore apply --file backup.txt --port /dev/tty.usbmodem01
 betaflight-cli presets plan --file preset.cli
 betaflight-cli presets apply --file preset.cli --port /dev/tty.usbmodem01
+betaflight-cli blackbox inspect flight.bbl
 betaflight-cli settings get gyro_lpf1_static_hz --port /dev/tty.usbmodem01
 betaflight-cli settings set gyro_lpf1_static_hz 0 --port /dev/tty.usbmodem01 --apply
 betaflight-cli features list --port /dev/tty.usbmodem01
@@ -102,6 +103,7 @@ Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `restore plan` and `presets plan` convert local Betaflight CLI text into audited change plans without connecting.
 They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosave` lines are included only with `--include-defaults`.
 `restore apply --include-defaults` and `presets apply --include-defaults` require `--yes` because defaults reset configuration before applying later lines.
+`blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, and approximate frame marker counts.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.
 Network preset fetching is opt-in and must report source metadata.

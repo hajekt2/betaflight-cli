@@ -111,6 +111,8 @@ Raw MSP reads are useful for maintainers, agents, and new firmware exploration.
 Raw MSP writes should require stronger confirmation than reviewed domain commands.
 Blackbox should be a separate command family in the same binary.
 Blackbox packages should not depend on live serial connection code.
+The first Blackbox command should inspect local log files offline by parsing `H <name>:<value>` headers and frame field definitions.
+Full binary frame decoding, statistics, and tuning analysis should build on that package without introducing a live Flight Controller dependency.
 Preset workflows should support local preset files through the same Change Plan, apply, and save flow as settings.
 Network preset fetching should be explicit and should include source URL, version, checksum when available, and retrieval time in JSON output.
 Restore workflows should use the same plan and apply model.

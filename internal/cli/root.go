@@ -18,6 +18,7 @@ import (
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
+	"github.com/hajekt2/betaflight-cli/pkg/blackbox"
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
@@ -92,6 +93,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.backupCommand())
 	root.AddCommand(a.restoreCommand())
 	root.AddCommand(a.presetsCommand())
+	root.AddCommand(a.blackboxCommand())
 	root.AddCommand(a.settingsCommand())
 	root.AddCommand(a.featuresCommand())
 	root.AddCommand(a.serialCommand())
@@ -116,6 +118,41 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.saveCommand())
 	root.AddCommand(a.mspCommand())
 	return root
+}
+
+func (a *app) blackboxCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "blackbox", Short: "Inspect and analyze Blackbox logs"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "inspect FILE",
+		Short: "Inspect a Blackbox log file without connecting to hardware",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			path := args[0]
+			var reader io.Reader
+			if path == "-" {
+				reader = a.in
+				if reader == nil {
+					reader = os.Stdin
+				}
+			} else {
+				file, err := os.Open(path)
+				if err != nil {
+					return a.render(output.Failure(commandPath(cmd), nil, "file_error", err.Error()))
+				}
+				defer file.Close()
+				reader = file
+			}
+			inspection, err := blackbox.Inspect(reader)
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "blackbox_parse_error", err.Error()))
+			}
+			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+				"file":       path,
+				"inspection": inspection,
+			}))
+		},
+	})
+	return cmd
 }
 
 func (a *app) versionCommand() *cobra.Command {

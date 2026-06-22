@@ -108,6 +108,10 @@ Restore and local preset commands emit the same change-plan fields plus `skipped
 `skipped_lines` records ignored import wrappers such as comments, `batch start`, `batch end`, `save`, and skipped `defaults nosave`.
 When `include_defaults` is true, exact `defaults nosave` lines are included in `cli_lines`; applying such a plan requires global `--yes`.
 
+`blackbox inspect` returns an `inspection` object.
+The object includes file sizes, header metadata, ordered header names, parsed field definitions, warnings, and `frame_marker_counts_approx`.
+The marker counts are approximate until full binary frame decoding is implemented.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -144,6 +146,43 @@ func TestCLIExecDiffIncludesConfiguration(t *testing.T) {
 	}
 	if len(configuration["settings"].([]any)) != 1 {
 		t.Fatalf("configuration = %+v", configuration)
+	}
+}
+
+func TestBlackboxInspectDoesNotConnect(t *testing.T) {
+	path := writeTempBlackboxLog(t)
+	called := false
+	env, err := runTestCommand(t, []string{"blackbox", "inspect", path}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	inspection := data["inspection"].(map[string]any)
+	if inspection["product"] == "" || inspection["firmware_revision"] == "" {
+		t.Fatalf("inspection = %+v", inspection)
+	}
+	if called {
+		t.Fatal("connector was called for offline blackbox inspect")
+	}
+}
+
+func TestBlackboxInspectReportsParseError(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "bad.bbl")
+	if err := os.WriteFile(path, []byte("not a blackbox log"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	env, err := runTestCommand(t, []string{"blackbox", "inspect", path}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "blackbox_parse_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
 	}
 }
 
@@ -676,6 +715,26 @@ func TestSaveRefusalDoesNotConnect(t *testing.T) {
 	if called {
 		t.Fatal("connector was called for refused save")
 	}
+}
+
+func writeTempBlackboxLog(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "log.bbl")
+	log := strings.Join([]string{
+		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
+		"H Firmware revision:Betaflight 2025.12.1 (abc123) STM32F405",
+		"H Field I name:loopIteration,time",
+		"H Field I signed:0,0",
+		"H Field I predictor:6,0",
+		"H Field I encoding:1,1",
+		"H Field P predictor:0,10",
+		"H Field P encoding:0,0",
+		"I\x00P\x00E",
+	}, "\n")
+	if err := os.WriteFile(path, []byte(log), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	return path
 }
 
 func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.Envelope, error) {

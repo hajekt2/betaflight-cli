@@ -75,6 +75,8 @@ func New() *FC {
 				"set osd_units = METRIC",
 				"set gps_rescue_min_sats = 8",
 				"set failsafe_procedure = DROP",
+				"set bat_capacity = 1300",
+				"set vbat_warning_cell_voltage = 350",
 				"save",
 			},
 			"defaults nosave":                       {"defaults loaded without save"},
@@ -226,6 +228,24 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, 456)
 		payload = append(payload, 0)
 		payload = appendU16(payload, 1599)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPBatteryConfig:
+		f.out.Write(response(frame.Code, fakeBatteryConfigPayload(), false))
+	case msp.MSP2BatteryProfile:
+		f.out.Write(response(frame.Code, fakeBatteryProfilePayload(), false))
+	case msp.MSPVoltageMeters:
+		f.out.Write(response(frame.Code, []byte{10, 160, 40, 120}, false))
+	case msp.MSPCurrentMeters:
+		payload := []byte{10}
+		payload = appendU16(payload, 123)
+		payload = appendU16(payload, 4560)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPVoltageMeterConfig:
+		f.out.Write(response(frame.Code, []byte{1, 5, 10, 0, 110, 10, 1}, false))
+	case msp.MSPCurrentMeterConfig:
+		payload := []byte{1, 6, 10, 1}
+		payload = appendS16(payload, 400)
+		payload = appendS16(payload, -10)
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBlackboxConfig:
 		payload := []byte{1, 2, 1, 4}
@@ -609,6 +629,27 @@ func fakeFilterConfigPayload() []byte {
 	payload = appendU16(payload, 50)
 	payload = appendU16(payload, 500)
 	payload = append(payload, 100, 80, 60)
+	return payload
+}
+
+func fakeBatteryConfigPayload() []byte {
+	payload := []byte{33, 43, 35}
+	payload = appendU16(payload, 1300)
+	payload = append(payload, 1, 1)
+	payload = appendU16(payload, 330)
+	payload = appendU16(payload, 435)
+	payload = appendU16(payload, 350)
+	return payload
+}
+
+func fakeBatteryProfilePayload() []byte {
+	payload := []byte{0}
+	payload = appendU16(payload, 330)
+	payload = appendU16(payload, 435)
+	payload = appendU16(payload, 350)
+	payload = appendU16(payload, 420)
+	payload = appendU16(payload, 1300)
+	payload = append(payload, 4, 20)
 	return payload
 }
 

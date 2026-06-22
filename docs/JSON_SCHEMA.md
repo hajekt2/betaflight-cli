@@ -137,6 +137,9 @@ The object includes receiver configuration, channel map indexes and names, RSSI 
 `gps status` returns a `gps` object decoded from `MSP_GPS_CONFIG`, `MSP_RAW_GPS`, `MSP_COMP_GPS`, `MSP_GPS_RESCUE`, `MSP_GPS_RESCUE_PIDS`, and `MSP_GPSSVINFO`.
 The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.
 
+`battery status` returns a `battery` object decoded from `MSP_BATTERY_CONFIG`, `MSP2_BATTERY_PROFILE`, `MSP_BATTERY_STATE`, `MSP_VOLTAGE_METERS`, `MSP_CURRENT_METERS`, `MSP_VOLTAGE_METER_CONFIG`, and `MSP_CURRENT_METER_CONFIG`.
+The object includes active battery profile thresholds, runtime battery state, voltage and current meter readings, voltage meter calibration, current meter calibration, and meter source names when known.
+
 `sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.
 The object includes configured hardware IDs, active hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
 

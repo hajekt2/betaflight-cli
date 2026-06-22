@@ -118,6 +118,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
 `receiver status` reads receiver configuration, channel map, RSSI channel, and live RC channels over MSP.
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
+`battery status` reads battery profile thresholds, runtime battery state, and voltage/current meter readings and calibration over MSP.
 `pid status` reads active PID gain triplets, rate profile data, and advanced PID tuning over MSP.
 `rates status` reads active rate profile fields and TPA settings over MSP.
 `filters status` reads loop timing, motor protocol, gyro, D-term, dynamic notch, and RPM filter configuration over MSP.

@@ -924,6 +924,40 @@ func TestFiltersStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestBatteryStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"battery", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	battery := data["battery"].(map[string]any)
+	config := battery["config"].(map[string]any)
+	if config["capacity_mah"] != float64(1300) || config["voltage_meter_source_name"] != "ADC" || config["warning_cell_voltage_v"] != float64(3.5) {
+		t.Fatalf("config = %+v", config)
+	}
+	profile := battery["profile"].(map[string]any)
+	if profile["force_cell_count"] != float64(4) || profile["full_cell_voltage_v"] != float64(4.2) {
+		t.Fatalf("profile = %+v", profile)
+	}
+	state := battery["state"].(map[string]any)
+	if state["state_name"] != "OK" || state["voltage_v"] != float64(15.99) {
+		t.Fatalf("state = %+v", state)
+	}
+	voltageMeters := battery["voltage_meters"].([]any)
+	firstVoltageMeter := voltageMeters[0].(map[string]any)
+	if firstVoltageMeter["id_name"] != "BATTERY_1" || firstVoltageMeter["voltage_v"] != float64(16) {
+		t.Fatalf("voltage meters = %+v", voltageMeters)
+	}
+	currentConfigs := battery["current_meter_configs"].([]any)
+	firstCurrentConfig := currentConfigs[0].(map[string]any)
+	if firstCurrentConfig["sensor_type_name"] != "ADC" || firstCurrentConfig["offset"] != float64(-10) {
+		t.Fatalf("current configs = %+v", currentConfigs)
+	}
+}
+
 func TestVTXTableListIncludesSummary(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtxtable", "list"}, nil)
 	if err != nil {
@@ -1046,6 +1080,7 @@ func TestSettingDomainListsWithFakeFC(t *testing.T) {
 		{[]string{"vtx", "list"}, "settings"},
 		{[]string{"osd", "list"}, "settings"},
 		{[]string{"gps", "list"}, "settings"},
+		{[]string{"battery", "list"}, "settings"},
 		{[]string{"failsafe", "list"}, "settings"},
 	}
 	for _, tt := range tests {

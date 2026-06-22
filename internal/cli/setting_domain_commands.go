@@ -67,6 +67,9 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "filters" {
 		cmd.AddCommand(a.filtersStatusCommand())
 	}
+	if domain.use == "battery" {
+		cmd.AddCommand(a.batteryStatusCommand())
+	}
 	return cmd
 }
 
@@ -184,6 +187,25 @@ func (a *app) filtersStatusCommand() *cobra.Command {
 	}
 }
 
+func (a *app) batteryStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read battery profile, runtime state, and meter configuration over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				battery, warnings, err := bfcommands.ReadBatteryStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"battery":  battery,
+					"warnings": warnings,
+				})
+			})
+		},
+	}
+}
+
 func currentDomainSettings(doc bfconfig.Document, matches func(settings.Metadata) bool) []bfconfig.Setting {
 	out := []bfconfig.Setting{}
 	for _, setting := range doc.Settings {
@@ -239,6 +261,22 @@ func osdDomain() settingDomain {
 func gpsDomain() settingDomain {
 	return settingDomain{use: "gps", short: "Inspect and change GPS settings", matches: func(s settings.Metadata) bool {
 		return strings.Contains(s.PG, "GPS") || strings.HasPrefix(s.Name, "gps_")
+	}}
+}
+
+func batteryDomain() settingDomain {
+	return settingDomain{use: "battery", short: "Inspect and change battery and power meter settings", matches: func(s settings.Metadata) bool {
+		name := s.Name
+		return strings.Contains(s.PG, "BATTERY") ||
+			strings.Contains(s.PG, "VOLTAGE") ||
+			strings.Contains(s.PG, "CURRENT") ||
+			s.Scope == "batteryprofile" ||
+			strings.HasPrefix(name, "vbat_") ||
+			strings.Contains(name, "battery") ||
+			strings.Contains(name, "current_meter") ||
+			strings.Contains(name, "battery_meter") ||
+			strings.Contains(name, "bat_capacity") ||
+			strings.Contains(name, "cbat_")
 	}}
 }
 

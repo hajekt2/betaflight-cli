@@ -116,6 +116,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.settingDomainCommand(vtxDomain()))
 	root.AddCommand(a.settingDomainCommand(osdDomain()))
 	root.AddCommand(a.settingDomainCommand(gpsDomain()))
+	root.AddCommand(a.settingDomainCommand(batteryDomain()))
 	root.AddCommand(a.settingDomainCommand(failsafeDomain()))
 	root.AddCommand(a.batchCommand())
 	root.AddCommand(a.saveCommand())

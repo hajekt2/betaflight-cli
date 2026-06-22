@@ -56,6 +56,15 @@ betaflight-cli modes list --port /dev/tty.usbmodem01
 betaflight-cli resources list --port /dev/tty.usbmodem01
 betaflight-cli profiles list --port /dev/tty.usbmodem01
 betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
+betaflight-cli pid list --port /dev/tty.usbmodem01
+betaflight-cli pid set p_roll 46 --port /dev/tty.usbmodem01
+betaflight-cli rates list --port /dev/tty.usbmodem01
+betaflight-cli filters list --port /dev/tty.usbmodem01
+betaflight-cli receiver list --port /dev/tty.usbmodem01
+betaflight-cli vtx list --port /dev/tty.usbmodem01
+betaflight-cli osd list --port /dev/tty.usbmodem01
+betaflight-cli gps list --port /dev/tty.usbmodem01
+betaflight-cli failsafe list --port /dev/tty.usbmodem01
 printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch plan
 printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch apply --port /dev/tty.usbmodem01
 betaflight-cli save --port /dev/tty.usbmodem01 --yes
@@ -75,6 +84,8 @@ Configurator parity should be exposed as focused command families rather than on
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
 The current CLI includes first domain commands for features, serial ports, AUX modes, resources, and profile selectors.
 These commands read from parsed `dump all` output and use Betaflight CLI text lines for plan/apply writes.
+It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
+Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.
 Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch plan` validates without connecting.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.

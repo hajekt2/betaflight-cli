@@ -117,7 +117,7 @@ func TestBackupCreateIncludesConfiguration(t *testing.T) {
 	data := env.Data.(map[string]any)
 	configuration := data["configuration"].(map[string]any)
 	settings := configuration["settings"].([]any)
-	if len(settings) != 2 {
+	if len(settings) < 8 {
 		t.Fatalf("settings = %+v", settings)
 	}
 	features := configuration["features"].([]any)
@@ -329,6 +329,93 @@ func TestBatchApplyWithFakeFC(t *testing.T) {
 		t.Fatalf("data = %+v", data)
 	}
 	if len(env.SideEffects) != 2 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSettingDomainListsWithFakeFC(t *testing.T) {
+	tests := []struct {
+		args []string
+		key  string
+	}{
+		{[]string{"pid", "list"}, "settings"},
+		{[]string{"rates", "list"}, "settings"},
+		{[]string{"filters", "list"}, "settings"},
+		{[]string{"receiver", "list"}, "settings"},
+		{[]string{"vtx", "list"}, "settings"},
+		{[]string{"osd", "list"}, "settings"},
+		{[]string{"gps", "list"}, "settings"},
+		{[]string{"failsafe", "list"}, "settings"},
+	}
+	for _, tt := range tests {
+		env, err := runTestCommand(t, tt.args, nil)
+		if err != nil {
+			t.Fatalf("%v command error = %v", tt.args, err)
+		}
+		if !env.OK {
+			t.Fatalf("%v env.OK = false: %+v", tt.args, env.Errors)
+		}
+		data := env.Data.(map[string]any)
+		view := data["view"].(map[string]any)
+		items := view[tt.key].([]any)
+		if len(items) == 0 {
+			t.Fatalf("%v view = %+v", tt.args, view)
+		}
+	}
+}
+
+func TestSettingDomainSetPlanDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"pid", "set", "p_roll", "46"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if lines[0] != "set p_roll = 46" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only domain set")
+	}
+}
+
+func TestSettingDomainSetRejectsWrongDomain(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"pid", "set", "roll_rc_rate", "8"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "unknown_setting" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after domain validation failure")
+	}
+}
+
+func TestSettingDomainSetApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"pid", "set", "p_roll", "46", "--apply"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "set p_roll = 46" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

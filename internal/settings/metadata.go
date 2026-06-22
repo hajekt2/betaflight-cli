@@ -108,6 +108,16 @@ func (r Registry) Lookup(name string) (Metadata, bool) {
 	return setting, ok
 }
 
+func (r Registry) Filter(match func(Metadata) bool) []Metadata {
+	var out []Metadata
+	for _, setting := range r.Settings {
+		if match(setting) {
+			out = append(out, setting)
+		}
+	}
+	return out
+}
+
 func (m Metadata) Validate(value string) error {
 	switch m.Type {
 	case TypeString:

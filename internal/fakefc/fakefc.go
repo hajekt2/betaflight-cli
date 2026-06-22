@@ -233,6 +233,16 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 2)
 		payload = appendU32(payload, 0x1001)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPBoxnames:
+		f.out.Write(response(frame.Code, modeNamePage(frame.Payload), false))
+	case msp.MSPBoxids:
+		f.out.Write(response(frame.Code, modeIDPage(frame.Payload), false))
+	case msp.MSPModeRanges:
+		payload := []byte{0, 0, 32, 48, 52, 2, 16, 32, 0, 0, 0, 0}
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPModeRangesExtra:
+		payload := []byte{3, 0, 0, 0, 52, 1, 53, 0, 0, 0}
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPVTXConfig:
 		payload := []byte{3, 5, 8, 2, 1}
 		payload = appendU16(payload, 5861)
@@ -298,4 +308,117 @@ func appendU32(dst []byte, v uint32) []byte {
 	var buf [4]byte
 	binary.LittleEndian.PutUint32(buf[:], v)
 	return append(dst, buf[:]...)
+}
+
+func modeNamePage(payload []byte) []byte {
+	page := requestPage(payload)
+	names := fakeModeNames()
+	start := page * 32
+	if start >= len(names) {
+		return nil
+	}
+	end := start + 32
+	if end > len(names) {
+		end = len(names)
+	}
+	return []byte(strings.Join(names[start:end], ";") + ";")
+}
+
+func modeIDPage(payload []byte) []byte {
+	page := requestPage(payload)
+	ids := fakeModeIDs()
+	start := page * 32
+	if start >= len(ids) {
+		return nil
+	}
+	end := start + 32
+	if end > len(ids) {
+		end = len(ids)
+	}
+	return ids[start:end]
+}
+
+func requestPage(payload []byte) int {
+	if len(payload) == 0 {
+		return 0
+	}
+	return int(payload[0])
+}
+
+func fakeModeNames() []string {
+	return []string{
+		"ARM",
+		"ANGLE",
+		"HORIZON",
+		"ALTHOLD",
+		"ANTI GRAVITY",
+		"MAG",
+		"HEADFREE",
+		"HEADADJ",
+		"CAMSTAB",
+		"POS HOLD",
+		"PASSTHRU",
+		"BEEPER",
+		"LEDLOW",
+		"CALIB",
+		"OSD DISABLE",
+		"TELEMETRY",
+		"SERVO1",
+		"SERVO2",
+		"SERVO3",
+		"BLACKBOX",
+		"FAILSAFE",
+		"AIR MODE",
+		"3D DISABLE",
+		"FPV ANGLE MIX",
+		"BLACKBOX ERASE",
+		"CAMERA CONTROL 1",
+		"CAMERA CONTROL 2",
+		"CAMERA CONTROL 3",
+		"FLIP OVER AFTER CRASH",
+		"PREARM",
+		"GPS BEEP SATELLITE COUNT",
+		"VTX PIT MODE",
+		"BEEPER MUTE",
+		"READY",
+	}
+}
+
+func fakeModeIDs() []byte {
+	return []byte{
+		0,
+		1,
+		2,
+		3,
+		4,
+		5,
+		6,
+		7,
+		8,
+		11,
+		12,
+		13,
+		15,
+		17,
+		19,
+		20,
+		23,
+		24,
+		25,
+		26,
+		27,
+		28,
+		29,
+		30,
+		31,
+		32,
+		33,
+		34,
+		35,
+		36,
+		37,
+		39,
+		52,
+		53,
+	}
 }

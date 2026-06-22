@@ -12,6 +12,7 @@ import (
 
 	"github.com/hajekt2/betaflight-cli/internal/batch"
 	"github.com/hajekt2/betaflight-cli/internal/bfconfig"
+	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
@@ -78,6 +79,22 @@ func (a *app) modesCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List AUX mode ranges and mode color commands", func(doc bfconfig.Document) any {
 		return map[string]any{"aux": doc.Aux, "lines": doc.Sections["modes"]}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "active",
+		Short: "Read active mode definitions and ranges over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				modes, warnings, err := bfcommands.ReadModeConfiguration(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"modes":    modes,
+					"warnings": warnings,
+				})
+			})
+		},
+	})
 	var flags changeFlags
 	set := &cobra.Command{
 		Use:   "set INDEX MODE_ID CHANNEL RANGE_START RANGE_END [EXTRA...]",

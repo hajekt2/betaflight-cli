@@ -119,6 +119,9 @@ The object includes support status, device index and name, rate fields, optional
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
 
+`modes active` returns a `modes` object decoded from `MSP_BOXNAMES`, `MSP_BOXIDS`, `MSP_MODE_RANGES`, and `MSP_MODE_RANGES_EXTRA`.
+The object includes a paged mode definition catalog and mode range rows with permanent IDs, names, AUX channel indexes, microsecond ranges, logic, and linked mode names when supplied by firmware.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

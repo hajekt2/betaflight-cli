@@ -224,6 +224,38 @@ func TestVTXConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestModesActiveWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"modes", "active"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	modes := data["modes"].(map[string]any)
+	definitions := modes["definitions"].([]any)
+	if len(definitions) != 34 {
+		t.Fatalf("definitions = %+v", definitions)
+	}
+	last := definitions[33].(map[string]any)
+	if last["id"] != float64(53) || last["name"] != "READY" {
+		t.Fatalf("last definition = %+v", last)
+	}
+	ranges := modes["ranges"].([]any)
+	if len(ranges) != 3 {
+		t.Fatalf("ranges = %+v", ranges)
+	}
+	arm := ranges[0].(map[string]any)
+	if arm["name"] != "ARM" || arm["aux_channel_name"] != "AUX1" || arm["active"] != true {
+		t.Fatalf("arm range = %+v", arm)
+	}
+	beeperMute := ranges[1].(map[string]any)
+	if beeperMute["name"] != "BEEPER MUTE" || beeperMute["mode_logic_name"] != "AND" || beeperMute["linked_to_name"] != "READY" {
+		t.Fatalf("beeper mute range = %+v", beeperMute)
+	}
+}
+
 func TestFeaturesListWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "list"}, nil)
 	if err != nil {

@@ -59,6 +59,7 @@ betaflight-cli features enable GPS --port /dev/tty.usbmodem01
 betaflight-cli features enable GPS --port /dev/tty.usbmodem01 --apply
 betaflight-cli serial list --port /dev/tty.usbmodem01
 betaflight-cli modes list --port /dev/tty.usbmodem01
+betaflight-cli modes active --port /dev/tty.usbmodem01
 betaflight-cli resources list --port /dev/tty.usbmodem01
 betaflight-cli profiles list --port /dev/tty.usbmodem01
 betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
@@ -107,6 +108,8 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `restore apply --include-defaults` and `presets apply --include-defaults` require `--yes` because defaults reset configuration before applying later lines.
 `blackbox config` reads current Blackbox configuration over MSP and returns decoded device, sample rate, and enabled or disabled field selections.
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
+`modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
+It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
 `blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, and a capped candidate frame index.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.

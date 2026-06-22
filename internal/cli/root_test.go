@@ -513,6 +513,62 @@ func TestFeatureEnablePlanDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestReceiverRXFailPlanDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"receiver", "rxfail", "2", "s", "1100"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if lines[0] != "rxfail 2 s 1100" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only rxfail command")
+	}
+}
+
+func TestReceiverRXFailValidationFailureDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"receiver", "rxfail", "4", "a"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after rxfail validation failure")
+	}
+}
+
+func TestReceiverRXFailApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "rxfail", "2", "s", "1100", "--apply"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "rxfail 2 s 1100" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestFeatureEnableApplyWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply"}, nil)
 	if err != nil {
@@ -1153,7 +1209,7 @@ func TestTableDomainSetApplyWithFakeFC(t *testing.T) {
 }
 
 func TestBatchPlanAllowsTableRows(t *testing.T) {
-	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "led 0 0,0::C:0\nservo 0 1000 2000 1500 100 -1\nadjrange 0 0 0 900 1300 12 0 0 0\nrxrange 0 1000 2000\n", nil)
+	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "led 0 0,0::C:0\nservo 0 1000 2000 1500 100 -1\nadjrange 0 0 0 900 1300 12 0 0 0\nrxrange 0 1000 2000\nrxfail 2 s 1100\n", nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -1162,7 +1218,7 @@ func TestBatchPlanAllowsTableRows(t *testing.T) {
 	}
 	data := env.Data.(map[string]any)
 	lines := data["cli_lines"].([]any)
-	if len(lines) != 4 {
+	if len(lines) != 5 {
 		t.Fatalf("plan = %+v", data)
 	}
 }

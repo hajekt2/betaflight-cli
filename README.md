@@ -80,6 +80,7 @@ betaflight-cli rates list --port /dev/tty.usbmodem01
 betaflight-cli filters list --port /dev/tty.usbmodem01
 betaflight-cli receiver list --port /dev/tty.usbmodem01
 betaflight-cli receiver status --port /dev/tty.usbmodem01
+betaflight-cli receiver rxfail 2 s 1100 --port /dev/tty.usbmodem01
 betaflight-cli vtx list --port /dev/tty.usbmodem01
 betaflight-cli vtx config --port /dev/tty.usbmodem01
 betaflight-cli osd list --port /dev/tty.usbmodem01

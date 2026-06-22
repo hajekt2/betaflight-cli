@@ -100,6 +100,7 @@ func New() *FC {
 			"smix reverse 0 2 r":                    {"smix updated"},
 			"adjrange 0 0 0 900 1300 12 0 0 0":      {"adjrange updated"},
 			"rxrange 0 1000 2000":                   {"rxrange updated"},
+			"rxfail 2 s 1100":                       {"rxfail updated"},
 			"profile 1":                             {"profile 1"},
 			"rateprofile 2":                         {"rateprofile 2"},
 			"save":                                  {"Saving..."},

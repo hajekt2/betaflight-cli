@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -51,6 +52,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "receiver" {
 		cmd.AddCommand(a.receiverStatusCommand())
+		cmd.AddCommand(a.receiverRXFailCommand())
 	}
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
@@ -93,6 +95,51 @@ func (a *app) receiverStatusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) receiverRXFailCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "rxfail INDEX MODE [VALUE]",
+		Short: "Plan or set one receiver failsafe channel row",
+		Args:  cobra.RangeArgs(2, 3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			line, err := receiverRXFailLine(args)
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			return a.planOrApplyCLI(cmd, []string{line}, "rxfail", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func receiverRXFailLine(args []string) (string, error) {
+	channel, err := strconv.Atoi(args[0])
+	if err != nil || channel < 0 || channel >= 18 {
+		return "", fmt.Errorf("channel index must be an integer in [0..17]")
+	}
+	mode := strings.ToLower(args[1])
+	if mode != "a" && mode != "h" && mode != "s" {
+		return "", fmt.Errorf("mode must be one of a, h, or s")
+	}
+	if channel >= 4 && mode == "a" {
+		return "", fmt.Errorf("mode a is only valid for flight channels 0..3")
+	}
+	if mode == "s" {
+		if len(args) != 3 {
+			return "", fmt.Errorf("mode s requires a channel value")
+		}
+		if _, err := strconv.Atoi(args[2]); err != nil {
+			return "", fmt.Errorf("value must be an integer")
+		}
+		return fmt.Sprintf("rxfail %d %s %s", channel, mode, args[2]), nil
+	}
+	if len(args) == 3 {
+		return "", fmt.Errorf("value is only valid with mode s")
+	}
+	return fmt.Sprintf("rxfail %d %s", channel, mode), nil
 }
 
 func (a *app) gpsStatusCommand() *cobra.Command {

@@ -786,7 +786,7 @@ func classifyCLI(command string) cliClass {
 			return cliReadOnly
 		}
 		return cliWrite
-	case "set", "feature", "serial", "aux", "profile", "rateprofile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange":
+	case "set", "feature", "serial", "aux", "profile", "rateprofile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail":
 		return cliWrite
 	default:
 		return cliWrite

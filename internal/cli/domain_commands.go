@@ -361,7 +361,7 @@ func isBatchAllowed(line string) bool {
 		return false
 	}
 	switch fields[0] {
-	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange":
+	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail":
 		return true
 	default:
 		return false

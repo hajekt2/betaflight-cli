@@ -77,6 +77,7 @@ func New() *FC {
 				"set failsafe_procedure = DROP",
 				"save",
 			},
+			"defaults nosave":                       {"defaults loaded without save"},
 			"set gyro_lpf1_static_hz = 0":           {"gyro_lpf1_static_hz set to 0"},
 			"set p_roll = 46":                       {"p_roll set to 46"},
 			"set roll_rc_rate = 8":                  {"roll_rc_rate set to 8"},

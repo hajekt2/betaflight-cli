@@ -90,6 +90,8 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.telemetryCommand())
 	root.AddCommand(a.cliCommand())
 	root.AddCommand(a.backupCommand())
+	root.AddCommand(a.restoreCommand())
+	root.AddCommand(a.presetsCommand())
 	root.AddCommand(a.settingsCommand())
 	root.AddCommand(a.featuresCommand())
 	root.AddCommand(a.serialCommand())

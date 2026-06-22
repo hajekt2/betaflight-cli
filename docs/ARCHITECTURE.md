@@ -113,6 +113,9 @@ Blackbox should be a separate command family in the same binary.
 Blackbox packages should not depend on live serial connection code.
 Preset workflows should support local preset files through the same Change Plan, apply, and save flow as settings.
 Network preset fetching should be explicit and should include source URL, version, checksum when available, and retrieval time in JSON output.
+Restore workflows should use the same plan and apply model.
+Raw Betaflight dump wrappers such as `batch start`, `batch end`, and `save` should be interpreted as import metadata instead of being blindly applied.
+Exact `defaults nosave` restore lines may be supported only behind an explicit restore or preset option and a dangerous-operation confirmation when applied.
 
 ### Connection Layer
 

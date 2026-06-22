@@ -104,6 +104,10 @@ Only supported configuration-changing CLI commands are accepted.
 Dangerous commands such as `save`, `defaults`, motor output, reboot, bootloader, and erase are rejected.
 `batch apply --save` persists after applying and requires global `--yes`.
 
+Restore and local preset commands emit the same change-plan fields plus `skipped_lines`.
+`skipped_lines` records ignored import wrappers such as comments, `batch start`, `batch end`, `save`, and skipped `defaults nosave`.
+When `include_defaults` is true, exact `defaults nosave` lines are included in `cli_lines`; applying such a plan requires global `--yes`.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

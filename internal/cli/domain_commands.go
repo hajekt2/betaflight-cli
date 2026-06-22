@@ -230,6 +230,14 @@ func filterProfiles(profiles []bfconfig.Profile, kind string) []bfconfig.Profile
 }
 
 func (a *app) readBatchPlan(path string) (batch.Plan, error) {
+	data, err := a.readInput(path)
+	if err != nil {
+		return batch.Plan{}, err
+	}
+	return batch.Parse(data)
+}
+
+func (a *app) readInput(path string) ([]byte, error) {
 	var reader io.Reader
 	if path == "" || path == "-" {
 		reader = a.in
@@ -239,23 +247,34 @@ func (a *app) readBatchPlan(path string) (batch.Plan, error) {
 	} else {
 		file, err := os.Open(path)
 		if err != nil {
-			return batch.Plan{}, err
+			return nil, err
 		}
 		defer file.Close()
 		reader = file
 	}
 	data, err := io.ReadAll(reader)
 	if err != nil {
-		return batch.Plan{}, err
+		return nil, err
 	}
-	return batch.Parse(data)
+	return data, nil
 }
 
 func (a *app) validateBatchPlan(cmd *cobra.Command, plan batch.Plan) (output.Envelope, bool) {
+	return a.validateChangePlan(cmd, plan, planValidationOptions{})
+}
+
+type planValidationOptions struct {
+	allowDefaultsNoSave bool
+}
+
+func (a *app) validateChangePlan(cmd *cobra.Command, plan batch.Plan, opts planValidationOptions) (output.Envelope, bool) {
 	if len(plan.CLILines) == 0 {
 		return output.Failure(commandPath(cmd), nil, "validation_error", "batch plan has no CLI lines"), false
 	}
 	for _, line := range plan.CLILines {
+		if opts.allowDefaultsNoSave && isDefaultsNoSave(line) {
+			continue
+		}
 		class := classifyCLI(line)
 		if class == cliReadOnly {
 			return output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("%q is read-only and does not belong in a change batch", line)), false
@@ -308,6 +327,10 @@ func validateSetLine(line string) error {
 	return nil
 }
 
+func isDefaultsNoSave(line string) bool {
+	return strings.EqualFold(strings.TrimSpace(line), "defaults nosave")
+}
+
 func batchPlanData(plan batch.Plan, applied bool) map[string]any {
 	return map[string]any{
 		"schema_version": plan.SchemaVersion,
@@ -354,6 +377,10 @@ func addChangeFlags(cmd *cobra.Command, flags *changeFlags) {
 }
 
 func (a *app) planOrApplyCLI(cmd *cobra.Command, lines []string, kind string, flags changeFlags) error {
+	return a.planOrApplyCLIWithOperation(cmd, lines, kind, flags, connection.Write)
+}
+
+func (a *app) planOrApplyCLIWithOperation(cmd *cobra.Command, lines []string, kind string, flags changeFlags, op connection.OperationClass) error {
 	plan := map[string]any{
 		"kind":      kind,
 		"cli_lines": lines,
@@ -366,7 +393,10 @@ func (a *app) planOrApplyCLI(cmd *cobra.Command, lines []string, kind string, fl
 	if flags.save && !a.opts.yes {
 		return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--save requires --yes because it persists and usually reboots the flight controller"))
 	}
-	return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+	if flags.save {
+		op = connection.Dangerous
+	}
+	return a.withClient(cmd.Context(), commandPath(cmd), op, func(client *connection.Client, target output.Target) output.Envelope {
 		responses := map[string][]string{}
 		for _, line := range lines {
 			responseLines, err := client.ExecCLI(cmd.Context(), line)

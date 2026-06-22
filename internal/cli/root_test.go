@@ -333,6 +333,113 @@ func TestBatchApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestRestorePlanSkipsBackupWrappersDoesNotConnect(t *testing.T) {
+	called := false
+	input := "# version\nbatch start\ndefaults nosave\nfeature GPS\nset gyro_lpf1_static_hz = 0\nsave\nbatch end\n"
+	env, err := runTestCommandWithInput(t, []string{"restore", "plan"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "feature GPS" || lines[1] != "set gyro_lpf1_static_hz = 0" {
+		t.Fatalf("plan = %+v", data)
+	}
+	skipped := data["skipped_lines"].([]any)
+	if len(skipped) != 5 {
+		t.Fatalf("skipped = %+v", skipped)
+	}
+	if called {
+		t.Fatal("connector was called for restore plan")
+	}
+}
+
+func TestRestorePlanCanIncludeDefaultsNoSave(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"restore", "plan", "--include-defaults"}, "defaults nosave\nfeature GPS\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "defaults nosave" || data["include_defaults"] != true {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
+func TestRestoreApplyIncludeDefaultsRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--include-defaults"}, "defaults nosave\nfeature GPS\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after restore confirmation failure")
+	}
+}
+
+func TestRestoreApplyIncludeDefaultsUsesDangerousOperation(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--include-defaults", "--yes"}, "defaults nosave\nfeature GPS\n", func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		return nil, connection.TargetInfo{}, &connection.CodedError{Code: "test_stop", Message: "stop before hardware"}
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "test_stop" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+}
+
+func TestRestoreApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true || data["saved"] != false {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 2 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestPresetsPlanUsesPresetKind(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"presets", "plan"}, "feature GPS\nset small_angle = 25\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["kind"] != "preset" || data["source_format"] != "preset_text" {
+		t.Fatalf("data = %+v", data)
+	}
+}
+
 func TestTableDomainListsWithFakeFC(t *testing.T) {
 	tests := []struct {
 		args []string

@@ -146,6 +146,126 @@ func TestCLIExecDiffIncludesConfiguration(t *testing.T) {
 	}
 }
 
+func TestFeaturesListWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"features", "list"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	view := data["view"].(map[string]any)
+	features := view["features"].([]any)
+	if len(features) != 1 {
+		t.Fatalf("features = %+v", features)
+	}
+}
+
+func TestFeatureEnablePlanDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"features", "enable", "gps"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if lines[0] != "feature GPS" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only feature command")
+	}
+}
+
+func TestFeatureEnableApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "feature GPS" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestModeSetValidationFailureDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"modes", "set", "x", "0", "0", "1700", "2100"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after validation failure")
+	}
+}
+
+func TestSerialSetPlan(t *testing.T) {
+	env, err := runTestCommand(t, []string{"serial", "set", "UART1", "64", "115200", "57600", "0", "115200"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if lines[0] != "serial UART1 64 115200 57600 0 115200" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
+func TestRateprofilesListWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"rateprofiles", "list"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	view := data["view"].(map[string]any)
+	rateprofiles := view["rateprofiles"].([]any)
+	if len(rateprofiles) != 1 {
+		t.Fatalf("rateprofiles = %+v", rateprofiles)
+	}
+}
+
+func TestDomainSaveRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply", "--save"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after confirmation failure")
+	}
+}
+
 func TestSettingsSetValidationFailureDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"settings", "set", "small_angle", "181", "--apply"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

@@ -48,7 +48,15 @@ betaflight-cli backup diff --port /dev/tty.usbmodem01
 betaflight-cli cli interactive --port /dev/tty.usbmodem01
 betaflight-cli settings get gyro_lpf1_static_hz --port /dev/tty.usbmodem01
 betaflight-cli settings set gyro_lpf1_static_hz 0 --port /dev/tty.usbmodem01 --apply
-betaflight-cli save --port /dev/tty.usbmodem01 --confirm
+betaflight-cli features list --port /dev/tty.usbmodem01
+betaflight-cli features enable GPS --port /dev/tty.usbmodem01
+betaflight-cli features enable GPS --port /dev/tty.usbmodem01 --apply
+betaflight-cli serial list --port /dev/tty.usbmodem01
+betaflight-cli modes list --port /dev/tty.usbmodem01
+betaflight-cli resources list --port /dev/tty.usbmodem01
+betaflight-cli profiles list --port /dev/tty.usbmodem01
+betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
+betaflight-cli save --port /dev/tty.usbmodem01 --yes
 ```
 
 The exact command names are still open for review.
@@ -63,6 +71,8 @@ If multiple Betaflight-compatible devices answer the handshake, the command shou
 
 Configurator parity should be exposed as focused command families rather than one giant command.
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
+The current CLI includes first domain commands for features, serial ports, AUX modes, resources, and profile selectors.
+These commands read from parsed `dump all` output and use Betaflight CLI text lines for plan/apply writes.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.
 Network preset fetching is opt-in and must report source metadata.

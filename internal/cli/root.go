@@ -90,6 +90,12 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.cliCommand())
 	root.AddCommand(a.backupCommand())
 	root.AddCommand(a.settingsCommand())
+	root.AddCommand(a.featuresCommand())
+	root.AddCommand(a.serialCommand())
+	root.AddCommand(a.modesCommand())
+	root.AddCommand(a.resourcesCommand())
+	root.AddCommand(a.profilesCommand())
+	root.AddCommand(a.rateprofilesCommand())
 	root.AddCommand(a.saveCommand())
 	root.AddCommand(a.mspCommand())
 	return root

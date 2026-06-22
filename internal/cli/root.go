@@ -1,0 +1,628 @@
+package cli
+
+import (
+	"context"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
+	"github.com/spf13/cobra"
+
+	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/internal/output"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
+)
+
+type BuildInfo struct {
+	Version string
+	Commit  string
+	Date    string
+}
+
+type app struct {
+	build BuildInfo
+	opts  options
+}
+
+type options struct {
+	port             string
+	autoPort         bool
+	allowUnsupported bool
+	baud             int
+	timeout          time.Duration
+	format           string
+	yes              bool
+}
+
+type exitError int
+
+func (e exitError) Error() string {
+	return fmt.Sprintf("exit %d", int(e))
+}
+
+func Execute(build BuildInfo) int {
+	a := &app{build: build}
+	root := a.rootCommand()
+	if err := root.Execute(); err != nil {
+		var ee exitError
+		if errors.As(err, &ee) {
+			return int(ee)
+		}
+		env := output.Failure(commandPath(root), nil, "usage_error", err.Error())
+		_ = output.Render(os.Stdout, a.opts.format, env)
+		return 1
+	}
+	return 0
+}
+
+func (a *app) rootCommand() *cobra.Command {
+	root := &cobra.Command{
+		Use:           "betaflight-cli",
+		Short:         "AI-agent-first CLI for Betaflight flight controllers",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+	root.PersistentFlags().StringVar(&a.opts.port, "port", "", "USB serial port, such as COM3 or /dev/tty.usbmodem01")
+	root.PersistentFlags().BoolVar(&a.opts.autoPort, "auto-port", false, "explicitly allow automatic port selection for writes")
+	root.PersistentFlags().BoolVar(&a.opts.allowUnsupported, "allow-unsupported", false, "allow domain commands outside supported firmware metadata")
+	root.PersistentFlags().IntVar(&a.opts.baud, "baud", 115200, "serial baud rate")
+	root.PersistentFlags().DurationVar(&a.opts.timeout, "timeout", 2*time.Second, "serial read timeout")
+	root.PersistentFlags().StringVar(&a.opts.format, "format", "json", "output format: json or text")
+	root.PersistentFlags().BoolVar(&a.opts.yes, "yes", false, "confirm non-interactive write or dangerous action")
+
+	root.AddCommand(a.versionCommand())
+	root.AddCommand(a.portsCommand())
+	root.AddCommand(a.doctorCommand())
+	root.AddCommand(a.infoCommand())
+	root.AddCommand(a.telemetryCommand())
+	root.AddCommand(a.cliCommand())
+	root.AddCommand(a.backupCommand())
+	root.AddCommand(a.settingsCommand())
+	root.AddCommand(a.saveCommand())
+	root.AddCommand(a.mspCommand())
+	return root
+}
+
+func (a *app) versionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "version",
+		Short: "Print build version",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			env := output.Success(commandPath(cmd), nil, map[string]string{
+				"version":        a.build.Version,
+				"commit":         a.build.Commit,
+				"date":           a.build.Date,
+				"schema_version": output.SchemaVersion,
+				"go_target":      "latest stable",
+			})
+			return a.render(env)
+		},
+	}
+}
+
+func (a *app) portsCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "ports", Short: "Inspect serial ports"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "list",
+		Short: "List serial ports without opening them",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ports, err := connection.ListPorts()
+			if err != nil {
+				return a.render(a.failure(commandPath(cmd), nil, err))
+			}
+			return a.render(output.Success(commandPath(cmd), nil, map[string]any{"ports": ports}))
+		},
+	})
+	return cmd
+}
+
+func (a *app) doctorCommand() *cobra.Command {
+	var probe bool
+	cmd := &cobra.Command{
+		Use:   "doctor",
+		Short: "Read-only environment and connection diagnostics",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ports, err := connection.ListPorts()
+			if err != nil {
+				return a.render(a.failure(commandPath(cmd), nil, err))
+			}
+			data := map[string]any{
+				"ports":         ports,
+				"probe":         probe,
+				"platform_hint": platformHint(),
+			}
+			if probe {
+				data["probe_results"] = a.probePorts(cmd.Context(), ports)
+			}
+			return a.render(output.Success(commandPath(cmd), nil, data))
+		},
+	}
+	cmd.Flags().BoolVar(&probe, "probe", false, "open candidate ports and test MSP_API_VERSION")
+	return cmd
+}
+
+func (a *app) infoCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "info",
+		Short: "Read flight controller identity and board information",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				info, warnings := bfcommands.ReadInfo(cmd.Context(), client)
+				env := output.Success(commandPath(cmd), &target, info)
+				addStringWarnings(&env, warnings)
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) telemetryCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "telemetry", Short: "Read telemetry"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "snapshot",
+		Short: "Read one telemetry snapshot",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				telemetry, warnings := bfcommands.ReadTelemetry(cmd.Context(), client)
+				env := output.Success(commandPath(cmd), &target, telemetry)
+				addStringWarnings(&env, warnings)
+				return env
+			})
+		},
+	})
+	return cmd
+}
+
+func (a *app) cliCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "cli", Short: "Run Betaflight CLI commands"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "exec COMMAND",
+		Short: "Run a framed non-interactive Betaflight CLI command",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw := args[0]
+			class := classifyCLI(raw)
+			if class != cliReadOnly && !a.opts.yes {
+				env := output.Failure(commandPath(cmd), nil, "confirmation_required", fmt.Sprintf("%q is not classified as read-only; pass --yes or use a safer domain command", raw))
+				return a.render(env)
+			}
+			op := connection.ReadOnly
+			if class == cliWrite {
+				op = connection.Write
+			}
+			if class == cliDangerous {
+				op = connection.Dangerous
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), op, func(client *connection.Client, target output.Target) output.Envelope {
+				lines, err := client.ExecCLI(cmd.Context(), raw)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"command": raw,
+					"lines":   lines,
+					"raw":     strings.Join(lines, "\n"),
+				})
+				if class != cliReadOnly {
+					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: raw})
+				}
+				return env
+			})
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "interactive",
+		Short: "Enter interactive Betaflight CLI mode using #",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			client, _, err := connection.Connect(cmd.Context(), a.connectionConfig(), connection.Dangerous)
+			if err != nil {
+				return a.render(a.failure(commandPath(cmd), nil, err))
+			}
+			defer client.Close()
+			return client.RunInteractive(os.Stdin, os.Stdout)
+		},
+	})
+	return cmd
+}
+
+func (a *app) backupCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "backup", Short: "Create backups and diffs"}
+	cmd.AddCommand(a.backupCreateCommand())
+	cmd.AddCommand(a.backupDiffCommand())
+	return cmd
+}
+
+func (a *app) backupCreateCommand() *cobra.Command {
+	var redact bool
+	returnCmd := &cobra.Command{
+		Use:   "create",
+		Short: "Create restore-oriented backup",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.runBackupCommand(cmd, "dump all", redact)
+		},
+	}
+	returnCmd.Flags().BoolVar(&redact, "redact", false, "redact sensitive values for sharing")
+	return returnCmd
+}
+
+func (a *app) backupDiffCommand() *cobra.Command {
+	var redact bool
+	returnCmd := &cobra.Command{
+		Use:   "diff",
+		Short: "Create compact diff output",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.runBackupCommand(cmd, "diff all", redact)
+		},
+	}
+	returnCmd.Flags().BoolVar(&redact, "redact", false, "redact sensitive values for sharing")
+	return returnCmd
+}
+
+func (a *app) settingsCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "settings", Short: "Plan and apply setting changes"}
+	var apply bool
+	var save bool
+	set := &cobra.Command{
+		Use:   "set NAME VALUE",
+		Short: "Plan or apply a CLI-backed setting change",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name, value := args[0], args[1]
+			line := fmt.Sprintf("set %s = %s", name, value)
+			plan := map[string]any{
+				"setting":   name,
+				"value":     value,
+				"cli_lines": []string{line},
+				"applied":   false,
+				"saved":     false,
+			}
+			if !apply {
+				return a.render(output.Success(commandPath(cmd), nil, plan))
+			}
+			if save && !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--save requires --yes because it persists and usually reboots the flight controller"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				lines, err := client.ExecCLI(cmd.Context(), line)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				plan["applied"] = true
+				plan["response_lines"] = lines
+				env := output.Success(commandPath(cmd), &target, plan)
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
+				if save {
+					saveLines, err := client.ExecCLI(cmd.Context(), "save")
+					if err != nil {
+						addStringWarnings(&env, []string{fmt.Sprintf("save command may have rebooted or disconnected before response completed: %v", err)})
+					}
+					plan["saved"] = true
+					plan["save_response_lines"] = saveLines
+					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
+				}
+				return env
+			})
+		},
+	}
+	set.Flags().BoolVar(&apply, "apply", false, "send the CLI-backed setting change")
+	set.Flags().BoolVar(&save, "save", false, "persist after applying; requires --yes")
+	cmd.AddCommand(set)
+	return cmd
+}
+
+func (a *app) saveCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "save",
+		Short: "Persist configuration with Betaflight save",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "save persists configuration and usually reboots; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Dangerous, func(client *connection.Client, target output.Target) output.Envelope {
+				lines, err := client.ExecCLI(cmd.Context(), "save")
+				env := output.Success(commandPath(cmd), &target, map[string]any{"lines": lines})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
+				if err != nil {
+					addStringWarnings(&env, []string{fmt.Sprintf("save command may have rebooted or disconnected before response completed: %v", err)})
+				}
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) mspCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "msp", Short: "Raw MSP diagnostics"}
+	var payloadHex string
+	cmd.AddCommand(&cobra.Command{
+		Use:   "request CODE",
+		Short: "Send a raw MSP request and return raw payload hex",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			code64, err := strconv.ParseUint(args[0], 0, 16)
+			if err != nil {
+				return err
+			}
+			code := uint16(code64)
+			payload, err := hex.DecodeString(strings.TrimPrefix(payloadHex, "0x"))
+			if err != nil {
+				return err
+			}
+			op := connection.ReadOnly
+			if msp.IsLikelyWriteCode(code) {
+				if !a.opts.yes {
+					return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "raw MSP write-like command requires --yes"))
+				}
+				op = connection.Dangerous
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), op, func(client *connection.Client, target output.Target) output.Envelope {
+				frame, err := client.Request(cmd.Context(), code, payload)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"code":        frame.Code,
+					"version":     frame.Version,
+					"payload_hex": hex.EncodeToString(frame.Payload),
+					"length":      len(frame.Payload),
+				})
+				if op != connection.ReadOnly {
+					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "raw_msp", Detail: "raw MSP write-like command sent"})
+				}
+				return env
+			})
+		},
+	})
+	cmd.PersistentFlags().StringVar(&payloadHex, "payload-hex", "", "hex payload bytes")
+	return cmd
+}
+
+func (a *app) runBackupCommand(cmd *cobra.Command, cliLine string, redact bool) error {
+	return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+		lines, err := client.ExecCLI(cmd.Context(), cliLine)
+		if err != nil {
+			return a.failure(commandPath(cmd), &target, err)
+		}
+		raw := strings.Join(lines, "\n")
+		redactedLines := lines
+		var redacted []string
+		if redact {
+			redactedLines, redacted = redactLines(lines)
+			raw = strings.Join(redactedLines, "\n")
+		}
+		sections := parseCLISections(redactedLines)
+		env := output.Success(commandPath(cmd), &target, map[string]any{
+			"command":           cliLine,
+			"raw":               raw,
+			"lines":             redactedLines,
+			"sections":          sections,
+			"redacted":          redact,
+			"redacted_classes":  redacted,
+			"raw_authoritative": true,
+		})
+		return env
+	})
+}
+
+func (a *app) withClient(ctx context.Context, command string, op connection.OperationClass, fn func(*connection.Client, output.Target) output.Envelope) error {
+	client, targetInfo, err := connection.Connect(ctx, a.connectionConfig(), op)
+	target := toOutputTarget(targetInfo)
+	if err != nil {
+		return a.render(a.failure(command, &target, err))
+	}
+	defer client.Close()
+	return a.render(fn(client, target))
+}
+
+func (a *app) connectionConfig() connection.Config {
+	return connection.Config{
+		Port:             a.opts.port,
+		Baud:             a.opts.baud,
+		Timeout:          a.opts.timeout,
+		AutoPort:         a.opts.autoPort,
+		AllowUnsupported: a.opts.allowUnsupported,
+	}
+}
+
+func (a *app) render(env output.Envelope) error {
+	if err := output.Render(os.Stdout, a.opts.format, env); err != nil {
+		return err
+	}
+	if !env.OK {
+		return exitError(1)
+	}
+	return nil
+}
+
+func (a *app) failure(command string, target *output.Target, err error) output.Envelope {
+	var coded *connection.CodedError
+	if errors.As(err, &coded) {
+		env := output.Failure(command, target, coded.Code, coded.Message)
+		if len(coded.Candidates) > 0 {
+			env.Data = map[string]any{"candidates": coded.Candidates}
+		}
+		return env
+	}
+	return output.Failure(command, target, "error", err.Error())
+}
+
+func (a *app) probePorts(ctx context.Context, ports []connection.PortInfo) []map[string]any {
+	var results []map[string]any
+	for _, p := range ports {
+		if !p.Candidate {
+			results = append(results, map[string]any{
+				"port":      p.Name,
+				"candidate": false,
+				"ok":        false,
+				"reason":    p.Reason,
+			})
+			continue
+		}
+		cfg := a.connectionConfig()
+		cfg.Port = p.Name
+		cfg.AllowUnsupported = true
+		client, target, err := connection.Connect(ctx, cfg, connection.ReadOnly)
+		if client != nil {
+			_ = client.Close()
+		}
+		if err != nil {
+			results = append(results, map[string]any{
+				"port":      p.Name,
+				"candidate": true,
+				"ok":        false,
+				"error":     err.Error(),
+			})
+			continue
+		}
+		results = append(results, map[string]any{
+			"port":      p.Name,
+			"candidate": true,
+			"ok":        true,
+			"target":    target,
+		})
+	}
+	return results
+}
+
+func toOutputTarget(target connection.TargetInfo) output.Target {
+	return output.Target{
+		Port:            target.Port,
+		AutoDetected:    target.AutoDetected,
+		SelectionReason: target.SelectionReason,
+		Variant:         target.Variant,
+		FirmwareVersion: target.FirmwareVersion,
+		MSPAPIVersion:   target.MSPAPIVersion,
+		MSPProtocol:     target.MSPProtocol,
+	}
+}
+
+func addStringWarnings(env *output.Envelope, warnings []string) {
+	for _, warning := range warnings {
+		env.Warnings = append(env.Warnings, output.Warning{
+			Code:    "partial_result",
+			Message: warning,
+		})
+	}
+}
+
+func commandPath(cmd *cobra.Command) string {
+	if cmd == nil {
+		return "betaflight-cli"
+	}
+	return cmd.CommandPath()
+}
+
+func platformHint() string {
+	return "USB serial only. On macOS prefer /dev/cu.* ports; on Linux check dialout/uucp permissions; on Windows use COM ports."
+}
+
+type cliClass int
+
+const (
+	cliReadOnly cliClass = iota
+	cliWrite
+	cliDangerous
+)
+
+func classifyCLI(command string) cliClass {
+	fields := strings.Fields(strings.ToLower(strings.TrimSpace(command)))
+	if len(fields) == 0 {
+		return cliReadOnly
+	}
+	first := fields[0]
+	switch first {
+	case "save", "defaults", "motor", "motors", "dshotprog", "bl", "dfu", "msc", "exit", "reboot", "erase", "beeper":
+		return cliDangerous
+	case "diff", "dump", "get", "version", "status", "help", "tasks":
+		return cliReadOnly
+	case "resource":
+		if len(fields) == 1 || fields[1] == "show" || fields[1] == "list" {
+			return cliReadOnly
+		}
+		return cliWrite
+	case "set", "feature", "serial", "aux", "profile", "rateprofile", "vtxtable", "mode_color", "color":
+		return cliWrite
+	default:
+		return cliWrite
+	}
+}
+
+func parseCLISections(lines []string) map[string][]string {
+	sections := map[string][]string{
+		"settings":  {},
+		"profiles":  {},
+		"serial":    {},
+		"modes":     {},
+		"features":  {},
+		"resources": {},
+		"vtx_table": {},
+		"osd":       {},
+		"unknown":   {},
+	}
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(trimmed, "set "):
+			sections["settings"] = append(sections["settings"], trimmed)
+		case strings.HasPrefix(trimmed, "profile ") || strings.HasPrefix(trimmed, "rateprofile "):
+			sections["profiles"] = append(sections["profiles"], trimmed)
+		case strings.HasPrefix(trimmed, "serial "):
+			sections["serial"] = append(sections["serial"], trimmed)
+		case strings.HasPrefix(trimmed, "aux ") || strings.HasPrefix(trimmed, "mode_color ") || strings.HasPrefix(trimmed, "color "):
+			sections["modes"] = append(sections["modes"], trimmed)
+		case strings.HasPrefix(trimmed, "feature "):
+			sections["features"] = append(sections["features"], trimmed)
+		case strings.HasPrefix(trimmed, "resource "):
+			sections["resources"] = append(sections["resources"], trimmed)
+		case strings.HasPrefix(trimmed, "vtxtable "):
+			sections["vtx_table"] = append(sections["vtx_table"], trimmed)
+		case strings.HasPrefix(trimmed, "osd_") || strings.HasPrefix(trimmed, "set osd_"):
+			sections["osd"] = append(sections["osd"], trimmed)
+		default:
+			sections["unknown"] = append(sections["unknown"], trimmed)
+		}
+	}
+	return sections
+}
+
+func redactLines(lines []string) ([]string, []string) {
+	var out []string
+	classes := map[string]bool{}
+	sensitive := []string{"pilot_name", "craft_name", "callsign", "bind", "signature", "uid", "name"}
+	for _, line := range lines {
+		redacted := line
+		lower := strings.ToLower(line)
+		for _, key := range sensitive {
+			if strings.Contains(lower, key) {
+				redacted = redactValue(line)
+				classes[key] = true
+				break
+			}
+		}
+		out = append(out, redacted)
+	}
+	var classList []string
+	for class := range classes {
+		classList = append(classList, class)
+	}
+	return out, classList
+}
+
+func redactValue(line string) string {
+	if i := strings.Index(line, "="); i >= 0 {
+		return strings.TrimSpace(line[:i+1]) + " REDACTED"
+	}
+	fields := strings.Fields(line)
+	if len(fields) <= 1 {
+		return line
+	}
+	return fields[0] + " REDACTED"
+}

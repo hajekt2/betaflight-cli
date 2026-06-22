@@ -1,0 +1,85 @@
+# Source Review Notes
+
+These notes summarize the first architecture pass over the upstream references.
+They are not a substitute for generated metadata or tests.
+
+## Betaflight Firmware
+
+`src/main/msp/msp_protocol.h` defines MSP API version `1.48` on the reviewed master branch.
+It states that clients should start with `MSP_API_VERSION`, reject unsupported major versions, and handle minor-version increases gracefully.
+Upstream release information shows Betaflight has moved from the planned `4.6` naming to the `2025.12.x` CalVer line.
+The initial support policy should therefore target official Betaflight `2025.12.x` and newer instead of old `4.x` firmware.
+
+The same header defines the core v1 command codes used for the MVP shape:
+
+- `MSP_API_VERSION = 1`
+- `MSP_FC_VARIANT = 2`
+- `MSP_FC_VERSION = 3`
+- `MSP_STATUS = 101`
+- `MSP_RC = 105`
+- `MSP_ATTITUDE = 108`
+- `MSP_BATTERY_STATE = 130`
+- `MSP_STATUS_EX = 150`
+
+`src/main/msp/msp_protocol_v2_betaflight.h` defines Betaflight-specific MSP v2 commands.
+The reviewed branch includes `MSP2_CLI_SETTING = 0x3010` and `MSP2_CLI_SETTING_INFO = 0x3011`, which are promising for typed setting access.
+
+`src/main/msp/msp.c` writes identity and telemetry payloads directly.
+`MSP_STATUS_EX` extends `MSP_STATUS` with CPU load, profile counts, rate profile, extended mode flags, arming disable flags, configuration state, and optional CPU temperature.
+
+`src/main/msp/msp_serial.c` enters interactive CLI Mode after receiving `#` while the port is idle.
+It enters framed CLI command mode after receiving STX.
+The firmware sends STX at the start and ETX at the end of framed CLI output.
+`betaflight-cli` should mirror that split by using `#` for `cli interactive` and STX/ETX command mode for `cli exec`.
+
+`src/main/cli/cli.c` shows that non-interactive CLI command mode exits when ETX is received or after a two-second timeout.
+Interactive CLI Mode prints a prompt and disables arming for safety.
+
+`src/main/cli/settings.c` is the main source of setting metadata.
+Its table contains names, value types, lookup tables, ranges, scopes, parameter groups, and field offsets.
+
+Backup command behavior still needs exact verification against Betaflight `2025.12.x`.
+The intended policy is restore-oriented `backup create`, preferably based on `dump all`, and compact `backup diff`, based on `diff all`.
+
+## Betaflight Configurator
+
+`src/js/msp.js` implements the MSP state machine.
+It supports MSP v1 and v2.
+MSP v1 uses `$M<`, one-byte size, one-byte code, payload, and XOR checksum.
+MSP v2 uses `$X<`, flag, little-endian command, little-endian size, payload, and CRC8 DVB-S2.
+
+The same file sends codes up to 254 as MSP v1 and larger codes as MSP v2.
+It also contains separate CLI command framing with STX, LF, and ETX.
+
+Configurator keeps a CLI command queue, a command timeout, and a drain period after timeouts.
+This is a strong signal that the Go CLI should model CLI command mode explicitly.
+
+`src/js/msp/MSPConnector.js` opens the serial connection and immediately requests `MSP_API_VERSION`.
+It disconnects after a connect timeout if that response never arrives.
+
+`src/js/msp/MSPCodes.js` is useful as a comparison source, but the firmware headers should remain the primary code source.
+
+## Betaflight MCP Reference
+
+The Python reference uses a small MSP protocol layer and a higher-level command layer.
+Its payload reader returns safe zero values on out-of-range reads, which avoids panics on shorter payloads.
+
+For Go, silent zero values would hide parsing errors too easily.
+The better adaptation is guarded reads that return structured short-payload errors while still allowing optional trailing fields.
+
+The reference also tries `MSP_STATUS_EX` first and falls back to `MSP_STATUS`.
+That is a good pattern for compatibility-aware commands.
+
+## Betaflight Claude Skill
+
+The skill emphasizes machine-readable JSON, live reads before writes, explicit confirmation before saving, and props-off warnings for high-risk actions.
+Those are product requirements for this CLI, not just documentation preferences.
+
+It also treats Blackbox analysis as a future structured workflow.
+The Go CLI should keep room for Blackbox commands without coupling them to live serial sessions.
+
+## Blackbox Log Viewer
+
+The viewer remains the reference for Blackbox decoding and analysis behavior.
+Initial `betaflight-cli` work should not copy its graphical behavior.
+Future Blackbox support should focus on extraction, decoding, summaries, CSV, and JSON.

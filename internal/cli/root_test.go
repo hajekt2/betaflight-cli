@@ -205,6 +205,25 @@ func TestBlackboxConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestVTXConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtx", "config"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	config := data["vtx"].(map[string]any)
+	if config["type_name"] != "SMARTAUDIO" || config["frequency_mhz"] != float64(5861) || config["pit_mode"] != true {
+		t.Fatalf("config = %+v", config)
+	}
+	table := config["table"].(map[string]any)
+	if table["available"] != true || table["bands"] != float64(5) || table["channels"] != float64(8) || table["power_levels"] != float64(3) {
+		t.Fatalf("table = %+v", table)
+	}
+}
+
 func TestFeaturesListWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "list"}, nil)
 	if err != nil {

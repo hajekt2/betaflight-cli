@@ -44,6 +44,9 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	addChangeFlags(set, &flags)
 	cmd.AddCommand(set)
+	if domain.use == "vtx" {
+		cmd.AddCommand(a.vtxConfigCommand())
+	}
 	return cmd
 }
 

@@ -116,6 +116,9 @@ The marker counts and candidate frame index are approximate until full binary fr
 `blackbox config` returns a `blackbox` object decoded from `MSP_BLACKBOX_CONFIG`.
 The object includes support status, device index and name, rate fields, optional sample-rate metadata, and optional enabled or disabled Blackbox field selections when the firmware supplies the mask.
 
+`vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
+The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

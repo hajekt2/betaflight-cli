@@ -125,6 +125,9 @@ The object includes a paged mode definition catalog and mode range rows with per
 `receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, and `MSP_RC`.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, and live RC channel values.
 
+`gps status` returns a `gps` object decoded from `MSP_GPS_CONFIG`, `MSP_RAW_GPS`, `MSP_COMP_GPS`, `MSP_GPS_RESCUE`, `MSP_GPS_RESCUE_PIDS`, and `MSP_GPSSVINFO`.
+The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

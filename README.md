@@ -78,6 +78,7 @@ betaflight-cli vtx list --port /dev/tty.usbmodem01
 betaflight-cli vtx config --port /dev/tty.usbmodem01
 betaflight-cli osd list --port /dev/tty.usbmodem01
 betaflight-cli gps list --port /dev/tty.usbmodem01
+betaflight-cli gps status --port /dev/tty.usbmodem01
 betaflight-cli failsafe list --port /dev/tty.usbmodem01
 printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch plan
 printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch apply --port /dev/tty.usbmodem01
@@ -112,6 +113,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
 `receiver status` reads receiver configuration, channel map, RSSI channel, and live RC channels over MSP.
+`gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, and a capped candidate frame index.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.

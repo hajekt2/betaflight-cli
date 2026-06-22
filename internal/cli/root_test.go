@@ -283,6 +283,34 @@ func TestReceiverStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestGPSStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"gps", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	gps := data["gps"].(map[string]any)
+	config := gps["config"].(map[string]any)
+	if config["provider"] != float64(1) || config["auto_config"] != true || config["ublox_use_galileo"] != true {
+		t.Fatalf("config = %+v", config)
+	}
+	position := gps["position"].(map[string]any)
+	if position["fix"] != true || position["satellites"] != float64(12) || position["latitude_degrees"] != 59.9123456 {
+		t.Fatalf("position = %+v", position)
+	}
+	rescue := gps["rescue"].(map[string]any)
+	if rescue["min_sats"] != float64(8) || rescue["initial_climb_m"] != float64(20) {
+		t.Fatalf("rescue = %+v", rescue)
+	}
+	satellites := gps["satellites"].([]any)
+	if len(satellites) != 2 {
+		t.Fatalf("satellites = %+v", satellites)
+	}
+}
+
 func TestFeaturesListWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"features", "list"}, nil)
 	if err != nil {

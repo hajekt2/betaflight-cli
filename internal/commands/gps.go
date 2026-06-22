@@ -1,0 +1,411 @@
+package commands
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
+)
+
+type GPSStatus struct {
+	Config     *GPSConfig     `json:"config,omitempty"`
+	Position   *GPSPosition   `json:"position,omitempty"`
+	Home       *GPSHome       `json:"home,omitempty"`
+	Rescue     *GPSRescue     `json:"rescue,omitempty"`
+	RescuePID  *GPSRescuePID  `json:"rescue_pid,omitempty"`
+	Satellites []GPSSatellite `json:"satellites,omitempty"`
+}
+
+type GPSConfig struct {
+	Provider        uint8 `json:"provider"`
+	SBASMode        uint8 `json:"sbas_mode"`
+	AutoConfig      bool  `json:"auto_config"`
+	AutoBaud        bool  `json:"auto_baud"`
+	HomePointOnce   *bool `json:"home_point_once,omitempty"`
+	UBloxUseGalileo *bool `json:"ublox_use_galileo,omitempty"`
+}
+
+type GPSPosition struct {
+	Fix              bool    `json:"fix"`
+	Satellites       uint8   `json:"satellites"`
+	LatitudeE7       int32   `json:"latitude_e7"`
+	LongitudeE7      int32   `json:"longitude_e7"`
+	LatitudeDegrees  float64 `json:"latitude_degrees"`
+	LongitudeDegrees float64 `json:"longitude_degrees"`
+	AltitudeM        uint16  `json:"altitude_m"`
+	GroundSpeedCMS   uint16  `json:"ground_speed_cm_s"`
+	GroundCourseDeg  float64 `json:"ground_course_degrees"`
+	PDOP             *uint16 `json:"pdop,omitempty"`
+}
+
+type GPSHome struct {
+	DistanceM    uint16 `json:"distance_m"`
+	DirectionDeg uint16 `json:"direction_degrees"`
+	Update       bool   `json:"update"`
+}
+
+type GPSRescue struct {
+	MaxRescueAngle        uint16  `json:"max_rescue_angle"`
+	ReturnAltitudeM       uint16  `json:"return_altitude_m"`
+	DescentDistanceM      uint16  `json:"descent_distance_m"`
+	GroundSpeedCMS        uint16  `json:"ground_speed_cm_s"`
+	ThrottleMin           uint16  `json:"throttle_min"`
+	ThrottleMax           uint16  `json:"throttle_max"`
+	ThrottleHover         uint16  `json:"throttle_hover"`
+	SanityChecks          uint8   `json:"sanity_checks"`
+	MinSats               uint8   `json:"min_sats"`
+	AscendRate            *uint16 `json:"ascend_rate,omitempty"`
+	DescendRate           *uint16 `json:"descend_rate,omitempty"`
+	AllowArmingWithoutFix *bool   `json:"allow_arming_without_fix,omitempty"`
+	AltitudeMode          *uint8  `json:"altitude_mode,omitempty"`
+	MinStartDistanceM     *uint16 `json:"min_start_distance_m,omitempty"`
+	InitialClimbM         *uint16 `json:"initial_climb_m,omitempty"`
+}
+
+type GPSRescuePID struct {
+	AltitudeP uint16 `json:"altitude_p"`
+	AltitudeI uint16 `json:"altitude_i"`
+	AltitudeD uint16 `json:"altitude_d"`
+	VelocityP uint16 `json:"velocity_p"`
+	VelocityI uint16 `json:"velocity_i"`
+	VelocityD uint16 `json:"velocity_d"`
+	YawP      uint16 `json:"yaw_p"`
+}
+
+type GPSSatellite struct {
+	Channel uint8 `json:"channel"`
+	SVID    uint8 `json:"svid"`
+	Quality uint8 `json:"quality"`
+	CNO     uint8 `json:"cno"`
+}
+
+func ReadGPSStatus(ctx context.Context, client *connection.Client) (*GPSStatus, []string, error) {
+	status := &GPSStatus{}
+	warnings := []string{}
+	frame, err := client.Request(ctx, msp.MSPGPSConfig, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gps config unavailable: %w", err)
+	}
+	config, err := DecodeGPSConfig(frame.Payload)
+	if err != nil {
+		return nil, nil, fmt.Errorf("gps config decode failed: %w", err)
+	}
+	status.Config = config
+	if position, err := readGPSPosition(ctx, client); err == nil {
+		status.Position = position
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if home, err := readGPSHome(ctx, client); err == nil {
+		status.Home = home
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if rescue, err := readGPSRescue(ctx, client); err == nil {
+		status.Rescue = rescue
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if rescuePID, err := readGPSRescuePID(ctx, client); err == nil {
+		status.RescuePID = rescuePID
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if satellites, err := readGPSSatellites(ctx, client); err == nil {
+		status.Satellites = satellites
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	return status, warnings, nil
+}
+
+func DecodeGPSConfig(payload []byte) (*GPSConfig, error) {
+	r := msp.NewPayloadReader(payload)
+	provider, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	sbas, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	autoConfig, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	autoBaud, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	config := &GPSConfig{
+		Provider:   provider,
+		SBASMode:   sbas,
+		AutoConfig: autoConfig != 0,
+		AutoBaud:   autoBaud != 0,
+	}
+	if r.Remaining() >= 1 {
+		homePointOnce, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		v := homePointOnce != 0
+		config.HomePointOnce = &v
+	}
+	if r.Remaining() >= 1 {
+		useGalileo, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		v := useGalileo != 0
+		config.UBloxUseGalileo = &v
+	}
+	return config, nil
+}
+
+func DecodeGPSPosition(payload []byte) (*GPSPosition, error) {
+	r := msp.NewPayloadReader(payload)
+	fix, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	sats, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	latRaw, err := r.U32()
+	if err != nil {
+		return nil, err
+	}
+	lonRaw, err := r.U32()
+	if err != nil {
+		return nil, err
+	}
+	altitude, err := r.U16()
+	if err != nil {
+		return nil, err
+	}
+	speed, err := r.U16()
+	if err != nil {
+		return nil, err
+	}
+	course, err := r.U16()
+	if err != nil {
+		return nil, err
+	}
+	lat := int32(latRaw)
+	lon := int32(lonRaw)
+	position := &GPSPosition{
+		Fix:              fix != 0,
+		Satellites:       sats,
+		LatitudeE7:       lat,
+		LongitudeE7:      lon,
+		LatitudeDegrees:  float64(lat) / 1e7,
+		LongitudeDegrees: float64(lon) / 1e7,
+		AltitudeM:        altitude,
+		GroundSpeedCMS:   speed,
+		GroundCourseDeg:  float64(course) / 10,
+	}
+	if r.Remaining() >= 2 {
+		pdop, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		position.PDOP = &pdop
+	}
+	return position, nil
+}
+
+func DecodeGPSHome(payload []byte) (*GPSHome, error) {
+	r := msp.NewPayloadReader(payload)
+	distance, err := r.U16()
+	if err != nil {
+		return nil, err
+	}
+	direction, err := r.U16()
+	if err != nil {
+		return nil, err
+	}
+	update, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	return &GPSHome{DistanceM: distance, DirectionDeg: direction, Update: update != 0}, nil
+}
+
+func DecodeGPSRescue(payload []byte) (*GPSRescue, error) {
+	r := msp.NewPayloadReader(payload)
+	rescue := &GPSRescue{}
+	var err error
+	if rescue.MaxRescueAngle, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if rescue.ReturnAltitudeM, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if rescue.DescentDistanceM, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if rescue.GroundSpeedCMS, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if rescue.ThrottleMin, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if rescue.ThrottleMax, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if rescue.ThrottleHover, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if rescue.SanityChecks, err = r.U8(); err != nil {
+		return nil, err
+	}
+	if rescue.MinSats, err = r.U8(); err != nil {
+		return nil, err
+	}
+	if r.Remaining() >= 2 {
+		v, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		rescue.AscendRate = &v
+	}
+	if r.Remaining() >= 2 {
+		v, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		rescue.DescendRate = &v
+	}
+	if r.Remaining() >= 1 {
+		raw, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		v := raw != 0
+		rescue.AllowArmingWithoutFix = &v
+	}
+	if r.Remaining() >= 1 {
+		v, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		rescue.AltitudeMode = &v
+	}
+	if r.Remaining() >= 2 {
+		v, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		rescue.MinStartDistanceM = &v
+	}
+	if r.Remaining() >= 2 {
+		v, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		rescue.InitialClimbM = &v
+	}
+	return rescue, nil
+}
+
+func DecodeGPSRescuePID(payload []byte) (*GPSRescuePID, error) {
+	r := msp.NewPayloadReader(payload)
+	pid := &GPSRescuePID{}
+	var err error
+	if pid.AltitudeP, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if pid.AltitudeI, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if pid.AltitudeD, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if pid.VelocityP, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if pid.VelocityI, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if pid.VelocityD, err = r.U16(); err != nil {
+		return nil, err
+	}
+	if pid.YawP, err = r.U16(); err != nil {
+		return nil, err
+	}
+	return pid, nil
+}
+
+func DecodeGPSSatellites(payload []byte) ([]GPSSatellite, error) {
+	if len(payload) == 0 {
+		return nil, nil
+	}
+	r := msp.NewPayloadReader(payload)
+	count, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	satellites := make([]GPSSatellite, 0, count)
+	for i := 0; i < int(count); i++ {
+		channel, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		svid, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		quality, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		cno, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		satellites = append(satellites, GPSSatellite{Channel: channel, SVID: svid, Quality: quality, CNO: cno})
+	}
+	return satellites, nil
+}
+
+func readGPSPosition(ctx context.Context, client *connection.Client) (*GPSPosition, error) {
+	frame, err := client.Request(ctx, msp.MSPRawGPS, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gps position unavailable: %w", err)
+	}
+	return DecodeGPSPosition(frame.Payload)
+}
+
+func readGPSHome(ctx context.Context, client *connection.Client) (*GPSHome, error) {
+	frame, err := client.Request(ctx, msp.MSPCompGPS, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gps home unavailable: %w", err)
+	}
+	return DecodeGPSHome(frame.Payload)
+}
+
+func readGPSRescue(ctx context.Context, client *connection.Client) (*GPSRescue, error) {
+	frame, err := client.Request(ctx, msp.MSPGPSRescue, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gps rescue unavailable: %w", err)
+	}
+	return DecodeGPSRescue(frame.Payload)
+}
+
+func readGPSRescuePID(ctx context.Context, client *connection.Client) (*GPSRescuePID, error) {
+	frame, err := client.Request(ctx, msp.MSPGPSRescuePids, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gps rescue pids unavailable: %w", err)
+	}
+	return DecodeGPSRescuePID(frame.Payload)
+}
+
+func readGPSSatellites(ctx context.Context, client *connection.Client) ([]GPSSatellite, error) {
+	frame, err := client.Request(ctx, msp.MSPGpssvinfo, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gps satellite info unavailable: %w", err)
+	}
+	return DecodeGPSSatellites(frame.Payload)
+}

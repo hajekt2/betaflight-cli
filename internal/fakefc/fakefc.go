@@ -262,6 +262,48 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte{0, 1, 3, 2}, false))
 	case msp.MSPRSSIConfig:
 		f.out.Write(response(frame.Code, []byte{8}, false))
+	case msp.MSPGPSConfig:
+		f.out.Write(response(frame.Code, []byte{1, 0, 1, 1, 1, 1}, false))
+	case msp.MSPRawGPS:
+		payload := []byte{1, 12}
+		payload = appendS32(payload, 599123456)
+		payload = appendS32(payload, 105123456)
+		payload = appendU16(payload, 124)
+		payload = appendU16(payload, 1450)
+		payload = appendU16(payload, 2715)
+		payload = appendU16(payload, 95)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPCompGPS:
+		payload := appendU16(nil, 342)
+		payload = appendU16(payload, 184)
+		payload = append(payload, 1)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPGPSRescue:
+		payload := appendU16(nil, 3200)
+		payload = appendU16(payload, 100)
+		payload = appendU16(payload, 50)
+		payload = appendU16(payload, 1500)
+		payload = appendU16(payload, 1200)
+		payload = appendU16(payload, 1800)
+		payload = appendU16(payload, 1450)
+		payload = append(payload, 1, 8)
+		payload = appendU16(payload, 500)
+		payload = appendU16(payload, 150)
+		payload = append(payload, 1, 2)
+		payload = appendU16(payload, 30)
+		payload = appendU16(payload, 20)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPGPSRescuePids:
+		payload := appendU16(nil, 80)
+		payload = appendU16(payload, 10)
+		payload = appendU16(payload, 5)
+		payload = appendU16(payload, 120)
+		payload = appendU16(payload, 20)
+		payload = appendU16(payload, 10)
+		payload = appendU16(payload, 45)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPGpssvinfo:
+		f.out.Write(response(frame.Code, []byte{2, 0, 12, 4, 45, 1, 24, 3, 39}, false))
 	case msp.MSPVTXConfig:
 		payload := []byte{3, 5, 8, 2, 1}
 		payload = appendU16(payload, 5861)
@@ -321,6 +363,10 @@ func appendU16(dst []byte, v uint16) []byte {
 
 func appendS16(dst []byte, v int16) []byte {
 	return appendU16(dst, uint16(v))
+}
+
+func appendS32(dst []byte, v int32) []byte {
+	return appendU32(dst, uint32(v))
 }
 
 func appendU32(dst []byte, v uint32) []byte {

@@ -52,6 +52,9 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "receiver" {
 		cmd.AddCommand(a.receiverStatusCommand())
 	}
+	if domain.use == "gps" {
+		cmd.AddCommand(a.gpsStatusCommand())
+	}
 	return cmd
 }
 
@@ -67,6 +70,25 @@ func (a *app) receiverStatusCommand() *cobra.Command {
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"receiver": receiver,
+					"warnings": warnings,
+				})
+			})
+		},
+	}
+}
+
+func (a *app) gpsStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read GPS configuration, position, and Rescue state over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				gps, warnings, err := bfcommands.ReadGPSStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"gps":      gps,
 					"warnings": warnings,
 				})
 			})

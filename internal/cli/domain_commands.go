@@ -210,7 +210,20 @@ func (a *app) profilesCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(rate, &rateFlags)
-	cmd.AddCommand(profile, rate)
+	var batteryFlags changeFlags
+	battery := &cobra.Command{
+		Use:   "battery-select INDEX",
+		Short: "Plan or select battery profile",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if err := requireInts(args); err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			return a.planOrApplyCLI(cmd, []string{"battery_profile " + args[0]}, "battery_profile", batteryFlags)
+		},
+	}
+	addChangeFlags(battery, &batteryFlags)
+	cmd.AddCommand(profile, rate, battery)
 	return cmd
 }
 
@@ -361,7 +374,7 @@ func isBatchAllowed(line string) bool {
 		return false
 	}
 	switch fields[0] {
-	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail":
+	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "battery_profile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail":
 		return true
 	default:
 		return false

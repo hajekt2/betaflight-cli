@@ -68,6 +68,7 @@ betaflight-cli modes active --port /dev/tty.usbmodem01
 betaflight-cli resources list --port /dev/tty.usbmodem01
 betaflight-cli profiles list --port /dev/tty.usbmodem01
 betaflight-cli profiles status --port /dev/tty.usbmodem01
+betaflight-cli profiles battery-select 1 --port /dev/tty.usbmodem01
 betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
 betaflight-cli vtxtable list --port /dev/tty.usbmodem01
 betaflight-cli leds list --port /dev/tty.usbmodem01

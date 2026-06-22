@@ -664,6 +664,62 @@ func TestProfilesStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestProfilesBatterySelectPlanDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"profiles", "battery-select", "1"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if lines[0] != "battery_profile 1" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only battery profile command")
+	}
+}
+
+func TestProfilesBatterySelectValidationFailureDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"profiles", "battery-select", "one"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after battery profile validation failure")
+	}
+}
+
+func TestProfilesBatterySelectApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"profiles", "battery-select", "1", "--apply"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "battery_profile 1" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestDomainSaveRequiresYesDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply", "--save"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
@@ -1209,7 +1265,7 @@ func TestTableDomainSetApplyWithFakeFC(t *testing.T) {
 }
 
 func TestBatchPlanAllowsTableRows(t *testing.T) {
-	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "led 0 0,0::C:0\nservo 0 1000 2000 1500 100 -1\nadjrange 0 0 0 900 1300 12 0 0 0\nrxrange 0 1000 2000\nrxfail 2 s 1100\n", nil)
+	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "led 0 0,0::C:0\nservo 0 1000 2000 1500 100 -1\nadjrange 0 0 0 900 1300 12 0 0 0\nrxrange 0 1000 2000\nrxfail 2 s 1100\nbattery_profile 1\n", nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -1218,7 +1274,7 @@ func TestBatchPlanAllowsTableRows(t *testing.T) {
 	}
 	data := env.Data.(map[string]any)
 	lines := data["cli_lines"].([]any)
-	if len(lines) != 5 {
+	if len(lines) != 6 {
 		t.Fatalf("plan = %+v", data)
 	}
 }

@@ -103,6 +103,7 @@ func New() *FC {
 			"rxfail 2 s 1100":                       {"rxfail updated"},
 			"profile 1":                             {"profile 1"},
 			"rateprofile 2":                         {"rateprofile 2"},
+			"battery_profile 1":                     {"battery_profile 1"},
 			"save":                                  {"Saving..."},
 		},
 		Unsupported: map[uint16]bool{},

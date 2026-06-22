@@ -333,6 +333,118 @@ func TestBatchApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestTableDomainListsWithFakeFC(t *testing.T) {
+	tests := []struct {
+		args []string
+		key  string
+	}{
+		{[]string{"vtxtable", "list"}, "vtx_table"},
+		{[]string{"leds", "list"}, "leds"},
+		{[]string{"servos", "list"}, "servos"},
+		{[]string{"adjustments", "list"}, "adjranges"},
+		{[]string{"rxrange", "list"}, "rxranges"},
+	}
+	for _, tt := range tests {
+		env, err := runTestCommand(t, tt.args, nil)
+		if err != nil {
+			t.Fatalf("%v command error = %v", tt.args, err)
+		}
+		if !env.OK {
+			t.Fatalf("%v env.OK = false: %+v", tt.args, env.Errors)
+		}
+		data := env.Data.(map[string]any)
+		view := data["view"].(map[string]any)
+		items := view[tt.key].([]any)
+		if len(items) == 0 {
+			t.Fatalf("%v view = %+v", tt.args, view)
+		}
+	}
+}
+
+func TestTableDomainSetPlansDoNotConnect(t *testing.T) {
+	tests := []struct {
+		args []string
+		line string
+	}{
+		{[]string{"vtxtable", "set", "bands", "1"}, "vtxtable bands 1"},
+		{[]string{"leds", "set", "0", "0,0::C:0"}, "led 0 0,0::C:0"},
+		{[]string{"servos", "set", "0", "1000", "2000", "1500", "100", "none"}, "servo 0 1000 2000 1500 100 -1"},
+		{[]string{"servos", "reverse", "0", "2", "r"}, "smix reverse 0 2 r"},
+		{[]string{"adjustments", "set", "0", "0", "0", "900", "1300", "12", "0", "0", "0"}, "adjrange 0 0 0 900 1300 12 0 0 0"},
+		{[]string{"rxrange", "set", "0", "1000", "2000"}, "rxrange 0 1000 2000"},
+	}
+	for _, tt := range tests {
+		called := false
+		env, err := runTestCommand(t, tt.args, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+			called = true
+			return nil, connection.TargetInfo{}, nil
+		})
+		if err != nil {
+			t.Fatalf("%v command error = %v", tt.args, err)
+		}
+		if !env.OK {
+			t.Fatalf("%v env.OK = false: %+v", tt.args, env.Errors)
+		}
+		data := env.Data.(map[string]any)
+		lines := data["cli_lines"].([]any)
+		if lines[0] != tt.line || data["applied"] != false {
+			t.Fatalf("%v plan = %+v", tt.args, data)
+		}
+		if called {
+			t.Fatalf("%v connector was called for plan-only table command", tt.args)
+		}
+	}
+}
+
+func TestTableDomainSetValidationFailureDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"servos", "set", "0", "1000", "2000", "middle", "100", "none"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after table validation failure")
+	}
+}
+
+func TestTableDomainSetApplyWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"rxrange", "set", "0", "1000", "2000", "--apply"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "rxrange 0 1000 2000" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBatchPlanAllowsTableRows(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "led 0 0,0::C:0\nservo 0 1000 2000 1500 100 -1\nadjrange 0 0 0 900 1300 12 0 0 0\nrxrange 0 1000 2000\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 4 {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
 func TestSettingDomainListsWithFakeFC(t *testing.T) {
 	tests := []struct {
 		args []string

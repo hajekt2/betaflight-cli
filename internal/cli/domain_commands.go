@@ -279,7 +279,7 @@ func isBatchAllowed(line string) bool {
 		return false
 	}
 	switch fields[0] {
-	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "vtxtable", "mode_color", "color":
+	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange":
 		return true
 	default:
 		return false
@@ -401,4 +401,12 @@ func requireInts(values []string) error {
 		}
 	}
 	return nil
+}
+
+func validationFailure(a *app, cmd *cobra.Command, err error) error {
+	return validationFailureMessage(a, cmd, err.Error())
+}
+
+func validationFailureMessage(a *app, cmd *cobra.Command, message string) error {
+	return a.render(output.Failure(commandPath(cmd), nil, "validation_error", message))
 }

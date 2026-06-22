@@ -97,6 +97,11 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.resourcesCommand())
 	root.AddCommand(a.profilesCommand())
 	root.AddCommand(a.rateprofilesCommand())
+	root.AddCommand(a.vtxTableCommand())
+	root.AddCommand(a.ledsCommand())
+	root.AddCommand(a.servosCommand())
+	root.AddCommand(a.adjustmentsCommand())
+	root.AddCommand(a.rxRangeCommand())
 	root.AddCommand(a.settingDomainCommand(pidDomain()))
 	root.AddCommand(a.settingDomainCommand(ratesDomain()))
 	root.AddCommand(a.settingDomainCommand(filtersDomain()))
@@ -643,7 +648,7 @@ func classifyCLI(command string) cliClass {
 			return cliReadOnly
 		}
 		return cliWrite
-	case "set", "feature", "serial", "aux", "profile", "rateprofile", "vtxtable", "mode_color", "color":
+	case "set", "feature", "serial", "aux", "profile", "rateprofile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange":
 		return cliWrite
 	default:
 		return cliWrite

@@ -18,6 +18,11 @@ func TestParseDocument(t *testing.T) {
 		"aux 0 0 0 1700 2100 0 0",
 		"resource MOTOR 1 A00",
 		"vtxtable bands 5",
+		"led 0 0,0::C:0",
+		"servo 0 1000 2000 1500 100 -1",
+		"smix reverse 0 2 r",
+		"adjrange 0 0 0 900 1300 12 0 0 0",
+		"rxrange 0 1000 2000",
 		"set gyro_lpf1_static_hz = 0",
 		"set imaginary_setting = value",
 		"set osd_units = METRIC",
@@ -53,6 +58,21 @@ func TestParseDocument(t *testing.T) {
 	}
 	if len(doc.VTXTable) != 1 {
 		t.Fatalf("vtx = %+v", doc.VTXTable)
+	}
+	if len(doc.LEDs) != 1 || doc.LEDs[0].Index != "0" || doc.LEDs[0].Value != "0,0::C:0" {
+		t.Fatalf("leds = %+v", doc.LEDs)
+	}
+	if len(doc.Servos) != 1 || doc.Servos[0].Middle == nil || *doc.Servos[0].Middle != 1500 {
+		t.Fatalf("servos = %+v", doc.Servos)
+	}
+	if len(doc.SMix) != 1 {
+		t.Fatalf("smix = %+v", doc.SMix)
+	}
+	if len(doc.AdjRanges) != 1 || doc.AdjRanges[0].Function == nil || *doc.AdjRanges[0].Function != 12 {
+		t.Fatalf("adjranges = %+v", doc.AdjRanges)
+	}
+	if len(doc.RXRanges) != 1 || doc.RXRanges[0].Max == nil || *doc.RXRanges[0].Max != 2000 {
+		t.Fatalf("rxranges = %+v", doc.RXRanges)
 	}
 	if len(doc.OSD) != 1 {
 		t.Fatalf("osd = %+v", doc.OSD)

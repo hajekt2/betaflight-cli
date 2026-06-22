@@ -18,6 +18,11 @@ type Document struct {
 	Profiles  []Profile           `json:"profiles"`
 	VTXTable  []Command           `json:"vtx_table"`
 	OSD       []Command           `json:"osd"`
+	LEDs      []IndexedCommand    `json:"leds"`
+	Servos    []Servo             `json:"servos"`
+	SMix      []Command           `json:"smix"`
+	AdjRanges []AdjustmentRange   `json:"adjranges"`
+	RXRanges  []RXRange           `json:"rxranges"`
 	Comments  []string            `json:"comments"`
 	Unknown   []string            `json:"unknown"`
 }
@@ -76,6 +81,43 @@ type Profile struct {
 	Line  string `json:"line"`
 }
 
+type IndexedCommand struct {
+	Index string   `json:"index,omitempty"`
+	Value string   `json:"value,omitempty"`
+	Line  string   `json:"line"`
+	Args  []string `json:"args,omitempty"`
+}
+
+type Servo struct {
+	Index   *int   `json:"index,omitempty"`
+	Min     *int   `json:"min,omitempty"`
+	Max     *int   `json:"max,omitempty"`
+	Middle  *int   `json:"middle,omitempty"`
+	Rate    *int   `json:"rate,omitempty"`
+	Forward *int   `json:"forward,omitempty"`
+	Line    string `json:"line"`
+}
+
+type AdjustmentRange struct {
+	Index         *int   `json:"index,omitempty"`
+	Unused        *int   `json:"unused,omitempty"`
+	RangeChannel  *int   `json:"range_channel,omitempty"`
+	RangeStart    *int   `json:"range_start,omitempty"`
+	RangeEnd      *int   `json:"range_end,omitempty"`
+	Function      *int   `json:"function,omitempty"`
+	SelectChannel *int   `json:"select_channel,omitempty"`
+	Center        *int   `json:"center,omitempty"`
+	Scale         *int   `json:"scale,omitempty"`
+	Line          string `json:"line"`
+}
+
+type RXRange struct {
+	Channel *int   `json:"channel,omitempty"`
+	Min     *int   `json:"min,omitempty"`
+	Max     *int   `json:"max,omitempty"`
+	Line    string `json:"line"`
+}
+
 func Parse(lines []string, registry settings.Registry) Document {
 	doc := Document{
 		Sections: map[string][]string{
@@ -87,6 +129,11 @@ func Parse(lines []string, registry settings.Registry) Document {
 			"resources": {},
 			"vtx_table": {},
 			"osd":       {},
+			"leds":      {},
+			"servos":    {},
+			"smix":      {},
+			"adjranges": {},
+			"rxranges":  {},
 			"unknown":   {},
 		},
 	}
@@ -156,6 +203,21 @@ func classify(doc *Document, line string, fields []string, registry settings.Reg
 	case fields[0] == "vtxtable":
 		doc.Sections["vtx_table"] = append(doc.Sections["vtx_table"], line)
 		doc.VTXTable = append(doc.VTXTable, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "led":
+		doc.Sections["leds"] = append(doc.Sections["leds"], line)
+		doc.LEDs = append(doc.LEDs, parseIndexedCommand(line, fields))
+	case fields[0] == "servo":
+		doc.Sections["servos"] = append(doc.Sections["servos"], line)
+		doc.Servos = append(doc.Servos, parseServo(line, fields))
+	case fields[0] == "smix":
+		doc.Sections["smix"] = append(doc.Sections["smix"], line)
+		doc.SMix = append(doc.SMix, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "adjrange":
+		doc.Sections["adjranges"] = append(doc.Sections["adjranges"], line)
+		doc.AdjRanges = append(doc.AdjRanges, parseAdjustmentRange(line, fields))
+	case fields[0] == "rxrange":
+		doc.Sections["rxranges"] = append(doc.Sections["rxranges"], line)
+		doc.RXRanges = append(doc.RXRanges, parseRXRange(line, fields))
 	case strings.HasPrefix(line, "osd_") || strings.HasPrefix(line, "set osd_"):
 		doc.Sections["osd"] = append(doc.Sections["osd"], line)
 		doc.OSD = append(doc.OSD, Command{Kind: fields[0], Line: line, Args: fields[1:]})
@@ -233,4 +295,63 @@ func parseResource(line string, fields []string) Resource {
 		resource.Target = fields[3]
 	}
 	return resource
+}
+
+func parseIndexedCommand(line string, fields []string) IndexedCommand {
+	out := IndexedCommand{Line: line}
+	if len(fields) > 1 {
+		out.Index = fields[1]
+	}
+	if len(fields) > 2 {
+		out.Value = strings.Join(fields[2:], " ")
+		out.Args = fields[1:]
+	}
+	return out
+}
+
+func parseServo(line string, fields []string) Servo {
+	out := Servo{Line: line}
+	values := parseIntFields(fields[1:], 6)
+	out.Index = values[0]
+	out.Min = values[1]
+	out.Max = values[2]
+	out.Middle = values[3]
+	out.Rate = values[4]
+	out.Forward = values[5]
+	return out
+}
+
+func parseAdjustmentRange(line string, fields []string) AdjustmentRange {
+	out := AdjustmentRange{Line: line}
+	values := parseIntFields(fields[1:], 9)
+	out.Index = values[0]
+	out.Unused = values[1]
+	out.RangeChannel = values[2]
+	out.RangeStart = values[3]
+	out.RangeEnd = values[4]
+	out.Function = values[5]
+	out.SelectChannel = values[6]
+	out.Center = values[7]
+	out.Scale = values[8]
+	return out
+}
+
+func parseRXRange(line string, fields []string) RXRange {
+	out := RXRange{Line: line}
+	values := parseIntFields(fields[1:], 3)
+	out.Channel = values[0]
+	out.Min = values[1]
+	out.Max = values[2]
+	return out
+}
+
+func parseIntFields(fields []string, count int) []*int {
+	parsed := make([]*int, count)
+	for i := 0; i < len(fields) && i < len(parsed); i++ {
+		if n, err := strconv.Atoi(fields[i]); err == nil {
+			value := n
+			parsed[i] = &value
+		}
+	}
+	return parsed
 }

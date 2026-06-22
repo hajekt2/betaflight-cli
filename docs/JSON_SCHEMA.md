@@ -72,6 +72,14 @@ Redacted backups should list the fields, commands, or line classes that were rem
 Backup and diff commands should include raw CLI text and parsed sections.
 Raw text is authoritative when parsed sections are partial.
 
+## Parsed Configuration
+
+Configuration-oriented CLI reads such as `backup create`, `backup diff`, and `cli exec "diff all"` include `data.configuration`.
+The raw CLI text remains authoritative.
+The parsed configuration is a best-effort agent view over the same lines.
+It includes settings, features, serial commands, AUX ranges, resources, selected profiles, VTX table commands, OSD commands, comments, unknown lines, and compatibility section buckets.
+Known settings include metadata hints from the compiled Betaflight setting registry.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

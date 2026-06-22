@@ -105,6 +105,47 @@ func TestSettingsListMetadata(t *testing.T) {
 	}
 }
 
+func TestBackupCreateIncludesConfiguration(t *testing.T) {
+	env, err := runTestCommand(t, []string{"backup", "create"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	configuration := data["configuration"].(map[string]any)
+	settings := configuration["settings"].([]any)
+	if len(settings) != 2 {
+		t.Fatalf("settings = %+v", settings)
+	}
+	features := configuration["features"].([]any)
+	if len(features) != 1 {
+		t.Fatalf("features = %+v", features)
+	}
+	if data["raw_authoritative"] != true {
+		t.Fatalf("raw_authoritative = %+v", data["raw_authoritative"])
+	}
+}
+
+func TestCLIExecDiffIncludesConfiguration(t *testing.T) {
+	env, err := runTestCommand(t, []string{"cli", "exec", "diff all"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	configuration := data["configuration"].(map[string]any)
+	if len(configuration["features"].([]any)) != 1 {
+		t.Fatalf("configuration = %+v", configuration)
+	}
+	if len(configuration["settings"].([]any)) != 1 {
+		t.Fatalf("configuration = %+v", configuration)
+	}
+}
+
 func TestSettingsSetValidationFailureDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"settings", "set", "small_angle", "181", "--apply"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

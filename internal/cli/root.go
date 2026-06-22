@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/hajekt2/betaflight-cli/internal/bfconfig"
 	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
@@ -214,6 +215,17 @@ func (a *app) cliCommand() *cobra.Command {
 					"lines":   lines,
 					"raw":     strings.Join(lines, "\n"),
 				})
+				if isConfigurationRead(raw) {
+					doc := bfconfig.Parse(lines, settings.DefaultRegistry)
+					env.Data = map[string]any{
+						"command":           raw,
+						"lines":             lines,
+						"raw":               strings.Join(lines, "\n"),
+						"configuration":     doc,
+						"sections":          doc.Sections,
+						"raw_authoritative": true,
+					}
+				}
 				if class != cliReadOnly {
 					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: raw})
 				}
@@ -456,12 +468,13 @@ func (a *app) runBackupCommand(cmd *cobra.Command, cliLine string, redact bool) 
 			redactedLines, redacted = redactLines(lines)
 			raw = strings.Join(redactedLines, "\n")
 		}
-		sections := parseCLISections(redactedLines)
+		doc := bfconfig.Parse(redactedLines, settings.DefaultRegistry)
 		env := output.Success(commandPath(cmd), &target, map[string]any{
 			"command":           cliLine,
 			"raw":               raw,
 			"lines":             redactedLines,
-			"sections":          sections,
+			"sections":          doc.Sections,
+			"configuration":     doc,
 			"redacted":          redact,
 			"redacted_classes":  redacted,
 			"raw_authoritative": true,
@@ -621,45 +634,16 @@ func classifyCLI(command string) cliClass {
 	}
 }
 
+func isConfigurationRead(command string) bool {
+	fields := strings.Fields(strings.ToLower(strings.TrimSpace(command)))
+	if len(fields) == 0 {
+		return false
+	}
+	return fields[0] == "dump" || fields[0] == "diff"
+}
+
 func parseCLISections(lines []string) map[string][]string {
-	sections := map[string][]string{
-		"settings":  {},
-		"profiles":  {},
-		"serial":    {},
-		"modes":     {},
-		"features":  {},
-		"resources": {},
-		"vtx_table": {},
-		"osd":       {},
-		"unknown":   {},
-	}
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
-			continue
-		}
-		switch {
-		case strings.HasPrefix(trimmed, "set "):
-			sections["settings"] = append(sections["settings"], trimmed)
-		case strings.HasPrefix(trimmed, "profile ") || strings.HasPrefix(trimmed, "rateprofile "):
-			sections["profiles"] = append(sections["profiles"], trimmed)
-		case strings.HasPrefix(trimmed, "serial "):
-			sections["serial"] = append(sections["serial"], trimmed)
-		case strings.HasPrefix(trimmed, "aux ") || strings.HasPrefix(trimmed, "mode_color ") || strings.HasPrefix(trimmed, "color "):
-			sections["modes"] = append(sections["modes"], trimmed)
-		case strings.HasPrefix(trimmed, "feature "):
-			sections["features"] = append(sections["features"], trimmed)
-		case strings.HasPrefix(trimmed, "resource "):
-			sections["resources"] = append(sections["resources"], trimmed)
-		case strings.HasPrefix(trimmed, "vtxtable "):
-			sections["vtx_table"] = append(sections["vtx_table"], trimmed)
-		case strings.HasPrefix(trimmed, "osd_") || strings.HasPrefix(trimmed, "set osd_"):
-			sections["osd"] = append(sections["osd"], trimmed)
-		default:
-			sections["unknown"] = append(sections["unknown"], trimmed)
-		}
-	}
-	return sections
+	return bfconfig.Parse(lines, settings.DefaultRegistry).Sections
 }
 
 func redactLines(lines []string) ([]string, []string) {

@@ -359,6 +359,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if voltageMeter["operation"] != "write" || voltageMeter["confirmation"] != "--yes" || voltageMeter["requires_connection"] != true || voltageMeter["output_root"] != "voltage_meter_config" || voltageMeter["runnable"] != true {
 		t.Fatalf("voltage meter capability = %+v", voltageMeter)
 	}
+	currentMeter := byCommand["betaflight-cli battery set-current-meter"]
+	if currentMeter["operation"] != "write" || currentMeter["confirmation"] != "--yes" || currentMeter["requires_connection"] != true || currentMeter["output_root"] != "current_meter_config" || currentMeter["runnable"] != true {
+		t.Fatalf("current meter capability = %+v", currentMeter)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -4627,6 +4631,62 @@ func TestBatterySetVoltageMeterWithFakeFC(t *testing.T) {
 		t.Fatalf("voltage meter config = %+v", result)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "voltage_meter_config" || env.SideEffects[0].Command != "MSP_SET_VOLTAGE_METER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBatterySetCurrentMeterRejectsOutOfRangeDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "10", "40000", "-10", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after current meter validation failure")
+	}
+}
+
+func TestBatterySetCurrentMeterRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "10", "400", "-10"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after current meter confirmation failure")
+	}
+}
+
+func TestBatterySetCurrentMeterWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "10", "400", "-10", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["current_meter_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["id"] != float64(10) || config["scale"] != float64(400) || config["offset"] != float64(-10) {
+		t.Fatalf("current meter config = %+v", result)
+	}
+	if result["msp_name"] != "MSP_SET_CURRENT_METER_CONFIG" || result["save_required"] != true {
+		t.Fatalf("current meter config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "current_meter_config" || env.SideEffects[0].Command != "MSP_SET_CURRENT_METER_CONFIG" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

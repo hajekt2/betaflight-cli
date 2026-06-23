@@ -375,6 +375,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, 400)
 		payload = appendS16(payload, -10)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetCurrentMeterConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 5))
 	case msp.MSPArmingConfig:
 		f.out.Write(response(frame.Code, []byte{5, 0, 25, 1}, false))
 	case msp.MSPFailsafeConfig:

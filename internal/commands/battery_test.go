@@ -93,6 +93,16 @@ func TestEncodeVoltageMeterConfig(t *testing.T) {
 	}
 }
 
+func TestEncodeCurrentMeterConfig(t *testing.T) {
+	got := EncodeCurrentMeterConfig(CurrentMeterConfig{ID: 10, Scale: 400, Offset: -10})
+	want := []byte{10}
+	want = appendS16Test(want, 400)
+	want = appendS16Test(want, -10)
+	if string(got) != string(want) {
+		t.Fatalf("EncodeCurrentMeterConfig() = %v, want %v", got, want)
+	}
+}
+
 func TestDecodeBatteryRejectsShortPayload(t *testing.T) {
 	if _, err := DecodeBatteryConfig([]byte{1, 2}); err == nil {
 		t.Fatal("DecodeBatteryConfig() error = nil, want short payload error")

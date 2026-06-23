@@ -116,6 +116,14 @@ type CurrentMeterConfig struct {
 	Offset         int16  `json:"offset"`
 }
 
+type CurrentMeterConfigSetResult struct {
+	Config       CurrentMeterConfig `json:"config"`
+	MSPCode      uint16             `json:"msp_code"`
+	MSPName      string             `json:"msp_name"`
+	Acknowledged bool               `json:"acknowledged"`
+	SaveRequired bool               `json:"save_required"`
+}
+
 func ReadBatteryStatus(ctx context.Context, client *connection.Client) (*BatteryStatus, []string, error) {
 	status := &BatteryStatus{Sources: map[string]string{}}
 	warnings := []string{}
@@ -185,6 +193,28 @@ func SetVoltageMeterConfig(ctx context.Context, client *connection.Client, confi
 
 func EncodeVoltageMeterConfig(config VoltageMeterConfig) []byte {
 	return []byte{config.ID, config.VBATScale, config.VBATResDivVal, config.VBATResDivMultiplier}
+}
+
+func SetCurrentMeterConfig(ctx context.Context, client *connection.Client, config CurrentMeterConfig) (*CurrentMeterConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetCurrentMeterConfig, EncodeCurrentMeterConfig(config)); err != nil {
+		return nil, fmt.Errorf("current meter config request failed: %w", err)
+	}
+	config.IDName = currentMeterIDName(config.ID)
+	config.SensorTypeName = indexedName(currentSensorTypeNames, config.SensorType)
+	return &CurrentMeterConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetCurrentMeterConfig,
+		MSPName:      "MSP_SET_CURRENT_METER_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeCurrentMeterConfig(config CurrentMeterConfig) []byte {
+	payload := []byte{config.ID}
+	payload = append(payload, byte(config.Scale), byte(uint16(config.Scale)>>8))
+	payload = append(payload, byte(config.Offset), byte(uint16(config.Offset)>>8))
+	return payload
 }
 
 func DecodeBatteryConfig(payload []byte) (*BatteryConfig, error) {

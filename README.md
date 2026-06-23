@@ -116,6 +116,7 @@ betaflight-cli failsafe list --port /dev/tty.usbmodem01
 betaflight-cli failsafe status --port /dev/tty.usbmodem01
 betaflight-cli failsafe set-board-alignment -2 3 90 --port /dev/tty.usbmodem01 --yes
 betaflight-cli battery set-voltage-meter 10 110 10 1 --port /dev/tty.usbmodem01 --yes
+betaflight-cli battery set-current-meter 10 400 -10 --port /dev/tty.usbmodem01 --yes
 printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch plan
 printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch apply --port /dev/tty.usbmodem01
 betaflight-cli save --port /dev/tty.usbmodem01 --yes
@@ -184,6 +185,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `battery status` reads battery profile thresholds, runtime battery state, and voltage/current meter readings and calibration over MSP.
 `battery set-voltage-meter` writes one voltage meter calibration row through `MSP_SET_VOLTAGE_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`battery set-current-meter` writes one current meter calibration row through `MSP_SET_CURRENT_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `failsafe status` reads failsafe configuration, arming configuration, board alignment, and active arming-disable flags over MSP.
 `failsafe set-board-alignment` writes roll, pitch, and yaw board alignment through `MSP_SET_BOARD_ALIGNMENT_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `pid status` reads active PID gain triplets, rate profile data, and advanced PID tuning over MSP.

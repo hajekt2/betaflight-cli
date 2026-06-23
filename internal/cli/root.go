@@ -1718,12 +1718,18 @@ func (a *app) versionCommand() *cobra.Command {
 		Use:   "version",
 		Short: "Print build version",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			env := output.Success(commandPath(cmd), nil, map[string]string{
-				"version":        a.build.Version,
-				"commit":         a.build.Commit,
-				"date":           a.build.Date,
-				"schema_version": output.SchemaVersion,
-				"go_target":      runtime.Version(),
+			registry := settings.DefaultRegistry
+			env := output.Success(commandPath(cmd), nil, map[string]any{
+				"version":                  a.build.Version,
+				"commit":                   a.build.Commit,
+				"date":                     a.build.Date,
+				"schema_version":           output.SchemaVersion,
+				"go_target":                runtime.Version(),
+				"msp_source_firmware":      msp.GeneratedMSPSourceVersion,
+				"settings_source_firmware": registry.SourceFirmware,
+				"settings_generated":       registry.Generated,
+				"settings_count":           len(registry.Settings),
+				"settings_source_files":    append([]string(nil), registry.SourceFiles...),
 			})
 			return a.render(env)
 		},

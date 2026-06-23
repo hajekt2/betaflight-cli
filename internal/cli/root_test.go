@@ -260,6 +260,40 @@ func TestRedactLines(t *testing.T) {
 	}
 }
 
+func TestVersionIncludesCompiledMetadata(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"version"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for version")
+	}
+	data := env.Data.(map[string]any)
+	if data["version"] != "test" || data["commit"] != "test" || data["date"] != "test" {
+		t.Fatalf("version data = %+v", data)
+	}
+	if data["schema_version"] != output.SchemaVersion {
+		t.Fatalf("schema_version = %v", data["schema_version"])
+	}
+	if data["msp_source_firmware"] != "2025.12.0" || data["settings_source_firmware"] != "2025.12.0" {
+		t.Fatalf("metadata versions = %+v", data)
+	}
+	if data["settings_generated"] != true || data["settings_count"].(float64) < 100 {
+		t.Fatalf("settings metadata = %+v", data)
+	}
+	files := data["settings_source_files"].([]any)
+	if !containsAnyString(files, "src/main/cli/settings.c") {
+		t.Fatalf("settings_source_files = %+v", files)
+	}
+}
+
 func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"capabilities"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

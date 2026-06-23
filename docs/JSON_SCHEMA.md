@@ -149,6 +149,9 @@ Agents should prefer this payload over scraping help text when selecting command
 `capabilities coverage` returns a `coverage` object without connecting to hardware.
 The object maps non-graphical Configurator parity domains to implemented read, write, and dangerous command surfaces, plus known next gaps.
 
+`version` returns build metadata without connecting to hardware.
+The object includes binary `version`, `commit`, `date`, Go runtime, envelope `schema_version`, `msp_source_firmware`, `settings_source_firmware`, `settings_generated`, `settings_count`, and `settings_source_files`.
+
 `info` returns flight-controller identity from the initial handshake plus optional `board`, `mcu`, `uid`, `build`, and `legacy_name` fields.
 It also includes a `support` object that encodes the configured policy for `2025.12+` firmware gating, variant check, the raw support reason, and any warning messages.
 The `board` object is decoded from `MSP_BOARD_INFO` and includes board identity, target capabilities, optional target signature, MCU type ID, configuration state, gyro sample rate, configuration problem names, and SPI/I2C device counts when supplied by firmware.

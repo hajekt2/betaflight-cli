@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -19,24 +20,29 @@ const (
 )
 
 type motorTestPlan struct {
-	Kind                  string               `json:"kind"`
-	Applied               bool                 `json:"applied"`
-	Dangerous             bool                 `json:"dangerous"`
+	Kind                 string               `json:"kind"`
+	Applied              bool                 `json:"applied"`
+	Dangerous            bool                 `json:"dangerous"`
+	AllMotors            bool                 `json:"all_motors"`
+	MotorCount           int                  `json:"motor_count,omitempty"`
+	MotorIndexes         []int                `json:"motor_indexes,omitempty"`
 	MotorIndex            int                  `json:"motor_index"`
-	Value                 int                  `json:"value"`
-	DurationMS            int64                `json:"duration_ms"`
-	CommandPreview        string               `json:"command_preview"`
-	StopCommandPreview    string               `json:"stop_command_preview"`
-	Stopped               bool                 `json:"stopped"`
-	Preflight             *motorTestPreflight  `json:"preflight,omitempty"`
-	PostStop              *motorTestPostStop   `json:"post_stop,omitempty"`
-	Comparison            *motorTestComparison `json:"comparison,omitempty"`
-	Audit                 *motorTestAudit      `json:"audit,omitempty"`
-	ResponseLines         map[string][]string  `json:"response_lines,omitempty"`
+	Value                int                  `json:"value"`
+	DurationMS           int64                `json:"duration_ms"`
+	CommandPreview       string               `json:"command_preview"`
+	StopCommandPreview   string               `json:"stop_command_preview"`
+	CommandPreviews      []string             `json:"command_previews"`
+	StopCommandPreviews  []string             `json:"stop_command_previews"`
+	Stopped              bool                 `json:"stopped"`
+	Preflight            *motorTestPreflight  `json:"preflight,omitempty"`
+	PostStop             *motorTestPostStop   `json:"post_stop,omitempty"`
+	Comparison           *motorTestComparison `json:"comparison,omitempty"`
+	Audit                *motorTestAudit      `json:"audit,omitempty"`
+	ResponseLines        map[string][]string  `json:"response_lines,omitempty"`
 	RequiredConfirmations []string             `json:"required_confirmations"`
-	SafetyChecks          []safetyCheck        `json:"safety_checks"`
+	SafetyChecks         []safetyCheck        `json:"safety_checks"`
 	RecommendedPreflight  []string             `json:"recommended_preflight"`
-	ApplyMessage          string               `json:"apply_message"`
+	ApplyMessage         string               `json:"apply_message"`
 }
 
 type motorTestPreflight struct {
@@ -86,15 +92,17 @@ func (a *app) motorTestApplyCommand() *cobra.Command {
 
 func (a *app) motorTestCommand(use, short string, apply bool) *cobra.Command {
 	var motor int
+	var motorCount int
 	var value int
 	var duration time.Duration
+	var all bool
 	var propsOff bool
 	var batteryAware bool
 	cmd := &cobra.Command{
 		Use:   use,
 		Short: short,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			plan, err := buildMotorTestPlan(motor, value, duration, propsOff, batteryAware)
+			plan, err := buildMotorTestPlan(motor, all, motorCount, value, duration, propsOff, batteryAware)
 			if err != nil {
 				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
 			}
@@ -107,6 +115,8 @@ func (a *app) motorTestCommand(use, short string, apply bool) *cobra.Command {
 		},
 	}
 	cmd.Flags().IntVar(&motor, "motor", 0, "zero-based motor index to test")
+	cmd.Flags().BoolVar(&all, "all", false, "test all motors from index 0 to motor-count-1")
+	cmd.Flags().IntVar(&motorCount, "motor-count", 0, "number of motors to test when --all is set")
 	cmd.Flags().IntVar(&value, "value", minMotorTestValue, "motor output value in Betaflight motor command units")
 	cmd.Flags().DurationVar(&duration, "duration", time.Second, "planned test duration, capped at 5s")
 	cmd.Flags().BoolVar(&propsOff, "props-off", false, "acknowledge propellers are removed")
@@ -132,22 +142,34 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		plan.Preflight = preflight
 		responses := map[string][]string{}
 		startedAt := time.Now()
-		startLines, err := client.ExecCLI(cmd.Context(), plan.CommandPreview)
-		if err != nil {
-			return a.failure(commandPath(cmd), &target, err)
-		}
-		responses[plan.CommandPreview] = startLines
-		timer := time.NewTimer(time.Duration(plan.DurationMS) * time.Millisecond)
-		select {
-		case <-cmd.Context().Done():
-			if !timer.Stop() {
-				<-timer.C
+		var stopErr error
+		var startErr error
+		for _, command := range plan.CommandPreviews {
+			lines, err := client.ExecCLI(cmd.Context(), command)
+			responses[command] = lines
+			if err != nil {
+				startErr = err
+				break
 			}
-		case <-timer.C:
 		}
-		stopLines, stopErr := client.ExecCLI(context.Background(), plan.StopCommandPreview)
+		if startErr == nil {
+			timer := time.NewTimer(time.Duration(plan.DurationMS) * time.Millisecond)
+			select {
+			case <-cmd.Context().Done():
+				if !timer.Stop() {
+					<-timer.C
+				}
+			case <-timer.C:
+			}
+		}
+		for _, command := range plan.StopCommandPreviews {
+			lines, err := client.ExecCLI(context.Background(), command)
+			responses[command] = lines
+			if err != nil && stopErr == nil {
+				stopErr = err
+			}
+		}
 		elapsedMS := time.Since(startedAt).Milliseconds()
-		responses[plan.StopCommandPreview] = stopLines
 		plan.Applied = true
 		plan.Stopped = stopErr == nil
 		plan.ResponseLines = responses
@@ -165,9 +187,12 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		})
 		env.SideEffects = append(env.SideEffects, output.SideEffect{
 			Type:    "motor_output",
-			Command: plan.CommandPreview,
-			Detail:  fmt.Sprintf("motor output sent for %dms; stop command attempted", plan.DurationMS),
+			Command: strings.Join(plan.CommandPreviews, "; "),
+			Detail:  fmt.Sprintf("motor output sent for %dms on %d command(s); stop command(s) attempted", plan.DurationMS, len(plan.StopCommandPreviews)),
 		})
+		if startErr != nil {
+			addStringWarnings(&env, []string{fmt.Sprintf("motor start command returned an error: %v", startErr)})
+		}
 		if stopErr != nil {
 			addStringWarnings(&env, []string{fmt.Sprintf("motor stop command returned an error: %v", stopErr)})
 		}
@@ -283,8 +308,8 @@ func buildMotorTestAudit(plan motorTestPlan, elapsedMS int64, stopErr error, war
 			ReadOnlyEvidence:    true,
 			RequestedDurationMS: plan.DurationMS,
 			ElapsedDurationMS:   elapsedMS,
-			StartCommand:        plan.CommandPreview,
-			StopCommand:         plan.StopCommandPreview,
+			StartCommand:        strings.Join(plan.CommandPreviews, "; "),
+			StopCommand:         strings.Join(plan.StopCommandPreviews, "; "),
 			Confirmations:       append([]string(nil), plan.RequiredConfirmations...),
 			SafetyPassed:        motorSafetyPassed(plan, "props_off") && motorSafetyPassed(plan, "battery_awareness"),
 			PreflightCaptured:   plan.Preflight != nil,
@@ -296,9 +321,13 @@ func buildMotorTestAudit(plan motorTestPlan, elapsedMS int64, stopErr error, war
 	}
 }
 
-func buildMotorTestPlan(motor, value int, duration time.Duration, propsOff, batteryAware bool) (motorTestPlan, error) {
+func buildMotorTestPlan(motor int, all bool, motorCount int, value int, duration time.Duration, propsOff, batteryAware bool) (motorTestPlan, error) {
 	switch {
-	case motor < 0 || motor > maxMotorTestIndex:
+	case all && motorCount <= 0:
+		return motorTestPlan{}, fmt.Errorf("--motor-count must be > 0 when --all is set")
+	case all && motorCount > maxMotorTestIndex+1:
+		return motorTestPlan{}, fmt.Errorf("--motor-count must be between 1 and %d", maxMotorTestIndex+1)
+	case !all && (motor < 0 || motor > maxMotorTestIndex):
 		return motorTestPlan{}, fmt.Errorf("--motor must be between 0 and %d", maxMotorTestIndex)
 	case value < minMotorTestValue || value > maxMotorTestValue:
 		return motorTestPlan{}, fmt.Errorf("--value must be between %d and %d", minMotorTestValue, maxMotorTestValue)
@@ -307,33 +336,54 @@ func buildMotorTestPlan(motor, value int, duration time.Duration, propsOff, batt
 	case duration > 5*time.Second:
 		return motorTestPlan{}, fmt.Errorf("--duration is capped at 5s")
 	}
-	checks := []safetyCheck{
-		{Name: "props_off", Passed: propsOff, Required: true, Detail: "propellers must be removed before any future motor output apply command"},
-		{Name: "battery_awareness", Passed: batteryAware, Required: true, Detail: "operator must review power source, bench restraint, and ESC arming state"},
-		{Name: "dry_run_only", Passed: true, Required: true, Detail: "this command only creates a plan and never sends motor output"},
+
+	motorIndexes := []int{motor}
+	if all {
+		motorIndexes = make([]int, motorCount)
+		for i := range motorIndexes {
+			motorIndexes[i] = i
+		}
 	}
+	commandPreviews := make([]string, 0, len(motorIndexes))
+	stopCommandPreviews := make([]string, 0, len(motorIndexes))
+	for _, idx := range motorIndexes {
+		commandPreviews = append(commandPreviews, fmt.Sprintf("motor %d %d", idx, value))
+		stopCommandPreviews = append(stopCommandPreviews, fmt.Sprintf("motor %d %d", idx, minMotorTestValue))
+	}
+
+	recommended := []string{
+		"remove all propellers",
+		"secure the frame on a bench",
+		"verify the intended motor index",
+		"keep duration and throttle value minimal",
+		"be ready to disconnect power",
+	}
+	if all {
+		recommended = append(recommended, "verify craft motor order and numbering before enabling all-motor tests")
+	}
+
 	return motorTestPlan{
-		Kind:               "motor_test",
-		Applied:            false,
-		Dangerous:          true,
-		MotorIndex:         motor,
-		Value:              value,
-		DurationMS:         duration.Milliseconds(),
-		CommandPreview:     fmt.Sprintf("motor %d %d", motor, value),
-		StopCommandPreview: fmt.Sprintf("motor %d %d", motor, minMotorTestValue),
-		RequiredConfirmations: []string{
-			"--yes",
-			"--props-off",
-			"--battery-aware",
+		Kind:                  "motor_test",
+		Applied:               false,
+		Dangerous:             true,
+		AllMotors:             all,
+		MotorCount:            len(motorIndexes),
+		MotorIndexes:          append([]int(nil), motorIndexes...),
+		MotorIndex:            motor,
+		Value:                 value,
+		DurationMS:            duration.Milliseconds(),
+		CommandPreview:        commandPreviews[0],
+		StopCommandPreview:    stopCommandPreviews[0],
+		CommandPreviews:       append([]string(nil), commandPreviews...),
+		StopCommandPreviews:   append([]string(nil), stopCommandPreviews...),
+		RequiredConfirmations: []string{"--yes", "--props-off", "--battery-aware"},
+		SafetyChecks: []safetyCheck{
+			{Name: "props_off", Passed: propsOff, Required: true, Detail: "propellers must be removed before any future motor output apply command"},
+			{Name: "battery_awareness", Passed: batteryAware, Required: true, Detail: "operator must review power source, bench restraint, and ESC arming state"},
+			{Name: "dry_run_only", Passed: true, Required: true, Detail: "this command only creates a plan and never sends motor output"},
 		},
-		SafetyChecks: checks,
-		RecommendedPreflight: []string{
-			"remove all propellers",
-			"secure the frame on a bench",
-			"verify the intended motor index",
-			"keep duration and throttle value minimal",
-			"be ready to disconnect power",
-		},
-		ApplyMessage: "test-plan is offline only; use test-apply with all confirmations to run the bounded motor output command",
+		RecommendedPreflight: recommended,
+		ApplyMessage:         "test-plan is offline only; use test-apply with all confirmations to run the bounded motor output command",
 	}, nil
 }
+

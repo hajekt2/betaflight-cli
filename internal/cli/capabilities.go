@@ -335,13 +335,7 @@ func missingCommands(commandSet map[string]bool, commands []string) []string {
 }
 
 func coverageGaps(domains []coverageDomain) []coverageGap {
-	gaps := []coverageGap{
-		{
-			Domain:     "motor-testing",
-			Reason:     "Configurator exposes richer live motor test workflows; this CLI currently provides a bounded single-motor test apply path.",
-			NextSteps:  []string{"support controlled all-motor idle tests only with stronger confirmation", "consider optional pre- and post-test diff helpers for repeated runs", "reuse the hazardous action audit shape for other high-risk operations"},
-			SafetyNote: "This must be dangerous by default because motors can spin.",
-		},
+		gaps := []coverageGap{
 		{
 			Domain:     "blackbox-decoding",
 			Reason:     "Offline Blackbox inspection currently decodes simple variable-byte samples, not full Blackbox frame streams.",

@@ -200,15 +200,11 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 		t.Fatalf("settings domain = %+v", settings)
 	}
 	gaps := coverage["next_gaps"].([]any)
-	foundMotorTesting := false
 	for _, item := range gaps {
 		gap := item.(map[string]any)
 		if gap["domain"] == "motor-testing" {
-			foundMotorTesting = true
+			t.Fatalf("unexpected motor-testing gap remains: %+v", gap)
 		}
-	}
-	if !foundMotorTesting {
-		t.Fatalf("gaps = %+v", gaps)
 	}
 }
 
@@ -2531,9 +2527,35 @@ func TestMotorsTestPlanDoesNotConnect(t *testing.T) {
 	if plan["applied"] != false || plan["dangerous"] != true || plan["command_preview"] != "motor 2 1100" || plan["duration_ms"] != float64(1500) {
 		t.Fatalf("plan = %+v", plan)
 	}
+	commandPreviews := plan["command_previews"].([]any)
+	if len(commandPreviews) != 1 || commandPreviews[0] != "motor 2 1100" {
+		t.Fatalf("command_previews = %+v", commandPreviews)
+	}
 	checks := plan["safety_checks"].([]any)
 	if checks[0].(map[string]any)["passed"] != true || checks[1].(map[string]any)["passed"] != false {
 		t.Fatalf("checks = %+v", checks)
+	}
+}
+
+func TestMotorsTestPlanAllMotors(t *testing.T) {
+	env, err := runTestCommand(t, []string{"motors", "test-plan", "--all", "--motor-count", "4", "--value", "1120", "--duration", "500ms", "--props-off"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)["motor_test_plan"].(map[string]any)
+	if plan["all_motors"] != true || int(plan["motor_count"].(float64)) != 4 {
+		t.Fatalf("plan = %+v", plan)
+	}
+	commandPreviews := plan["command_previews"].([]any)
+	if len(commandPreviews) != 4 || commandPreviews[0] != "motor 0 1120" || commandPreviews[3] != "motor 3 1120" {
+		t.Fatalf("command_previews = %+v", commandPreviews)
+	}
+	stopPreviews := plan["stop_command_previews"].([]any)
+	if len(stopPreviews) != 4 || stopPreviews[0] != "motor 0 1000" || stopPreviews[3] != "motor 3 1000" {
+		t.Fatalf("stop_command_previews = %+v", stopPreviews)
 	}
 }
 
@@ -2589,6 +2611,10 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
 	plan := env.Data.(map[string]any)["motor_test_plan"].(map[string]any)
+	commandPreviews := plan["command_previews"].([]any)
+	if len(commandPreviews) != 1 || plan["command_preview"] != "motor 1 1050" {
+		t.Fatalf("plan = %+v", plan)
+	}
 	if plan["applied"] != true || plan["stopped"] != true || plan["command_preview"] != "motor 1 1050" || plan["stop_command_preview"] != "motor 1 1000" {
 		t.Fatalf("plan = %+v", plan)
 	}
@@ -2611,8 +2637,49 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 	if audit["requested_duration_ms"] != float64(1) || audit["elapsed_duration_ms"].(float64) < 0 {
 		t.Fatalf("audit timing = %+v", audit)
 	}
+	if audit["start_command"] != "motor 1 1050" || audit["stop_command"] != "motor 1 1000" {
+		t.Fatalf("audit = %+v", audit)
+	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "motor_output" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestMotorsTestApplyAllMotors(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommand(t, []string{"motors", "test-apply", "--all", "--motor-count", "3", "--value", "1060", "--duration", "1ms", "--props-off", "--battery-aware", "--yes"}, func(ctx context.Context, cfg connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(ctx)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)["motor_test_plan"].(map[string]any)
+	if plan["all_motors"] != true || plan["applied"] != true || plan["stopped"] != true {
+		t.Fatalf("plan = %+v", plan)
+	}
+	commandPreviews := plan["command_previews"].([]any)
+	if len(commandPreviews) != 3 {
+		t.Fatalf("command_previews = %+v", commandPreviews)
+	}
+	stopPreviews := plan["stop_command_previews"].([]any)
+	if len(stopPreviews) != 3 {
+		t.Fatalf("stop_command_previews = %+v", stopPreviews)
 	}
 }
 

@@ -2,6 +2,7 @@ package connection
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -15,6 +16,27 @@ func TestClassifyPortIgnoresDebugAndBluetooth(t *testing.T) {
 		candidate, _ := classifyPort(name)
 		if candidate {
 			t.Fatalf("classifyPort(%q) candidate = true, want false", name)
+		}
+	}
+}
+
+func TestClassifyPortFollowsPlatformConventions(t *testing.T) {
+	tests := []struct {
+		name          string
+		port          string
+		wantCandidate bool
+	}{
+		{"linux acm device", "/dev/ttyACM0", runtime.GOOS == "linux"},
+		{"generic usb fallback", "/dev/serial-usb", runtime.GOOS == "linux" || runtime.GOOS == "windows"},
+		{"mac usb modem", "/dev/cu.usbmodem1234", runtime.GOOS == "darwin"},
+		{"windows com", "COM3", runtime.GOOS == "windows"},
+		{"generic serial", "/dev/ttyS0", false},
+	}
+
+	for _, tt := range tests {
+		candidate, _ := classifyPort(tt.port)
+		if candidate != tt.wantCandidate {
+			t.Fatalf("classifyPort(%s) = %v, want %v", tt.name, candidate, tt.wantCandidate)
 		}
 	}
 }

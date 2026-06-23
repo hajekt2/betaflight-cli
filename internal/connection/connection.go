@@ -7,6 +7,7 @@ import (
 	"io"
 	"runtime"
 	"sort"
+	"strings"
 	"time"
 
 	"go.bug.st/serial"

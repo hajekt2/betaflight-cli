@@ -398,6 +398,8 @@ Successful calibration commands also include a `sensor_calibration` side effect.
 
 `beeper config` returns a `beeper` object decoded from `MSP_BEEPER_CONFIG`.
 The object includes raw disable masks, decoded disabled beeper condition names, DShot beacon tone, and decoded DShot beacon disabled condition names.
+`beeper set-json` accepts `enable`/`enabled` and `disable`/`disabled` beeper mode names, either directly or under `beeper`, `changes`, or `set`.
+It returns a `change_plan` with exact native `beeper NAME` or `beeper -NAME` CLI lines, and applying it requires `--apply --yes`.
 `beeper set-config` returns a `beeper_config` object with the written masks, decoded condition names, DShot beacon tone, MSP command name/code, acknowledgement flag, and `save_required`.
 `beeper set-config-json` accepts either a beeper config object or an object with `beeper_config`, `beeper`, or `config`.
 It returns the same `beeper_config` object as `beeper set-config`.
@@ -405,6 +407,8 @@ Successful beeper config writes include a `beeper_config` side effect.
 
 `transponder config` returns a `transponder` object decoded from `MSP_TRANSPONDER_CONFIG`.
 The object includes provider requirements, the active provider ID and name, configured code bytes, uppercase hex data, native CLI commands, and decode warnings for unexpected disabled-provider data.
+`transponder set-json` accepts `provider`/`provider_name`/`name` and `data`/`data_bytes`/`bytes`/`data_hex`, either directly or under `transponder`, `changes`, or `set`.
+It returns a `change_plan` with exact native `set transponder_provider = NAME` and `set transponder_data = BYTES` CLI lines, and applying it requires `--apply --yes`.
 `transponder set-config` returns a `transponder_config` object with provider, provider name, data bytes, uppercase hex data, MSP command name/code, acknowledgement flag, and `save_required`.
 `transponder set-config-json` accepts either a transponder config object or an object with `transponder_config`, `transponder`, or `config`.
 It accepts either `data` as a byte array or `data_hex` as hexadecimal bytes and returns the same `transponder_config` object as `transponder set-config`.

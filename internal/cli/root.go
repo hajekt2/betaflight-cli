@@ -835,8 +835,114 @@ func (a *app) beeperCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(disable, &disableFlags)
-	cmd.AddCommand(disable, a.beeperSetConfigCommand(), a.beeperSetConfigJSONCommand())
+	cmd.AddCommand(disable, a.beeperSetJSONCommand(), a.beeperSetConfigCommand(), a.beeperSetConfigJSONCommand())
 	return cmd
+}
+
+func (a *app) beeperSetJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Plan or set beeper condition enables and disables from JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			lines, err := parseBeeperSetJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.planOrApplyCLI(cmd, lines, "beeper", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseBeeperSetJSON(data []byte) ([]string, error) {
+	type beeperSetInput struct {
+		Enable   json.RawMessage `json:"enable"`
+		Enabled  json.RawMessage `json:"enabled"`
+		Disable  json.RawMessage `json:"disable"`
+		Disabled json.RawMessage `json:"disabled"`
+	}
+	var wrapped struct {
+		Beeper  *beeperSetInput `json:"beeper"`
+		Changes *beeperSetInput `json:"changes"`
+		Set     *beeperSetInput `json:"set"`
+		beeperSetInput
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	input := wrapped.beeperSetInput
+	for _, candidate := range []*beeperSetInput{wrapped.Beeper, wrapped.Changes, wrapped.Set} {
+		if candidate != nil {
+			input = *candidate
+			break
+		}
+	}
+	enable, err := parseBeeperNameList(firstRawMessage(input.Enable, input.Enabled))
+	if err != nil {
+		return nil, err
+	}
+	disable, err := parseBeeperNameList(firstRawMessage(input.Disable, input.Disabled))
+	if err != nil {
+		return nil, err
+	}
+	lines := make([]string, 0, len(enable)+len(disable))
+	for _, name := range enable {
+		mode, err := bfcommands.ValidateBeeperModeName(name)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, "beeper "+mode)
+	}
+	for _, name := range disable {
+		mode, err := bfcommands.ValidateBeeperModeName(name)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, "beeper -"+mode)
+	}
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("at least one beeper enable or disable entry is required")
+	}
+	return lines, nil
+}
+
+func parseBeeperNameList(raw json.RawMessage) ([]string, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	var one string
+	if err := json.Unmarshal(raw, &one); err == nil {
+		if strings.TrimSpace(one) == "" {
+			return nil, fmt.Errorf("beeper mode must not be empty")
+		}
+		return []string{one}, nil
+	}
+	var many []string
+	if err := json.Unmarshal(raw, &many); err != nil {
+		return nil, fmt.Errorf("beeper mode list must be a string or array of strings")
+	}
+	for _, name := range many {
+		if strings.TrimSpace(name) == "" {
+			return nil, fmt.Errorf("beeper mode must not be empty")
+		}
+	}
+	return many, nil
+}
+
+func firstRawMessage(values ...json.RawMessage) json.RawMessage {
+	for _, value := range values {
+		if len(value) != 0 && string(value) != "null" {
+			return value
+		}
+	}
+	return nil
 }
 
 func (a *app) beeperSetConfigCommand() *cobra.Command {
@@ -986,8 +1092,109 @@ func (a *app) transponderCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(setData, &setDataFlags)
-	cmd.AddCommand(setData, a.transponderSetConfigCommand(), a.transponderSetConfigJSONCommand())
+	cmd.AddCommand(setData, a.transponderSetJSONCommand(), a.transponderSetConfigCommand(), a.transponderSetConfigJSONCommand())
 	return cmd
+}
+
+func (a *app) transponderSetJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Plan or set transponder provider and data from JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			lines, err := parseTransponderSetJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.planOrApplyCLI(cmd, lines, "transponder", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseTransponderSetJSON(data []byte) ([]string, error) {
+	type transponderSetInput struct {
+		Provider     string          `json:"provider"`
+		ProviderName string          `json:"provider_name"`
+		Name         string          `json:"name"`
+		Data         json.RawMessage `json:"data"`
+		DataBytes    json.RawMessage `json:"data_bytes"`
+		Bytes        json.RawMessage `json:"bytes"`
+		DataHex      string          `json:"data_hex"`
+	}
+	var wrapped struct {
+		Transponder *transponderSetInput `json:"transponder"`
+		Changes     *transponderSetInput `json:"changes"`
+		Set         *transponderSetInput `json:"set"`
+		transponderSetInput
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	input := wrapped.transponderSetInput
+	for _, candidate := range []*transponderSetInput{wrapped.Transponder, wrapped.Changes, wrapped.Set} {
+		if candidate != nil {
+			input = *candidate
+			break
+		}
+	}
+	var lines []string
+	providerText := firstString(input.Provider, input.ProviderName, input.Name)
+	if providerText != "" {
+		provider, err := bfcommands.ValidateTransponderProviderName(providerText)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, fmt.Sprintf("set transponder_provider = %s", provider))
+	}
+	dataRaw := firstRawMessage(input.Data, input.DataBytes, input.Bytes)
+	if len(dataRaw) != 0 || strings.TrimSpace(input.DataHex) != "" {
+		values, err := parseTransponderDataJSON(dataRaw, input.DataHex)
+		if err != nil {
+			return nil, err
+		}
+		lines = append(lines, bfcommands.FormatTransponderData(values))
+	}
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("provider or data is required")
+	}
+	return lines, nil
+}
+
+func parseTransponderDataJSON(raw json.RawMessage, dataHex string) ([]uint8, error) {
+	if strings.TrimSpace(dataHex) != "" {
+		decoded, err := hex.DecodeString(strings.TrimSpace(dataHex))
+		if err != nil {
+			return nil, fmt.Errorf("data_hex must be hexadecimal bytes: %w", err)
+		}
+		out := make([]uint8, 0, len(decoded))
+		for _, value := range decoded {
+			out = append(out, uint8(value))
+		}
+		return out, nil
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return nil, nil
+	}
+	var text string
+	if err := json.Unmarshal(raw, &text); err == nil {
+		return bfcommands.ValidateTransponderData(text)
+	}
+	var numbers []int
+	if err := json.Unmarshal(raw, &numbers); err != nil {
+		return nil, fmt.Errorf("transponder data must be a comma string, byte array, or data_hex")
+	}
+	parts := make([]string, 0, len(numbers))
+	for _, value := range numbers {
+		parts = append(parts, strconv.Itoa(value))
+	}
+	return bfcommands.ValidateTransponderData(strings.Join(parts, ","))
 }
 
 func (a *app) transponderSetConfigCommand() *cobra.Command {

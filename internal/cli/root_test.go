@@ -330,6 +330,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if beeperDisable["operation"] != "plan_or_write" || beeperDisable["requires_connection"] != true || beeperDisable["confirmation"] != "--yes with --apply or --save" || beeperDisable["runnable"] != true {
 		t.Fatalf("beeper disable capability = %+v", beeperDisable)
 	}
+	beeperSetJSON := byCommand["betaflight-cli beeper set-json"]
+	if beeperSetJSON["operation"] != "plan_or_write" || beeperSetJSON["requires_connection"] != true || beeperSetJSON["confirmation"] != "--yes with --apply or --save" || beeperSetJSON["output_root"] != "change_plan" || beeperSetJSON["input"] == "" || beeperSetJSON["runnable"] != true {
+		t.Fatalf("beeper set json capability = %+v", beeperSetJSON)
+	}
 	beeperConfig := byCommand["betaflight-cli beeper set-config"]
 	if beeperConfig["operation"] != "write" || beeperConfig["confirmation"] != "--yes" || beeperConfig["requires_connection"] != true || beeperConfig["output_root"] != "beeper_config" || beeperConfig["runnable"] != true {
 		t.Fatalf("beeper config capability = %+v", beeperConfig)
@@ -661,6 +665,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	transponderSetData := byCommand["betaflight-cli transponder set-data"]
 	if transponderSetData["operation"] != "plan_or_write" || transponderSetData["requires_connection"] != true || transponderSetData["confirmation"] != "--yes with --apply or --save" || transponderSetData["runnable"] != true {
 		t.Fatalf("transponder set-data capability = %+v", transponderSetData)
+	}
+	transponderSetJSON := byCommand["betaflight-cli transponder set-json"]
+	if transponderSetJSON["operation"] != "plan_or_write" || transponderSetJSON["requires_connection"] != true || transponderSetJSON["confirmation"] != "--yes with --apply or --save" || transponderSetJSON["output_root"] != "change_plan" || transponderSetJSON["input"] == "" || transponderSetJSON["runnable"] != true {
+		t.Fatalf("transponder set json capability = %+v", transponderSetJSON)
 	}
 	transponderConfig := byCommand["betaflight-cli transponder set-config"]
 	if transponderConfig["operation"] != "write" || transponderConfig["confirmation"] != "--yes" || transponderConfig["requires_connection"] != true || transponderConfig["output_root"] != "transponder_config" || transponderConfig["runnable"] != true {
@@ -5084,6 +5092,78 @@ func TestBeeperEnableRejectsUnknownMode(t *testing.T) {
 	}
 }
 
+func TestBeeperSetJSONPlanDoesNotConnect(t *testing.T) {
+	input := `{"beeper":{"enable":["ARMING"],"disable":"BAT_LOW"}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"beeper", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)
+	lines := plan["cli_lines"].([]any)
+	if plan["kind"] != "beeper" || plan["applied"] != false || len(lines) != 2 || lines[0] != "beeper ARMING" || lines[1] != "beeper -BAT_LOW" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only beeper set-json command")
+	}
+}
+
+func TestBeeperSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"enabled":["NOT_A_MODE"]}`
+	env, err := runTestCommandWithInput(t, []string{"beeper", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid beeper JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestBeeperSetJSONApply(t *testing.T) {
+	input := `{"set":{"disable":["ARMING"]}}`
+	var seenOp connection.OperationClass
+	connect := func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		seenOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	}
+	env, err := runTestCommandWithInput(t, []string{"beeper", "set-json", "-", "--apply", "--yes"}, input, connect)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if seenOp != connection.Write {
+		t.Fatalf("operation = %v, want Write", seenOp)
+	}
+	plan := env.Data.(map[string]any)
+	if plan["applied"] != true || plan["kind"] != "beeper" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "beeper -ARMING" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestBeeperDisableApply(t *testing.T) {
 	var seenOp connection.OperationClass
 	connect := func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
@@ -5245,6 +5325,78 @@ func TestTransponderSetProviderRejectsUnknown(t *testing.T) {
 	}
 	if env.OK {
 		t.Fatalf("expected failure: %+v", env)
+	}
+}
+
+func TestTransponderSetJSONPlanDoesNotConnect(t *testing.T) {
+	input := `{"transponder":{"provider":"ARCITIMER","data":[1,2,3]}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"transponder", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)
+	lines := plan["cli_lines"].([]any)
+	if plan["kind"] != "transponder" || plan["applied"] != false || len(lines) != 2 || lines[0] != "set transponder_provider = ARCITIMER" || lines[1] != "set transponder_data = 1,2,3" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only transponder set-json command")
+	}
+}
+
+func TestTransponderSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"provider":"UNKNOWN","data":[1,2,3]}`
+	env, err := runTestCommandWithInput(t, []string{"transponder", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid transponder JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestTransponderSetJSONApply(t *testing.T) {
+	input := `{"set":{"name":"ARCITIMER","data_hex":"010203"}}`
+	var seenOp connection.OperationClass
+	connect := func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		seenOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	}
+	env, err := runTestCommandWithInput(t, []string{"transponder", "set-json", "-", "--apply", "--yes"}, input, connect)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if seenOp != connection.Write {
+		t.Fatalf("operation = %v, want Write", seenOp)
+	}
+	plan := env.Data.(map[string]any)
+	if plan["applied"] != true || plan["kind"] != "transponder" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if len(env.SideEffects) != 2 || env.SideEffects[0].Command != "set transponder_provider = ARCITIMER" || env.SideEffects[1].Command != "set transponder_data = 1,2,3" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

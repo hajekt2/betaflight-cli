@@ -92,6 +92,8 @@ The raw CLI text remains authoritative.
 The parsed configuration is a best-effort agent view over the same lines.
 It includes settings, features, serial commands, AUX ranges, resources, selected profiles, VTX table commands, OSD commands, comments, unknown lines, and compatibility section buckets.
 Known settings include metadata hints from the compiled Betaflight setting registry.
+`settings set-json` accepts either a JSON object map of setting names to values or an array of `{name,value}` rows, directly or under `settings` or `changes`.
+It returns a `change_plan` with normalized `set NAME = VALUE` CLI lines plus per-setting metadata, and applying it requires `--apply --yes`.
 Configuration exports, validation results, snapshots, and comparisons also include an `inventory` object next to each parsed document.
 The inventory is a stable scan-friendly summary with setting counts, unknown counts, enabled and disabled features, populated section names, and row counts for common CLI families.
 

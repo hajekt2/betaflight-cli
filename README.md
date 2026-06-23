@@ -156,6 +156,7 @@ These commands read from parsed `dump all` output and use Betaflight CLI text li
 It also includes CLI-row table commands for VTX tables, LED strips, servos, adjustment ranges, and receiver channel ranges.
 It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.
+`settings set-json` accepts either a JSON object map of setting names to values or an array of `{name,value}` rows, validates every known setting against generated metadata, and returns a multi-line `change_plan` unless `--apply --yes` is supplied.
 `status` reads compact runtime status from `MSP_STATUS_EX`, including active sensor names, active flight mode names, arming-disable state, and reboot-required state.
 It includes a decoded health object for CPU load, cycle time, CPU temperature, I2C errors, arming-blocked state, and configuration-state flags.
 It preserves extended flight-mode bytes so new Betaflight modes beyond the legacy 32-bit mask can still be represented.

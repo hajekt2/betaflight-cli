@@ -117,6 +117,8 @@ func New() *FC {
 			},
 			"defaults nosave":                       {"defaults loaded without save"},
 			"set gyro_lpf1_static_hz = 0":           {"gyro_lpf1_static_hz set to 0"},
+			"set small_angle = 25":                  {"small_angle set to 25"},
+			"set dshot_bidir = ON":                  {"dshot_bidir set to ON"},
 			"set p_roll = 46":                       {"p_roll set to 46"},
 			"set roll_rc_rate = 8":                  {"roll_rc_rate set to 8"},
 			"set dterm_lpf1_static_hz = 100":        {"dterm_lpf1_static_hz set to 100"},

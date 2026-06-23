@@ -2269,6 +2269,65 @@ func TestSettingsApplyRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestSettingsSetJSONPlanDoesNotConnect(t *testing.T) {
+	input := `{"settings":{"small_angle":25,"dshot_bidir":true}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"settings", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "set dshot_bidir = ON" || lines[1] != "set small_angle = 25" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	settings := data["settings"].([]any)
+	if len(settings) != 2 || settings[0].(map[string]any)["name"] != "dshot_bidir" {
+		t.Fatalf("settings = %+v", settings)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only settings set-json command")
+	}
+}
+
+func TestSettingsSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `[{"name":"small_angle","value":181}]`
+	env, err := runTestCommandWithInput(t, []string{"settings", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid setting JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSettingsSetJSONApplyWithFakeFC(t *testing.T) {
+	input := `[{"name":"small_angle","value":25},{"name":"dshot_bidir","value":true}]`
+	env, err := runTestCommandWithInput(t, []string{"settings", "set-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v: %+v", err, env)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 2 || env.SideEffects[0].Command != "set small_angle = 25" || env.SideEffects[1].Command != "set dshot_bidir = ON" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestSettingsListMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"settings", "metadata", "dshot_bidir"}, nil)
 	if err != nil {

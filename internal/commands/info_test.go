@@ -43,6 +43,38 @@ func TestDecodeMCUInfoRejectsTrailingBytes(t *testing.T) {
 	}
 }
 
+func TestDecodeDeviceUID(t *testing.T) {
+	payload := appendU32Test(nil, 0x01234567)
+	payload = appendU32Test(payload, 0x89abcdef)
+	payload = appendU32Test(payload, 0x00000042)
+	uid, err := DecodeDeviceUID(payload)
+	if err != nil {
+		t.Fatalf("DecodeDeviceUID() error = %v", err)
+	}
+	if uid.Source != "MSP_UID" || uid.Hex != "0123456789abcdef00000042" || uid.ConfiguratorIdentifier != "123456789abcdef42" {
+		t.Fatalf("uid = %+v", uid)
+	}
+	if len(uid.Words) != 3 || uid.Words[0] != 0x01234567 || uid.Words[2] != 0x00000042 {
+		t.Fatalf("uid words = %+v", uid.Words)
+	}
+}
+
+func TestDecodeDeviceUIDRejectsShortPayload(t *testing.T) {
+	if _, err := DecodeDeviceUID([]byte{1, 2, 3}); err == nil {
+		t.Fatal("DecodeDeviceUID() error = nil, want short payload error")
+	}
+}
+
+func TestDecodeDeviceUIDRejectsTrailingBytes(t *testing.T) {
+	payload := appendU32Test(nil, 1)
+	payload = appendU32Test(payload, 2)
+	payload = appendU32Test(payload, 3)
+	payload = append(payload, 4)
+	if _, err := DecodeDeviceUID(payload); err == nil {
+		t.Fatal("DecodeDeviceUID() error = nil, want trailing byte error")
+	}
+}
+
 func TestDecodeBuildInfoRejectsShortPayload(t *testing.T) {
 	if _, err := DecodeBuildInfo([]byte("too short")); err == nil {
 		t.Fatal("DecodeBuildInfo() error = nil, want short payload error")

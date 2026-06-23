@@ -219,6 +219,11 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload := []byte{254}
 		payload = appendPString(payload, "STM32F405")
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPUID:
+		payload := appendU32(nil, 0x01234567)
+		payload = appendU32(payload, 0x89abcdef)
+		payload = appendU32(payload, 0x00000042)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPName:
 		f.out.Write(response(frame.Code, []byte("BetaFlight"), false))
 	case msp.MSPFeatureConfig:

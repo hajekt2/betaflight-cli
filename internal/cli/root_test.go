@@ -97,6 +97,10 @@ func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	if mcu["source"] != "MSP2_MCU_INFO" || mcu["id"] != float64(254) || mcu["name"] != "STM32F405" {
 		t.Fatalf("mcu = %+v", mcu)
 	}
+	uid := data["uid"].(map[string]any)
+	if uid["source"] != "MSP_UID" || uid["hex"] != "0123456789abcdef00000042" {
+		t.Fatalf("uid = %+v", uid)
+	}
 	build := data["build"].(map[string]any)
 	if build["date_time"] != "Jan 01 2026 00:00:00" || build["git_revision"] != "abc1234" {
 		t.Fatalf("build = %+v", build)

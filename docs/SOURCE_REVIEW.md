@@ -65,6 +65,9 @@ The option codes are generated upstream in `src/main/msp/msp_build_info.h` and m
 `MSP2_MCU_INFO` returns the MCU type ID and MCU name.
 Configurator reads it into `FC.MCU_INFO` for API 1.47 and newer.
 
+`MSP_UID` returns three little-endian 32-bit words.
+Configurator stores those words and concatenates their hex values into `deviceIdentifier`.
+
 `MSP2_GET_TEXT` is defined in `src/main/msp/msp_protocol_v2_betaflight.h`.
 Firmware returns the requested text type byte followed by a one-byte length and the text bytes.
 Configurator uses this for pilot name, craft name, active profile names, build key, and release name.

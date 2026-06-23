@@ -16,6 +16,7 @@ type Info struct {
 	MSPProtocol     uint8      `json:"msp_protocol_version"`
 	Board           *BoardInfo `json:"board,omitempty"`
 	MCU             *MCUInfo   `json:"mcu,omitempty"`
+	UID             *DeviceUID `json:"uid,omitempty"`
 	Build           *BuildInfo `json:"build,omitempty"`
 	LegacyName      string     `json:"legacy_name,omitempty"`
 }
@@ -34,6 +35,13 @@ type MCUInfo struct {
 	Source string `json:"source"`
 	ID     uint8  `json:"id"`
 	Name   string `json:"name"`
+}
+
+type DeviceUID struct {
+	Source                 string   `json:"source"`
+	Words                  []uint32 `json:"words"`
+	Hex                    string   `json:"hex"`
+	ConfiguratorIdentifier string   `json:"configurator_identifier,omitempty"`
 }
 
 type BuildInfo struct {
@@ -94,6 +102,16 @@ func ReadInfo(ctx context.Context, client *connection.Client) (Info, []string) {
 		}
 	} else {
 		warnings = append(warnings, fmt.Sprintf("MSP2_MCU_INFO unavailable: %v", err))
+	}
+	if frame, err := client.Request(ctx, msp.MSPUID, nil); err == nil {
+		uid, err := DecodeDeviceUID(frame.Payload)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("MSP_UID decode failed: %v", err))
+		} else {
+			info.UID = uid
+		}
+	} else {
+		warnings = append(warnings, fmt.Sprintf("MSP_UID unavailable: %v", err))
 	}
 	if frame, err := client.Request(ctx, msp.MSPName, nil); err == nil {
 		info.LegacyName = DecodeName(frame.Payload)
@@ -162,6 +180,28 @@ func DecodeMCUInfo(payload []byte) (*MCUInfo, error) {
 		Source: "MSP2_MCU_INFO",
 		ID:     id,
 		Name:   name,
+	}, nil
+}
+
+func DecodeDeviceUID(payload []byte) (*DeviceUID, error) {
+	const wordCount = 3
+	r := msp.NewPayloadReader(payload)
+	words := make([]uint32, 0, wordCount)
+	for i := 0; i < wordCount; i++ {
+		word, err := r.U32()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, fmt.Sprintf("UID word %d", i))
+		}
+		words = append(words, word)
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP_UID returned %d trailing byte(s)", r.Remaining())
+	}
+	return &DeviceUID{
+		Source:                 "MSP_UID",
+		Words:                  words,
+		Hex:                    fmt.Sprintf("%08x%08x%08x", words[0], words[1], words[2]),
+		ConfiguratorIdentifier: fmt.Sprintf("%x%x%x", words[0], words[1], words[2]),
 	}, nil
 }
 

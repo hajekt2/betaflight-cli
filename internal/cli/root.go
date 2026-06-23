@@ -548,6 +548,21 @@ func (a *app) configurationCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "snapshot",
+		Short: "Read dump and diff configuration snapshots for review",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				snapshot, err := bfcommands.ReadConfigurationSnapshot(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"configuration_snapshot": snapshot,
+				})
+			})
+		},
+	})
 	return cmd
 }
 

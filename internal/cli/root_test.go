@@ -202,6 +202,37 @@ func TestConfigurationStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestConfigurationSnapshotWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"configuration", "snapshot"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	snapshot := data["configuration_snapshot"].(map[string]any)
+	summary := snapshot["summary"].(map[string]any)
+	if summary["full_line_count"].(float64) <= summary["diff_line_count"].(float64) {
+		t.Fatalf("summary counts = %+v", summary)
+	}
+	if summary["diff_has_save_command"] != true || summary["review_required"] != true {
+		t.Fatalf("summary review = %+v", summary)
+	}
+	guidance := snapshot["guidance"].(map[string]any)
+	if guidance["read_only_snapshot"] != true || guidance["strip_save_before_restore"] != true {
+		t.Fatalf("guidance = %+v", guidance)
+	}
+	diff := snapshot["diff"].(map[string]any)
+	if diff["source_command"] != "diff all" || diff["unknown_count"].(float64) == 0 {
+		t.Fatalf("diff = %+v", diff)
+	}
+	full := snapshot["full"].(map[string]any)
+	if full["source_command"] != "dump all" || full["line_count"].(float64) == 0 {
+		t.Fatalf("full = %+v", full)
+	}
+}
+
 func TestTasksStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"tasks", "status"}, nil)
 	if err != nil {

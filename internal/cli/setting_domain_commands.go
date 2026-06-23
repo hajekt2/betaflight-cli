@@ -22,9 +22,12 @@ type settingDomain struct {
 
 func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	cmd := &cobra.Command{Use: domain.use, Short: domain.short}
-	if domain.use == "vtx" {
+	switch domain.use {
+	case "vtx":
 		cmd.AddCommand(a.vtxListCommand())
-	} else {
+	case "osd":
+		cmd.AddCommand(a.osdListCommand())
+	default:
 		cmd.AddCommand(a.configListCommand("list", "List current "+domain.use+" settings", func(doc bfconfig.Document) any {
 			return map[string]any{
 				"settings": currentDomainSettings(doc, domain.matches),
@@ -91,6 +94,18 @@ func (a *app) vtxListCommand() *cobra.Command {
 			"vtx":       doc.VTX,
 			"vtx_table": doc.VTXTable,
 			"lines":     doc.Sections["vtx_table"],
+		}
+	})
+}
+
+func (a *app) osdListCommand() *cobra.Command {
+	matches := osdSettingMatch()
+	return a.configListCommand("list", "List OSD settings and OSD layout rows", func(doc bfconfig.Document) any {
+		return map[string]any{
+			"settings": currentDomainSettings(doc, matches),
+			"metadata": settings.DefaultRegistry.Filter(matches),
+			"osd":      doc.OSD,
+			"lines":    doc.Sections["osd"],
 		}
 	})
 }
@@ -346,8 +361,14 @@ func vtxDomain() settingDomain {
 
 func osdDomain() settingDomain {
 	return settingDomain{use: "osd", short: "Inspect and change OSD settings", matches: func(s settings.Metadata) bool {
-		return strings.Contains(s.PG, "OSD") || strings.HasPrefix(s.Name, "osd_")
+		return osdSettingMatch()(s)
 	}}
+}
+
+func osdSettingMatch() func(settings.Metadata) bool {
+	return func(s settings.Metadata) bool {
+		return strings.Contains(s.PG, "OSD") || strings.HasPrefix(s.Name, "osd_")
+	}
 }
 
 func gpsDomain() settingDomain {

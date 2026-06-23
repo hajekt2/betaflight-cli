@@ -4101,6 +4101,15 @@ func TestSettingDomainListsWithFakeFC(t *testing.T) {
 				t.Fatalf("%v vtx_table = %+v", tt.args, view["vtx_table"])
 			}
 		}
+		if tt.args[0] == "osd" {
+			if _, ok := view["osd"]; !ok {
+				t.Fatalf("%v view = %+v", tt.args, view)
+			}
+			osdLines, ok := view["lines"].([]any)
+			if !ok || len(osdLines) == 0 {
+				t.Fatalf("%v osd lines = %+v", tt.args, view["lines"])
+			}
+		}
 	}
 }
 

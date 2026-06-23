@@ -3191,9 +3191,14 @@ func (a *app) mspCommand() *cobra.Command {
 				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
 			}
 			op := connection.ReadOnly
-			if msp.IsLikelyWriteCode(code) {
+			unknownCommand := meta.Source == ""
+			if unknownCommand || msp.IsLikelyWriteCode(code) {
 				if !a.opts.yes {
-					return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "raw MSP write-like command requires --yes"))
+					message := "raw MSP write-like command requires --yes"
+					if unknownCommand {
+						message = "raw MSP command without compiled metadata requires --yes"
+					}
+					return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", message))
 				}
 				op = connection.Dangerous
 			}

@@ -20,6 +20,7 @@ The first-class support target is official Betaflight `2025.12.x` and newer.
 Older `4.x` firmware and Betaflight forks are outside the initial support matrix.
 Domain commands should fail outside the compiled metadata support set unless `--allow-unsupported` is explicit.
 Raw CLI passthrough and raw MSP diagnostics may still run with warnings when the MSP major version is compatible.
+Raw MSP requests for generated write-like commands and numeric commands without compiled metadata require `--yes`.
 The first implementation targets USB serial connections to already-running Betaflight firmware.
 Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of scope.
 

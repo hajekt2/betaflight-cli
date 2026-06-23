@@ -223,6 +223,43 @@ func TestMSPRequestWriteLikeRequiresYes(t *testing.T) {
 	}
 }
 
+func TestMSPRequestUnknownCodeRequiresYes(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"msp", "request", "4095"}, "", func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if !strings.Contains(env.Errors[0].Message, "without compiled metadata") {
+		t.Fatalf("message = %q, want unknown metadata warning", env.Errors[0].Message)
+	}
+	if called {
+		t.Fatal("unknown msp request attempted transport without --yes")
+	}
+}
+
+func TestMSPRequestUnknownCodeWithYesUsesDangerousOperation(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommandWithInput(t, []string{"msp", "request", "4095", "--yes"}, "", func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		return nil, connection.TargetInfo{}, &connection.CodedError{Code: "test_stop", Message: "stop before transport"}
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want %v", gotOp, connection.Dangerous)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "test_stop" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
 func TestMSPRequestInvalidCodeReturnsValidationError(t *testing.T) {
 	// invalid code that cannot be resolved must fail before attempting transport
 	called := false
@@ -3095,7 +3132,7 @@ func TestMSPRequestByNameReturnsMetadata(t *testing.T) {
 }
 
 func TestMSPRequestNumericFallbackUsesCodeName(t *testing.T) {
-	env, err := runTestCommand(t, []string{"msp", "request", "0xFFFF"}, nil)
+	env, err := runTestCommand(t, []string{"msp", "request", "0xFFFF", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3135,7 +3172,7 @@ func TestMSPRequestWithDecodeReturnsStructuredPayload(t *testing.T) {
 }
 
 func TestMSPRequestWithDecodeUnsupportedCodeFallsBackToRaw(t *testing.T) {
-	env, err := runTestCommand(t, []string{"msp", "request", "0xFFFF", "--decode"}, nil)
+	env, err := runTestCommand(t, []string{"msp", "request", "0xFFFF", "--decode", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

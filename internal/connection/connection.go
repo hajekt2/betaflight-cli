@@ -214,6 +214,9 @@ func classifyPort(name string) (bool, string) {
 	if strings.Contains(lower, "bluetooth") || strings.Contains(lower, "debug-console") {
 		return false, "ignored non-USB or debug port"
 	}
+	if strings.Contains(lower, "usb") {
+		return true, "USB serial candidate"
+	}
 	switch runtime.GOOS {
 	case "darwin":
 		if !strings.Contains(lower, "/dev/cu.") {
@@ -230,9 +233,6 @@ func classifyPort(name string) (bool, string) {
 		if strings.HasPrefix(strings.ToUpper(name), "COM") {
 			return true, "Windows COM port candidate"
 		}
-	}
-	if strings.Contains(lower, "usb") {
-		return true, "USB serial candidate"
 	}
 	return false, "not a typical Betaflight USB serial port"
 }

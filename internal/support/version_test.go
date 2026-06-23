@@ -8,13 +8,13 @@ func TestIsSupportedFirmwareVersion(t *testing.T) {
 		version   string
 		supported bool
 	}{
-		{"2025.12.0", true},
-		{"2025.12.0-rc.1", true},
-		{"2025.12.5", true},
-		{"2026.1.0", true},
-		{"2024.12.0", false},
-		{"2025.11.9", false},
-		{"abc", false},
+		{"2025.12.0", "2025.12.0", true},
+		{"2025.12.0-rc.1", "2025.12.0-rc.1", true},
+		{"2025.12.5", "2025.12.5", true},
+		{"2026.1.0", "2026.1.0", true},
+		{"2024.12.0", "2024.12.0", false},
+		{"2025.11.9", "2025.11.9", false},
+		{"abc", "abc", false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

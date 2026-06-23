@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
-	"github.com/hajekt2/betaflight-cli/internal/support"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
+	"github.com/hajekt2/betaflight-cli/internal/support"
 )
 
 const supportedFirmwarePolicy = support.SupportedFirmwarePolicy
@@ -147,24 +147,24 @@ func ReadFirmwareStatus(ctx context.Context, client *connection.Client) (*Firmwa
 }
 
 func EvaluateFirmwareSupport(variant, firmwareVersion, apiVersion string) FirmwareSupport {
-	support := FirmwareSupport{
+	result := FirmwareSupport{
 		Policy:               supportedFirmwarePolicy,
 		AllowUnsupportedFlag: "--allow-unsupported",
 	}
 	switch {
 	case variant != "" && variant != "BTFL":
-		support.Reason = "non-Betaflight firmware variant"
+		result.Reason = "non-Betaflight firmware variant"
 	case apiVersion == "":
-		support.Reason = "missing MSP API version"
+		result.Reason = "missing MSP API version"
 	case !strings.HasPrefix(apiVersion, "1."):
-		support.Reason = "unsupported MSP API major version"
+		result.Reason = "unsupported MSP API major version"
 	case support.IsSupportedFirmwareVersion(firmwareVersion):
-		support.Supported = true
-		support.Reason = "firmware is inside the supported metadata range"
+		result.Supported = true
+		result.Reason = "firmware is inside the supported metadata range"
 	case firmwareVersion == "":
-		support.Reason = "missing firmware version"
+		result.Reason = "missing firmware version"
 	default:
-		support.Reason = "firmware is outside the supported metadata range"
+		result.Reason = "firmware is outside the supported metadata range"
 	}
-	return support
+	return result
 }

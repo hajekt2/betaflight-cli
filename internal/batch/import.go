@@ -205,6 +205,9 @@ func (e *parseError) Error() string {
 	return e.message
 }
 func sourceOrDefault(explicit, detected string) string {
+	if detected == "json" {
+		return detected
+	}
 	if explicit != "" {
 		return explicit
 	}

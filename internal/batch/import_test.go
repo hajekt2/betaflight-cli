@@ -10,7 +10,7 @@ func TestImportCLIAcceptsJSONWithLines(t *testing.T) {
 	if len(result.Plan.CLILines) != 2 || result.Plan.CLILines[0] != "feature GPS" || result.Plan.CLILines[1] != "set small_angle = 25" {
 		t.Fatalf("result = %+v", result)
 	}
-	if len(result.Skipped) != 2 {
+	if len(result.Skipped) != 4 {
 		t.Fatalf("skipped = %+v", result.Skipped)
 	}
 }

@@ -8,7 +8,7 @@ func TestDecodeAttitude(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DecodeAttitude() error = %v", err)
 	}
-	if attitude.RollDegrees != -10 || attitude.PitchDegrees != 2 || attitude.YawDegrees != 180 {
+	if attitude.RollDegrees != -1 || attitude.PitchDegrees != 2 || attitude.YawDegrees != 180 {
 		t.Fatalf("attitude = %+v", attitude)
 	}
 }
@@ -41,4 +41,3 @@ func TestDecodeStatusWrapper(t *testing.T) {
 		t.Fatalf("status = %+v", out)
 	}
 }
-

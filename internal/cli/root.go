@@ -215,19 +215,19 @@ func (a *app) schemaCommand() *cobra.Command {
 			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
 				"command": "schema",
 				"schema_version": map[string]any{
-					"envelope":        output.SchemaVersion,
+					"envelope":         output.SchemaVersion,
 					"inversion_level":  "command-output-schema-first",
-					"description":     "stable JSON envelope contract currently used for all machine-facing output",
+					"description":      "stable JSON envelope contract currently used for all machine-facing output",
 					"supported_minors": []string{"stable"},
 				},
 				"envelope": envelopeFields,
 				"command_contracts": map[string]any{
-					"total_commands": commandCount,
-					"runnable_commands": runnableCount,
+					"total_commands":               commandCount,
+					"runnable_commands":            runnableCount,
 					"requires_connection_commands": requiresConnectionCount,
-					"operation_counts": operationCounts,
-					"operations":       operations,
-					"requires_connection_default": "when command touches transport",
+					"operation_counts":             operationCounts,
+					"operations":                   operations,
+					"requires_connection_default":  "when command touches transport",
 				},
 				"capabilities": map[string]any{
 					"coverage": map[string]any{
@@ -237,7 +237,7 @@ func (a *app) schemaCommand() *cobra.Command {
 						"next_gaps":           coverage.NextGaps,
 					},
 				},
-				"output_roots": outputRoots,
+				"output_roots":  outputRoots,
 				"command_count": commandCount,
 			}))
 		},
@@ -1581,16 +1581,16 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 				RebootToBootloader: rebootFirst,
 			})
 			if err != nil {
-				return a.render(a.failure(commandPath(cmd), nil, err))
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
 			}
 			if !execute {
 				return a.render(output.Success(commandPath(cmd), nil, map[string]any{
 					"firmware_flash": map[string]any{
-						"action":    "plan",
-						"plan":      plan,
-						"executed":  false,
-						"requires":  "--yes and --execute to run",
-						"note":      "this command does not touch hardware in plan mode",
+						"action":   "plan",
+						"plan":     plan,
+						"executed": false,
+						"requires": "--yes and --execute to run",
+						"note":     "this command does not touch hardware in plan mode",
 					},
 				}))
 			}
@@ -1601,7 +1601,7 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 				if preflight != nil {
 					result, err := bfcommands.ExecuteFirmwareFlash(cmd.Context(), *plan)
 					if err != nil {
-						env := output.Failure(commandPath(cmd), &target, err)
+						env := output.Failure(commandPath(cmd), &target, "firmware_flash_failed", err.Error())
 						env.SideEffects = append(env.SideEffects, output.SideEffect{
 							Type:    "firmware_reboot",
 							Command: commandPath(cmd),
@@ -1640,7 +1640,7 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 				}
 				result, err := bfcommands.ExecuteFirmwareFlash(cmd.Context(), *plan)
 				if err != nil {
-					env := output.Failure(commandPath(cmd), &target, err)
+					env := output.Failure(commandPath(cmd), &target, "firmware_flash_failed", err.Error())
 					env.Data = map[string]any{
 						"firmware_flash": map[string]any{
 							"plan":       plan,
@@ -1893,7 +1893,7 @@ func (a *app) configurationCommand() *cobra.Command {
 					"lines":             lines,
 					"raw":               strings.Join(lines, "\n"),
 					"sections":          doc.Sections,
-					"configuration":      doc,
+					"configuration":     doc,
 					"inventory":         bfconfig.BuildInventory(doc),
 					"raw_authoritative": true,
 				})
@@ -2662,7 +2662,7 @@ func (a *app) settingsCommand() *cobra.Command {
 					"lines":             lines,
 					"raw":               strings.Join(lines, "\n"),
 					"sections":          doc.Sections,
-					"configuration":      doc,
+					"configuration":     doc,
 					"inventory":         bfconfig.BuildInventory(doc),
 					"raw_authoritative": true,
 				})
@@ -2838,8 +2838,8 @@ func (a *app) mspCommand() *cobra.Command {
 			}
 			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
 				"registry_version": msp.GeneratedMSPSourceVersion,
-				"count":           len(filtered),
-				"commands":        filtered,
+				"count":            len(filtered),
+				"commands":         filtered,
 			}))
 		},
 	}
@@ -2881,11 +2881,11 @@ func (a *app) mspCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, args []string) error {
 			code, meta, err := parseMSPCode(args[0])
 			if err != nil {
-				return err
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
 			}
 			payload, err := hex.DecodeString(strings.TrimPrefix(payloadHex, "0x"))
 			if err != nil {
-				return err
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
 			}
 			op := connection.ReadOnly
 			if msp.IsLikelyWriteCode(code) {
@@ -2900,15 +2900,15 @@ func (a *app) mspCommand() *cobra.Command {
 					return a.failure(commandPath(cmd), &target, err)
 				}
 				env := output.Success(commandPath(cmd), &target, map[string]any{
-					"code":             frame.Code,
-					"code_name":        meta.Name,
-					"protocol":         frame.Version,
-					"version":          frame.Version,
-					"direction_hint":   string(meta.Direction),
-					"command_source":   meta.Source,
-					"command_line":     meta.Line,
-					"payload_hex":      hex.EncodeToString(frame.Payload),
-					"length":           len(frame.Payload),
+					"code":           frame.Code,
+					"code_name":      meta.Name,
+					"protocol":       frame.Version,
+					"version":        frame.Version,
+					"direction_hint": string(meta.Direction),
+					"command_source": meta.Source,
+					"command_line":   meta.Line,
+					"payload_hex":    hex.EncodeToString(frame.Payload),
+					"length":         len(frame.Payload),
 				})
 				if op != connection.ReadOnly {
 					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "raw_msp", Detail: "raw MSP write-like command sent"})

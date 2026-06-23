@@ -459,7 +459,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli storage erase":                   {RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes", OutputRoot: "storage_erase", Tags: []string{"storage", "dangerous", "erase"}},
 		"betaflight-cli sensors calibrate-accelerometer": {RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes", OutputRoot: "sensor_calibration", Tags: []string{"sensors", "calibration", "dangerous"}},
 		"betaflight-cli sensors calibrate-magnetometer":  {RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes", OutputRoot: "sensor_calibration", Tags: []string{"sensors", "calibration", "dangerous"}},
-		"betaflight-cli configuration plan":              writePlan,
+		"betaflight-cli configuration plan":              {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "change_plan", Input: "raw CLI text or JSON lines/raw", Tags: []string{"configuration", "plan", "offline"}},
 		"betaflight-cli batch plan":                      writePlan,
 		"betaflight-cli restore plan":                    writePlan,
 		"betaflight-cli presets plan":                    writePlan,
@@ -597,14 +597,16 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli failsafe list",
 		"betaflight-cli failsafe status",
 	} {
-		registry[path] = readMSP
-		if strings.Contains(path, " list") ||
-			strings.Contains(path, "backup ") ||
-			strings.Contains(path, "configuration export") ||
-			strings.Contains(path, "configuration snapshot") ||
-			strings.Contains(path, "configuration diff") {
-			meta := readCLI
-			registry[path] = meta
+		if _, exists := registry[path]; !exists {
+			registry[path] = readMSP
+			if strings.Contains(path, " list") ||
+				strings.Contains(path, "backup ") ||
+				strings.Contains(path, "configuration export") ||
+				strings.Contains(path, "configuration snapshot") ||
+				strings.Contains(path, "configuration diff") {
+				meta := readCLI
+				registry[path] = meta
+			}
 		}
 	}
 	for _, path := range []string{
@@ -652,7 +654,9 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli reboot msc-utc",
 		"betaflight-cli msp request",
 	} {
-		registry[path] = dangerous
+		if _, exists := registry[path]; !exists {
+			registry[path] = dangerous
+		}
 	}
 	_ = offline
 	return registry

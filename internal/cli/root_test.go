@@ -347,13 +347,25 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if sensorConfig["operation"] != "write" || sensorConfig["confirmation"] != "--yes" || sensorConfig["requires_connection"] != true || sensorConfig["output_root"] != "sensor_config" || sensorConfig["runnable"] != true {
 		t.Fatalf("sensor config capability = %+v", sensorConfig)
 	}
+	sensorConfigJSON := byCommand["betaflight-cli sensors set-config-json"]
+	if sensorConfigJSON["operation"] != "write" || sensorConfigJSON["confirmation"] != "--yes" || sensorConfigJSON["requires_connection"] != true || sensorConfigJSON["output_root"] != "sensor_config" || sensorConfigJSON["runnable"] != true {
+		t.Fatalf("sensor config JSON capability = %+v", sensorConfigJSON)
+	}
 	sensorAlignment := byCommand["betaflight-cli sensors set-alignment"]
 	if sensorAlignment["operation"] != "write" || sensorAlignment["confirmation"] != "--yes" || sensorAlignment["requires_connection"] != true || sensorAlignment["output_root"] != "sensor_alignment" || sensorAlignment["runnable"] != true {
 		t.Fatalf("sensor alignment capability = %+v", sensorAlignment)
 	}
+	sensorAlignmentJSON := byCommand["betaflight-cli sensors set-alignment-json"]
+	if sensorAlignmentJSON["operation"] != "write" || sensorAlignmentJSON["confirmation"] != "--yes" || sensorAlignmentJSON["requires_connection"] != true || sensorAlignmentJSON["output_root"] != "sensor_alignment" || sensorAlignmentJSON["runnable"] != true {
+		t.Fatalf("sensor alignment JSON capability = %+v", sensorAlignmentJSON)
+	}
 	compassConfig := byCommand["betaflight-cli sensors set-compass-declination"]
 	if compassConfig["operation"] != "write" || compassConfig["confirmation"] != "--yes" || compassConfig["requires_connection"] != true || compassConfig["output_root"] != "compass_config" || compassConfig["runnable"] != true {
 		t.Fatalf("compass config capability = %+v", compassConfig)
+	}
+	compassConfigJSON := byCommand["betaflight-cli sensors set-compass-json"]
+	if compassConfigJSON["operation"] != "write" || compassConfigJSON["confirmation"] != "--yes" || compassConfigJSON["requires_connection"] != true || compassConfigJSON["output_root"] != "compass_config" || compassConfigJSON["runnable"] != true {
+		t.Fatalf("compass config JSON capability = %+v", compassConfigJSON)
 	}
 	profileCopy := byCommand["betaflight-cli profiles copy"]
 	if profileCopy["operation"] != "write" || profileCopy["confirmation"] != "--yes" || profileCopy["requires_connection"] != true || profileCopy["output_root"] != "profile_copy" || profileCopy["runnable"] != true {
@@ -4195,6 +4207,20 @@ func TestSensorsSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 	}
 }
 
+func TestSensorsSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"sensor_config":{"accelerometer":1,"barometer":2,"magnetometer":3,"rangefinder":4}}`
+	env, err := runTestCommandWithInput(t, []string{"sensors", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestSensorsSetConfigWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"sensors", "set-config", "1", "2", "3", "4", "--yes"}, nil)
 	if err != nil {
@@ -4212,6 +4238,29 @@ func TestSensorsSetConfigWithFakeFC(t *testing.T) {
 	hardware := result["hardware"].([]any)
 	if len(hardware) != 4 || hardware[0].(map[string]any)["name"] != "accelerometer" || hardware[3].(map[string]any)["name"] != "rangefinder" {
 		t.Fatalf("hardware = %+v", hardware)
+	}
+	if result["msp_name"] != "MSP_SET_SENSOR_CONFIG" || result["save_required"] != true {
+		t.Fatalf("sensor config result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_config" || env.SideEffects[0].Command != "MSP_SET_SENSOR_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSensorsSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"sensor_config":{"accelerometer":1,"barometer":2,"magnetometer":3,"rangefinder":4}}`
+	env, err := runTestCommandWithInput(t, []string{"sensors", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["sensor_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["accelerometer"] != float64(1) || config["barometer"] != float64(2) || config["rangefinder"] != float64(4) {
+		t.Fatalf("config = %+v", config)
 	}
 	if result["msp_name"] != "MSP_SET_SENSOR_CONFIG" || result["save_required"] != true {
 		t.Fatalf("sensor config result = %+v", result)
@@ -4247,8 +4296,46 @@ func TestSensorsSetAlignmentRequiresConfirmationBeforeConnect(t *testing.T) {
 	}
 }
 
+func TestSensorsSetAlignmentJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"sensors":{"alignment":{"magnetometer_alignment":2,"gyro_enabled_mask":3,"mag_custom_alignment":{"roll":-10,"pitch":20,"yaw":900}}}}`
+	env, err := runTestCommandWithInput(t, []string{"sensors", "set-alignment-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestSensorsSetAlignmentWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"sensors", "set-alignment", "2", "3", "-10", "20", "900", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["sensor_alignment"].(map[string]any)
+	config := result["config"].(map[string]any)
+	custom := config["mag_custom_alignment"].(map[string]any)
+	if config["magnetometer_alignment"] != float64(2) || config["gyro_enabled_mask"] != float64(3) || custom["yaw"] != float64(900) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_SENSOR_ALIGNMENT" || result["save_required"] != true {
+		t.Fatalf("sensor alignment result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_alignment" || env.SideEffects[0].Command != "MSP_SET_SENSOR_ALIGNMENT" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSensorsSetAlignmentJSONWithFakeFC(t *testing.T) {
+	input := `{"sensors":{"alignment":{"magnetometer_alignment":2,"gyro_enabled_mask":3,"mag_custom_alignment":{"roll":-10,"pitch":20,"yaw":900}}}}`
+	env, err := runTestCommandWithInput(t, []string{"sensors", "set-alignment-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -4296,8 +4383,45 @@ func TestSensorsSetCompassDeclinationRequiresConfirmationBeforeConnect(t *testin
 	}
 }
 
+func TestSensorsSetCompassJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"sensors":{"compass":{"declination_deci_degrees":-123}}}`
+	env, err := runTestCommandWithInput(t, []string{"sensors", "set-compass-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestSensorsSetCompassDeclinationWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"sensors", "set-compass-declination", "-123", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["compass_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["declination_deci_degrees"] != float64(-123) || config["declination_degrees"] != -12.3 {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_COMPASS_CONFIG" || result["save_required"] != true {
+		t.Fatalf("compass config result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "compass_config" || env.SideEffects[0].Command != "MSP_SET_COMPASS_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSensorsSetCompassJSONWithFakeFC(t *testing.T) {
+	input := `{"sensors":{"compass":{"declination_deci_degrees":-123}}}`
+	env, err := runTestCommandWithInput(t, []string{"sensors", "set-compass-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

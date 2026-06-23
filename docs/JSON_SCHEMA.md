@@ -361,10 +361,16 @@ Successful board alignment writes include a `board_alignment` side effect.
 The object includes configured hardware IDs, active hardware IDs, active gyro hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
 `sensors set-config` returns a `sensor_config` object with requested accelerometer, barometer, magnetometer, and rangefinder hardware IDs, decoded hardware rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful sensor config writes include a `sensor_config` side effect.
+`sensors set-config-json` accepts either a sensor hardware config object or an object with `sensor_config`, `hardware_config`, `config`, or `sensors.hardware_config`.
+It returns the same `sensor_config` object as `sensors set-config`.
 `sensors set-alignment` returns a `sensor_alignment` object with magnetometer alignment, gyro enabled mask, optional custom magnetometer alignment, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful sensor alignment writes include a `sensor_alignment` side effect.
+`sensors set-alignment-json` accepts either a sensor alignment object or an object with `sensor_alignment`, `alignment`, `config`, or `sensors.alignment`.
+It returns the same `sensor_alignment` object as `sensors set-alignment`.
 `sensors set-compass-declination` returns a `compass_config` object with declination in deci-degrees and degrees, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful compass config writes include a `compass_config` side effect.
+`sensors set-compass-json` accepts either a compass config object or an object with `compass_config`, `compass`, `config`, `sensors.compass`, or `declination_deci_degrees`.
+It returns the same `compass_config` object as `sensors set-compass-declination`.
 `sensors calibrate-accelerometer` and `sensors calibrate-magnetometer` return a `sensor_calibration` object with the calibration kind, MSP command name/code, and acknowledgement flag.
 Successful calibration commands also include a `sensor_calibration` side effect.
 

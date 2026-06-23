@@ -152,6 +152,10 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	if maintenance["status"] != "implemented" || len(maintenance["dangerous_commands"].([]any)) == 0 {
 		t.Fatalf("maintenance domain = %+v", maintenance)
 	}
+	motors := byDomain["motors-servos-mixer"]
+	if motors["status"] != "implemented" {
+		t.Fatalf("motors domain = %+v", motors)
+	}
 	gaps := coverage["next_gaps"].([]any)
 	foundMotorTesting := false
 	for _, item := range gaps {
@@ -1277,6 +1281,41 @@ func TestMotorsStatusWithFakeFC(t *testing.T) {
 	first := telemetry[0].(map[string]any)
 	if first["rpm"] != float64(12500) || first["voltage_v"] != 16.8 {
 		t.Fatalf("telemetry = %+v", telemetry)
+	}
+}
+
+func TestMotorsTestPlanDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"motors", "test-plan", "--motor", "2", "--value", "1100", "--duration", "1500ms", "--props-off"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for motors test-plan")
+	}
+	plan := env.Data.(map[string]any)["motor_test_plan"].(map[string]any)
+	if plan["applied"] != false || plan["dangerous"] != true || plan["command_preview"] != "motor 2 1100" || plan["duration_ms"] != float64(1500) {
+		t.Fatalf("plan = %+v", plan)
+	}
+	checks := plan["safety_checks"].([]any)
+	if checks[0].(map[string]any)["passed"] != true || checks[1].(map[string]any)["passed"] != false {
+		t.Fatalf("checks = %+v", checks)
+	}
+}
+
+func TestMotorsTestPlanValidatesBounds(t *testing.T) {
+	env, err := runTestCommand(t, []string{"motors", "test-plan", "--value", "2500"}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

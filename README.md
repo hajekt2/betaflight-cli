@@ -68,6 +68,7 @@ betaflight-cli sensors status --port /dev/tty.usbmodem01
 betaflight-cli beeper config --port /dev/tty.usbmodem01
 betaflight-cli mixer status --port /dev/tty.usbmodem01
 betaflight-cli motors status --port /dev/tty.usbmodem01
+betaflight-cli motors test-plan --motor 0 --value 1050 --duration 1s --props-off --battery-aware
 betaflight-cli servos status --port /dev/tty.usbmodem01
 betaflight-cli settings get gyro_lpf1_static_hz --port /dev/tty.usbmodem01
 betaflight-cli settings set gyro_lpf1_static_hz 0 --port /dev/tty.usbmodem01 --apply
@@ -168,6 +169,8 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `transponder config` reads IR transponder provider requirements, active provider, code bytes, hex data, and native CLI commands over MSP.
 `mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
+`motors test-plan` builds an offline high-risk motor output plan with bounded value and duration, required confirmations, and preflight checks.
+It never connects to hardware and does not implement live motor output apply yet.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.
 `blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, a capped candidate frame index, capped decoded frame samples for simple variable-byte payloads, and stream summaries for decoded fields.

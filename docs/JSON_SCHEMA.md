@@ -251,6 +251,8 @@ The object includes the mixer mode ID, CLI mixer name, display name, expected mo
 
 `motors status` returns a `motors` object decoded from `MSP_MOTOR_CONFIG`, `MSP_MOTOR`, `MSP_MOTOR_TELEMETRY`, `MSP_MOTOR_3D_CONFIG`, and `MSP2_MOTOR_OUTPUT_REORDERING`.
 The object includes motor configuration, current motor outputs, telemetry values with raw and scaled units, 3D motor config, and output reordering.
+`motors test-plan` returns a `motor_test_plan` object without connecting to hardware.
+The object includes the motor index, output value, duration, dangerous flag, command preview, stop command preview, required confirmations, safety checks, recommended preflight steps, and an explicit message that live apply is not implemented yet.
 
 `servos status` returns a `servos` object decoded from `MSP_SERVO`, `MSP_SERVO_CONFIGURATIONS`, and `MSP_SERVO_MIX_RULES`.
 The object includes current servo outputs, servo configuration rows, and servo mix rules.

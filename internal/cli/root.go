@@ -329,6 +329,7 @@ func (a *app) motorsCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(a.motorTestPlanCommand())
 	return cmd
 }
 

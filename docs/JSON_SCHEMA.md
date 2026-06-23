@@ -154,6 +154,9 @@ The object also includes a `by_key` map for direct agent lookup and per-field wa
 `debug status` returns a `debug` object decoded from `MSP_DEBUG` and `MSP_ACC_TRIM`.
 The object includes signed debug channel values, signed accelerometer pitch/roll trims, source metadata, and per-message warnings when one optional request is unavailable.
 
+`environment status` returns an `environment` object decoded from `MSP_ALTITUDE`, `MSP_SONAR_ALTITUDE`, and `MSP_ANALOG`.
+The object includes estimated altitude in centimeters/meters, vario, rangefinder altitude, legacy voltage, drawn mAh, RSSI, amperage, battery voltage, source metadata, and per-message warnings.
+
 `receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 

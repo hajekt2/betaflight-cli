@@ -101,6 +101,30 @@ func TestDebugStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestEnvironmentStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"environment", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	environment := data["environment"].(map[string]any)
+	altitude := environment["altitude"].(map[string]any)
+	if altitude["altitude_m"] != 123.45 || altitude["vario_cm_s"] != float64(-67) {
+		t.Fatalf("altitude = %+v", altitude)
+	}
+	rangefinder := environment["rangefinder"].(map[string]any)
+	if rangefinder["altitude_m"] != 43.21 {
+		t.Fatalf("rangefinder = %+v", rangefinder)
+	}
+	analog := environment["analog"].(map[string]any)
+	if analog["voltage_v"] != 15.99 || analog["rssi"] != float64(900) || analog["amperage_a"] != -1.23 {
+		t.Fatalf("analog = %+v", analog)
+	}
+}
+
 func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"info"}, nil)
 	if err != nil {

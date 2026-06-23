@@ -264,6 +264,19 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, -7)
 		payload = appendS16(payload, 8)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPAltitude:
+		payload := appendU32(nil, 12345)
+		payload = appendS16(payload, -67)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSonarAltitude:
+		f.out.Write(response(frame.Code, appendU32(nil, 4321), false))
+	case msp.MSPAnalog:
+		payload := []byte{160}
+		payload = appendU16(payload, 321)
+		payload = appendU16(payload, 900)
+		payload = appendS16(payload, -123)
+		payload = appendU16(payload, 1599)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBatteryState:
 		payload := []byte{4}
 		payload = appendU16(payload, 1300)

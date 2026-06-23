@@ -883,6 +883,28 @@ func TestSettingsListMetadata(t *testing.T) {
 	}
 }
 
+func TestSettingsGetIncludesMetadataAndLines(t *testing.T) {
+	env, err := runTestCommand(t, []string{"settings", "get", "gyro_lpf1_static_hz"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["setting"] != "gyro_lpf1_static_hz" {
+		t.Fatalf("setting = %+v", data["setting"])
+	}
+	lines := data["lines"].([]any)
+	if len(lines) != 1 || lines[0] != "gyro_lpf1_static_hz = 0" {
+		t.Fatalf("lines = %+v", lines)
+	}
+	metadata := data["metadata"].(map[string]any)
+	if metadata["name"] != "gyro_lpf1_static_hz" {
+		t.Fatalf("metadata = %+v", metadata["name"])
+	}
+}
+
 func TestSettingsDiffIncludesConfiguration(t *testing.T) {
 	env, err := runTestCommand(t, []string{"settings", "diff"}, nil)
 	if err != nil {

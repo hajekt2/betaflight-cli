@@ -127,6 +127,7 @@ func New() *FC {
 			"set failsafe_procedure = DROP":         {"failsafe_procedure set to DROP"},
 			"feature GPS":                           {"Enabled GPS"},
 			"feature -GPS":                          {"Disabled GPS"},
+			"get gyro_lpf1_static_hz":              {"gyro_lpf1_static_hz = 0"},
 			"serial UART1 64 115200 57600 0 115200": {"serial updated"},
 			"aux 0 0 0 1700 2100 0 0":               {"aux updated"},
 			"resource MOTOR 1 A00":                  {"resource updated"},

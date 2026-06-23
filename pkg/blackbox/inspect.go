@@ -25,6 +25,7 @@ type Inspection struct {
 	FrameMarkerCountsApprox map[string]int             `json:"frame_marker_counts_approx"`
 	FrameSummaryApprox      FrameSummary               `json:"frame_summary_approx"`
 	DecodedFrames           DecodedFrameSummary        `json:"decoded_frames"`
+	Events                  EventSummary               `json:"events"`
 	Warnings                []string                   `json:"warnings,omitempty"`
 }
 
@@ -71,6 +72,29 @@ type DecodedFrameSummary struct {
 	Groups                map[string]StreamGroup `json:"groups,omitempty"`
 	Samples               []DecodedFrame         `json:"samples,omitempty"`
 	Warnings              []string               `json:"warnings,omitempty"`
+}
+
+type EventSummary struct {
+	AttemptedCount int                  `json:"attempted_count"`
+	DecodedCount   int                  `json:"decoded_count"`
+	FailedCount    int                  `json:"failed_count"`
+	Truncated      bool                 `json:"truncated"`
+	ByType         map[string]EventStat `json:"by_type,omitempty"`
+	Samples        []EventSample        `json:"samples,omitempty"`
+	Warnings       []string             `json:"warnings,omitempty"`
+}
+
+type EventStat struct {
+	Count int `json:"count"`
+}
+
+type EventSample struct {
+	Type       string         `json:"type"`
+	Code       int            `json:"code"`
+	Offset     int64          `json:"offset"`
+	DataOffset int64          `json:"data_offset"`
+	Fields     map[string]any `json:"fields,omitempty"`
+	Error      string         `json:"error,omitempty"`
 }
 
 type DecodedStat struct {
@@ -129,6 +153,7 @@ func Inspect(r io.Reader) (Inspection, error) {
 	out.FrameMarkerCountsApprox = countFrameMarkers(data[headerEnd:])
 	out.FrameSummaryApprox = summarizeFrameCandidates(data[headerEnd:], int64(headerEnd), 200)
 	out.DecodedFrames = decodeFrames(data[headerEnd:], int64(headerEnd), out.Headers, out.FieldDefinitions, out.FrameSummaryApprox, 50)
+	out.Events = decodeEvents(data[headerEnd:], int64(headerEnd), out.FrameSummaryApprox, 50)
 	out.Warnings = validationWarnings(out)
 	return out, nil
 }
@@ -307,22 +332,20 @@ func decodeFrames(data []byte, headerBytes int64, headers map[string]string, def
 	}
 	ctx := newDecodeContext(headers, definitions)
 	for i, candidate := range candidates.Candidates {
-		if candidate.BytesToNext == 0 || candidate.DataOffset < 0 || candidate.DataOffset >= int64(len(data)) {
+		if candidate.DataOffset < 0 || candidate.DataOffset >= int64(len(data)) {
+			continue
+		}
+		if candidate.Type == "E" {
 			continue
 		}
 		if out.AttemptedCount >= maxSamples {
 			out.Truncated = true
 			break
 		}
-		nextOffset := candidate.DataOffset + candidate.BytesToNext
-		if nextOffset > int64(len(data)) {
-			nextOffset = int64(len(data))
+		payload, ok := candidatePayload(data, candidate)
+		if !ok {
+			continue
 		}
-		payloadStart := candidate.DataOffset + 1
-		if payloadStart > nextOffset {
-			payloadStart = nextOffset
-		}
-		payload := data[payloadStart:nextOffset]
 		frameType := candidate.Type
 		def, ok := definitionForFrame(frameType, definitions)
 		if !ok {
@@ -369,6 +392,145 @@ func decodeFrames(data []byte, headerBytes int64, headers map[string]string, def
 	}
 	sort.Strings(out.Warnings)
 	return out
+}
+
+func decodeEvents(data []byte, headerBytes int64, candidates FrameSummary, maxSamples int) EventSummary {
+	out := EventSummary{
+		ByType: map[string]EventStat{},
+	}
+	for _, candidate := range candidates.Candidates {
+		if candidate.Type != "E" || candidate.DataOffset < 0 || candidate.DataOffset >= int64(len(data)) {
+			continue
+		}
+		if out.AttemptedCount >= maxSamples {
+			out.Truncated = true
+			break
+		}
+		payload, ok := candidatePayload(data, candidate)
+		if !ok {
+			continue
+		}
+		out.AttemptedCount++
+		sample, err := decodeEventPayload(candidate, payload)
+		if err != nil {
+			out.FailedCount++
+			out.Samples = append(out.Samples, EventSample{
+				Type:       "UNKNOWN",
+				Code:       -1,
+				Offset:     candidate.Offset,
+				DataOffset: candidate.DataOffset,
+				Error:      err.Error(),
+			})
+			continue
+		}
+		out.DecodedCount++
+		stat := out.ByType[sample.Type]
+		stat.Count++
+		out.ByType[sample.Type] = stat
+		out.Samples = append(out.Samples, sample)
+	}
+	if len(out.ByType) == 0 {
+		out.ByType = nil
+	}
+	return out
+}
+
+func candidatePayload(data []byte, candidate FrameCandidate) ([]byte, bool) {
+	if candidate.DataOffset < 0 || candidate.DataOffset >= int64(len(data)) {
+		return nil, false
+	}
+	nextOffset := int64(len(data))
+	if candidate.BytesToNext > 0 {
+		nextOffset = candidate.DataOffset + candidate.BytesToNext
+		if nextOffset > int64(len(data)) {
+			nextOffset = int64(len(data))
+		}
+	}
+	payloadStart := candidate.DataOffset + 1
+	if payloadStart > nextOffset {
+		return nil, false
+	}
+	return data[payloadStart:nextOffset], true
+}
+
+func decodeEventPayload(candidate FrameCandidate, payload []byte) (EventSample, error) {
+	if len(payload) == 0 {
+		return EventSample{}, fmt.Errorf("truncated event payload")
+	}
+	code := int(payload[0])
+	offset := 1
+	sample := EventSample{
+		Code:       code,
+		Offset:     candidate.Offset,
+		DataOffset: candidate.DataOffset,
+	}
+	switch code {
+	case 0:
+		value, consumed, err := decodeUnsignedVB(payload[offset:])
+		if err != nil {
+			return EventSample{}, err
+		}
+		offset += consumed
+		sample.Type = "SYNC_BEEP"
+		sample.Fields = map[string]any{"time": int(value)}
+	case 14:
+		iteration, consumed, err := decodeUnsignedVB(payload[offset:])
+		if err != nil {
+			return EventSample{}, err
+		}
+		offset += consumed
+		currentTime, consumed, err := decodeUnsignedVB(payload[offset:])
+		if err != nil {
+			return EventSample{}, err
+		}
+		offset += consumed
+		sample.Type = "LOGGING_RESUME"
+		sample.Fields = map[string]any{
+			"log_iteration": int(iteration),
+			"current_time":  int(currentTime),
+		}
+	case 15:
+		reason, consumed, err := decodeUnsignedVB(payload[offset:])
+		if err != nil {
+			return EventSample{}, err
+		}
+		offset += consumed
+		sample.Type = "DISARM"
+		sample.Fields = map[string]any{
+			"reason":      int(reason),
+			"reason_name": disarmReasonName(int(reason)),
+		}
+	case 30:
+		newFlags, consumed, err := decodeUnsignedVB(payload[offset:])
+		if err != nil {
+			return EventSample{}, err
+		}
+		offset += consumed
+		lastFlags, consumed, err := decodeUnsignedVB(payload[offset:])
+		if err != nil {
+			return EventSample{}, err
+		}
+		offset += consumed
+		sample.Type = "FLIGHT_MODE"
+		sample.Fields = map[string]any{
+			"new_flags":        int(newFlags),
+			"last_flags":       int(lastFlags),
+			"enabled_modes":    decodeFlightModeNames(int(newFlags)),
+			"disabled_modes":   decodeFlightModeDisabledNames(int(lastFlags), int(newFlags)),
+			"changed_mode_set": decodeFlightModeNames(int(newFlags ^ lastFlags)),
+		}
+	case 255:
+		sample.Type = "LOG_END"
+		sample.Fields = map[string]any{
+			"message": trimNULString(string(payload[offset:])),
+		}
+	default:
+		return EventSample{}, fmt.Errorf("unsupported event code %d", code)
+	}
+	if offset > len(payload) {
+		return EventSample{}, fmt.Errorf("truncated event payload")
+	}
+	return sample, nil
 }
 
 func groupStreams(streams map[string]StreamStat) map[string]StreamGroup {

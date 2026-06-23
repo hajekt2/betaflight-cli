@@ -176,3 +176,49 @@ func TestSummarizeFrameCandidatesTruncatesIndex(t *testing.T) {
 		t.Fatalf("stats = %+v", summary.ByType)
 	}
 }
+
+func TestInspectDecodesSupportedEvents(t *testing.T) {
+	log := strings.Join([]string{
+		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
+		"H Field I name:time",
+		"H Field I predictor:0",
+		"H Field I encoding:1",
+		"H Field P predictor:0",
+		"H Field P encoding:1",
+		"E\x00\x7b",
+		"E\x0f\x02",
+		"E\x1e\x01\x00",
+		"E\x0e\x2a\x64",
+		"E\xffdone\x00",
+	}, "\n")
+	inspection, err := Inspect(strings.NewReader(log))
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	events := inspection.Events
+	if events.AttemptedCount != 5 || events.DecodedCount != 5 || events.FailedCount != 0 {
+		t.Fatalf("events = %+v", events)
+	}
+	if len(events.Samples) != 5 {
+		t.Fatalf("samples = %+v", events.Samples)
+	}
+	if events.Samples[0].Type != "SYNC_BEEP" || events.Samples[0].Fields["time"] != 123 {
+		t.Fatalf("sample0 = %+v", events.Samples[0])
+	}
+	if events.Samples[1].Type != "DISARM" || events.Samples[1].Fields["reason_name"] != "THROTTLE_TIMEOUT" {
+		t.Fatalf("sample1 = %+v", events.Samples[1])
+	}
+	if events.Samples[2].Type != "FLIGHT_MODE" {
+		t.Fatalf("sample2 = %+v", events.Samples[2])
+	}
+	enabled := events.Samples[2].Fields["enabled_modes"].([]string)
+	if len(enabled) != 1 || enabled[0] != "ARM" {
+		t.Fatalf("enabled = %+v", enabled)
+	}
+	if events.Samples[3].Type != "LOGGING_RESUME" || events.Samples[3].Fields["log_iteration"] != 42 || events.Samples[3].Fields["current_time"] != 100 {
+		t.Fatalf("sample3 = %+v", events.Samples[3])
+	}
+	if events.Samples[4].Type != "LOG_END" || events.Samples[4].Fields["message"] != "done" {
+		t.Fatalf("sample4 = %+v", events.Samples[4])
+	}
+}

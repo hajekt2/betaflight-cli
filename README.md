@@ -41,6 +41,7 @@ Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of sc
 betaflight-cli ports list
 betaflight-cli doctor
 betaflight-cli info --port /dev/tty.usbmodem01
+betaflight-cli text status --port /dev/tty.usbmodem01
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01
 betaflight-cli backup create --redact --port /dev/tty.usbmodem01
@@ -114,6 +115,7 @@ It also includes CLI-row table commands for VTX tables, LED strips, servos, adju
 It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
+`text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch plan` validates without connecting.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.

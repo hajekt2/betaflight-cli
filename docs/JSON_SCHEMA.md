@@ -137,6 +137,10 @@ The object includes the raw feature mask, enabled feature names, per-feature bit
 `profiles status` returns a `profiles` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes active PID, rate, and battery profile indexes, profile counts when supplied by firmware, native CLI selector commands, and reboot-required state when supplied by firmware.
 
+`text status` returns a `text` object decoded from `MSP2_GET_TEXT`.
+The object includes text fields for pilot name, craft name, active PID profile name, active rate profile name, active battery profile name, build key, and release name.
+The object also includes a `by_key` map for direct agent lookup and per-field warnings when custom firmware rejects one text type.
+
 `receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 

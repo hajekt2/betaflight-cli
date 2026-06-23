@@ -88,6 +88,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.portsCommand())
 	root.AddCommand(a.doctorCommand())
 	root.AddCommand(a.infoCommand())
+	root.AddCommand(a.textCommand())
 	root.AddCommand(a.telemetryCommand())
 	root.AddCommand(a.cliCommand())
 	root.AddCommand(a.backupCommand())
@@ -325,6 +326,26 @@ func (a *app) infoCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) textCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "text", Short: "Read Betaflight text metadata"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read pilot, craft, profile, build, and release text over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				text, err := bfcommands.ReadTextStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"text": text,
+				})
+			})
+		},
+	})
+	return cmd
 }
 
 func (a *app) telemetryCommand() *cobra.Command {

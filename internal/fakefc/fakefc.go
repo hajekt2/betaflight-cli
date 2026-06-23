@@ -196,6 +196,9 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, byte(len("2025.12.1")))
 		payload = append(payload, []byte("2025.12.1")...)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSP2GetText:
+		payload, ok := fakeTextPayload(frame.Payload)
+		f.out.Write(response(frame.Code, payload, !ok))
 	case msp.MSPBoardInfo:
 		payload := []byte("F405")
 		payload = appendU16(payload, 0)
@@ -575,6 +578,28 @@ func response(code uint16, payload []byte, unsupported bool) []byte {
 func appendPString(dst []byte, s string) []byte {
 	dst = append(dst, byte(len(s)))
 	return append(dst, []byte(s)...)
+}
+
+func fakeTextPayload(request []byte) ([]byte, bool) {
+	if len(request) != 1 {
+		return nil, false
+	}
+	values := map[byte]string{
+		msp.MSP2TextPilotName:          "BF pilot",
+		msp.MSP2TextCraftName:          "BetaFlight",
+		msp.MSP2TextPIDProfileName:     "PID 1",
+		msp.MSP2TextRateProfileName:    "Rate 1",
+		msp.MSP2TextBuildKey:           "fake-build-key",
+		msp.MSP2TextReleaseName:        "2025.12.1",
+		msp.MSP2TextBatteryProfileName: "Battery 1",
+	}
+	value, ok := values[request[0]]
+	if !ok {
+		return nil, false
+	}
+	payload := []byte{request[0]}
+	payload = appendPString(payload, value)
+	return payload, true
 }
 
 func appendU16(dst []byte, v uint16) []byte {

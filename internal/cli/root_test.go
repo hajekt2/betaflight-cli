@@ -81,6 +81,29 @@ func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestTextStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"text", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	text := data["text"].(map[string]any)
+	if text["source"] != "MSP2_GET_TEXT" {
+		t.Fatalf("text = %+v", text)
+	}
+	byKey := text["by_key"].(map[string]any)
+	if byKey["craft_name"] != "BetaFlight" || byKey["pilot_name"] != "BF pilot" || byKey["release_name"] != "2025.12.1" {
+		t.Fatalf("by_key = %+v", byKey)
+	}
+	fields := text["fields"].([]any)
+	if len(fields) != 7 {
+		t.Fatalf("fields = %+v", fields)
+	}
+}
+
 func TestSettingsApplyWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"settings", "set", "gyro_lpf1_static_hz", "0", "--apply", "--auto-port"}, nil)
 	if err != nil {

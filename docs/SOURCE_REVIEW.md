@@ -59,6 +59,10 @@ It disconnects after a connect timeout if that response never arrives.
 
 `src/js/msp/MSPCodes.js` is useful as a comparison source, but the firmware headers should remain the primary code source.
 
+`MSP2_GET_TEXT` is defined in `src/main/msp/msp_protocol_v2_betaflight.h`.
+Firmware returns the requested text type byte followed by a one-byte length and the text bytes.
+Configurator uses this for pilot name, craft name, active profile names, build key, and release name.
+
 ## Betaflight MCP Reference
 
 The Python reference uses a small MSP protocol layer and a higher-level command layer.

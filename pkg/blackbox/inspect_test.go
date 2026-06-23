@@ -78,11 +78,11 @@ func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
 		t.Fatalf("samples = %+v", decoded.Samples)
 	}
 	first := decoded.Samples[0]
-	if first.Type != "I" || first.Values["loopIteration"] != 2 || first.Values["time"] != 4 || first.Values["axisP[0]"] != -2 || first.Values["gyroADC[0]"] != -3 || first.Values["motor[0]"] != 100 {
+	if first.Type != "I" || first.Values["loopIteration"] != 1 || first.Values["time"] != 4 || first.Values["axisP[0]"] != -2 || first.Values["gyroADC[0]"] != -3 || first.Values["motor[0]"] != 100 {
 		t.Fatalf("first sample = %+v", first)
 	}
 	second := decoded.Samples[1]
-	if second.Type != "P" || second.Values["loopIteration"] != 6 || second.Values["time"] != 8 || second.Values["axisP[0]"] != 2 || second.Values["gyroADC[0]"] != 3 || second.Values["motor[0]"] != 101 {
+	if second.Type != "P" || second.Values["loopIteration"] != 2 || second.Values["time"] != 8 || second.Values["axisP[0]"] != 2 || second.Values["gyroADC[0]"] != 3 || second.Values["motor[0]"] != 101 {
 		t.Fatalf("second sample = %+v", second)
 	}
 	iTime := decoded.Streams["I.time"]
@@ -102,6 +102,39 @@ func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
 		if groups[group].Name != group || len(groups[group].Streams) == 0 {
 			t.Fatalf("group %s = %+v", group, groups[group])
 		}
+	}
+}
+
+func TestInspectDecodesNullEncodingWithPreviousPredictor(t *testing.T) {
+	log := strings.Join([]string{
+		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
+		"H Data version:2",
+		"H minthrottle:1000",
+		"H Field I name:time,axisP[0],motor[0],motor[1]",
+		"H Field I signed:0,1,0,0",
+		"H Field I predictor:0,0,4,5",
+		"H Field I encoding:1,1,1,9",
+		"H Field P predictor:10,1,4,5",
+		"H Field P encoding:1,1,9,9",
+		"I\x02\x04\x06P\x06\x01E",
+	}, "\n")
+	inspection, err := Inspect(strings.NewReader(log))
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	decoded := inspection.DecodedFrames
+	if decoded.DecodedCount != 2 || decoded.FailedCount != 0 {
+		t.Fatalf("decoded = %+v", decoded)
+	}
+	if len(decoded.Warnings) != 0 {
+		t.Fatalf("warnings = %+v", decoded.Warnings)
+	}
+	second := decoded.Samples[1]
+	if second.Type != "P" {
+		t.Fatalf("second sample = %+v", second)
+	}
+	if second.Values["time"] != 6 || second.Values["axisP[0]"] != -1 || second.Values["motor[0]"] != 1000 || second.Values["motor[1]"] != 1000 {
+		t.Fatalf("second sample = %+v", second)
 	}
 }
 

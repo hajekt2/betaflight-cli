@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -127,7 +128,7 @@ func Inspect(r io.Reader) (Inspection, error) {
 	out.DataBytes = int64(len(data) - headerEnd)
 	out.FrameMarkerCountsApprox = countFrameMarkers(data[headerEnd:])
 	out.FrameSummaryApprox = summarizeFrameCandidates(data[headerEnd:], int64(headerEnd), 200)
-	out.DecodedFrames = decodeFrames(data[headerEnd:], int64(headerEnd), out.FieldDefinitions, out.FrameSummaryApprox, 50)
+	out.DecodedFrames = decodeFrames(data[headerEnd:], int64(headerEnd), out.Headers, out.FieldDefinitions, out.FrameSummaryApprox, 50)
 	out.Warnings = validationWarnings(out)
 	return out, nil
 }
@@ -297,13 +298,14 @@ func summarizeFrameCandidates(data []byte, headerBytes int64, maxIndex int) Fram
 	return summary
 }
 
-func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDefinition, candidates FrameSummary, maxSamples int) DecodedFrameSummary {
+func decodeFrames(data []byte, headerBytes int64, headers map[string]string, definitions map[string]FieldDefinition, candidates FrameSummary, maxSamples int) DecodedFrameSummary {
 	out := DecodedFrameSummary{
 		UnsupportedEncodings:  map[string]int{},
 		UnsupportedFrameTypes: map[string]int{},
 		ByType:                map[string]DecodedStat{},
 		Streams:               map[string]StreamStat{},
 	}
+	ctx := newDecodeContext(headers, definitions)
 	for i, candidate := range candidates.Candidates {
 		if candidate.BytesToNext == 0 || candidate.DataOffset < 0 || candidate.DataOffset >= int64(len(data)) {
 			continue
@@ -329,11 +331,11 @@ func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDe
 			continue
 		}
 		out.AttemptedCount++
-		decoded, err := decodeFramePayload(frameType, candidate, payload, def)
+		decoded, err := decodeFramePayload(&ctx, frameType, candidate, payload, def)
 		if err != nil {
 			out.recordFailed(frameType, candidate, err.Error())
-			if strings.HasPrefix(err.Error(), "unsupported encoding ") {
-				out.UnsupportedEncodings[strings.TrimPrefix(err.Error(), "unsupported encoding ")]++
+			if encoding, ok := unsupportedEncodingValue(err.Error()); ok {
+				out.UnsupportedEncodings[encoding]++
 			}
 			continue
 		}
@@ -487,6 +489,7 @@ func definitionForFrame(frameType string, definitions map[string]FieldDefinition
 			if iDef, ok := definitions["I"]; ok {
 				def.Names = iDef.Names
 				def.Signed = iDef.Signed
+				def.Predictor = iDef.Predictor
 			}
 		}
 		return def, true
@@ -496,34 +499,94 @@ func definitionForFrame(frameType string, definitions map[string]FieldDefinition
 			pDef := definitions["P"]
 			pDef.Frame = "P"
 			pDef.Names = def.Names
+			pDef.Signed = def.Signed
+			pDef.Predictor = def.Predictor
 			return pDef, true
 		}
 	}
 	return FieldDefinition{}, false
 }
 
-func decodeFramePayload(frameType string, candidate FrameCandidate, payload []byte, def FieldDefinition) (DecodedFrame, error) {
+func decodeFramePayload(ctx *decodeContext, frameType string, candidate FrameCandidate, payload []byte, def FieldDefinition) (DecodedFrame, error) {
 	values := map[string]int{}
+	current := make([]int, len(def.Encoding))
+	var previous []int
+	var previous2 []int
+	switch frameType {
+	case "I":
+		previous = ctx.lastMain
+		previous2 = ctx.lastMain2
+	case "P":
+		previous = ctx.lastMain
+		previous2 = ctx.lastMain2
+	case "H":
+		previous = ctx.lastGPSHome
+	case "G":
+		previous = ctx.lastGPS
+	case "S":
+		previous = ctx.lastSlow
+	}
 	offset := 0
 	fieldCount := len(def.Encoding)
 	if len(def.Names) > 0 && len(def.Names) < fieldCount {
 		fieldCount = len(def.Names)
 	}
+	if len(def.Predictor) > 0 && len(def.Predictor) < fieldCount {
+		fieldCount = len(def.Predictor)
+	}
 	for i := 0; i < fieldCount; i++ {
-		encoding := def.Encoding[i]
-		name := fmt.Sprintf("field_%d", i)
-		if i < len(def.Names) && def.Names[i] != "" {
-			name = def.Names[i]
-		}
-		value, consumed, err := decodeFieldValue(payload[offset:], encoding, signedField(def, i))
+		groupValues, consumed, span, err := decodeFieldValue(payload[offset:], def.Encoding, i, signedField(def, i), ctx.dataVersion)
 		if err != nil {
 			return DecodedFrame{}, err
 		}
 		offset += consumed
-		values[name] = value
+		for j, rawValue := range groupValues {
+			index := i + j
+			if index >= fieldCount {
+				break
+			}
+			fieldName := fmt.Sprintf("field_%d", index)
+			if index < len(def.Names) && def.Names[index] != "" {
+				fieldName = def.Names[index]
+			}
+			fieldPredictor := fieldPredictorZero
+			if index < len(def.Predictor) {
+				fieldPredictor = parsePredictor(def.Predictor[index])
+			}
+			decodedValue, err := applyPrediction(ctx, frameType, index, fieldPredictor, rawValue, current, previous, previous2)
+			if err != nil {
+				return DecodedFrame{}, err
+			}
+			current[index] = decodedValue
+			values[fieldName] = decodedValue
+		}
+		i += span - 1
 	}
 	if offset < len(payload) {
 		return DecodedFrame{}, fmt.Errorf("decoded %d of %d payload bytes", offset, len(payload))
+	}
+	switch frameType {
+	case "I":
+		ctx.lastMain2 = ctx.lastMain
+		ctx.lastMain = append([]int(nil), current...)
+		if index, ok := ctx.mainNameToIndex["time"]; ok && index < len(current) {
+			ctx.lastMainFrameTime = current[index]
+		}
+		ctx.mainHistoryValid = true
+	case "P":
+		ctx.lastMain2 = ctx.lastMain
+		ctx.lastMain = append([]int(nil), current...)
+		if index, ok := ctx.mainNameToIndex["time"]; ok && index < len(current) {
+			ctx.lastMainFrameTime = current[index]
+		}
+		ctx.mainHistoryValid = true
+	case "H":
+		ctx.lastGPSHome = append([]int(nil), current...)
+		ctx.homeHistoryValid = true
+	case "G":
+		ctx.lastGPS = append([]int(nil), current...)
+	case "S":
+		ctx.lastSlow = append([]int(nil), current...)
 	}
 	return DecodedFrame{
 		Type:       frameType,
@@ -533,6 +596,22 @@ func decodeFramePayload(frameType string, candidate FrameCandidate, payload []by
 	}, nil
 }
 
+func unsupportedEncodingValue(message string) (string, bool) {
+	const prefix = "unsupported encoding "
+	if !strings.HasPrefix(message, prefix) {
+		return "", false
+	}
+	return strings.TrimPrefix(message, prefix), true
+}
+
+func parsePredictor(value string) int {
+	n, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return fieldPredictorZero
+	}
+	return n
+}
+
 func signedField(def FieldDefinition, index int) bool {
 	if index >= len(def.Signed) {
 		return false
@@ -540,21 +619,64 @@ func signedField(def FieldDefinition, index int) bool {
 	return def.Signed[index] == "1"
 }
 
-func decodeFieldValue(data []byte, encoding string, signed bool) (int, int, error) {
+func decodeFieldValue(data []byte, encodings []string, index int, signed bool, dataVersion int) ([]int, int, int, error) {
+	if index >= len(encodings) {
+		return nil, 0, 0, fmt.Errorf("missing field encoding")
+	}
+	encoding := strings.TrimSpace(encodings[index])
 	switch encoding {
 	case "0":
-		return decodeSignedVB(data)
+		value, consumed, err := decodeSignedVB(data)
+		return []int{value}, consumed, 1, err
 	case "1":
 		value, consumed, err := decodeUnsignedVB(data)
 		if err != nil {
-			return 0, 0, err
+			return nil, 0, 0, err
 		}
 		if signed {
-			return zigzagDecode(value), consumed, nil
+			return []int{zigzagDecode(value)}, consumed, 1, nil
 		}
-		return int(value), consumed, nil
+		return []int{int(value)}, consumed, 1, nil
+	case "3":
+		value, consumed, err := decodeUnsignedVB(data)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		return []int{-signExtend(int(value), 14)}, consumed, 1, nil
+	case "6":
+		groupCount := 1
+		for j := index + 1; j < len(encodings) && j < index+8; j++ {
+			if strings.TrimSpace(encodings[j]) != encoding {
+				break
+			}
+			groupCount++
+		}
+		values, consumed, err := decodeTag8_8SVB(data, groupCount)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		return values, consumed, len(values), nil
+	case "7":
+		values, consumed, err := decodeTag2_3S32(data)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		return values, consumed, len(values), nil
+	case "8":
+		if dataVersion < 2 {
+			return nil, 0, 0, fmt.Errorf("unsupported encoding %s", encoding)
+		}
+		values, consumed, err := decodeTag8_4S16V2(data)
+		if err != nil {
+			return nil, 0, 0, err
+		}
+		return values, consumed, len(values), nil
+	case "9":
+		return []int{0}, 0, 1, nil
+	case "10":
+		return nil, 0, 0, fmt.Errorf("unsupported encoding %s", encoding)
 	default:
-		return 0, 0, fmt.Errorf("unsupported encoding %s", encoding)
+		return nil, 0, 0, fmt.Errorf("unsupported encoding %s", encoding)
 	}
 }
 

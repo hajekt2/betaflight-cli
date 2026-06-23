@@ -69,6 +69,16 @@ If you prefer a single command and your environment has `opensrc` on PATH, run:
 make update-metadata
 ```
 
+To validate that checked-in metadata is still exactly what upstream currently generates, run:
+
+```sh
+make verify-metadata
+```
+
+`verify-metadata` is meant for CI and release hygiene.
+If it fails, regenerate with `make update-metadata`, review the diffs,
+and commit both generated changes and any parser updates they require.
+
 You can also point to a local checkout:
 
 ```sh

@@ -14,24 +14,24 @@ import (
 )
 
 type FirmwareFlashPlan struct {
-	ImagePath        string   `json:"image_path"`
-	ImageSizeBytes   int64    `json:"image_size_bytes"`
-	ImageSHA256      string   `json:"image_sha256"`
-	Tool             string   `json:"tool"`
-	ToolArgs         []string `json:"tool_args"`
-	RebootToBootloader bool  `json:"reboot_to_bootloader"`
-	RebootCommand    string   `json:"reboot_command"`
-	EstimatedCommand []string `json:"estimated_command"`
+	ImagePath          string   `json:"image_path"`
+	ImageSizeBytes     int64    `json:"image_size_bytes"`
+	ImageSHA256        string   `json:"image_sha256"`
+	Tool               string   `json:"tool"`
+	ToolArgs           []string `json:"tool_args"`
+	RebootToBootloader bool     `json:"reboot_to_bootloader"`
+	RebootCommand      string   `json:"reboot_command"`
+	EstimatedCommand   []string `json:"estimated_command"`
 }
 
 type FirmwareFlashResult struct {
 	Plan        FirmwareFlashPlan `json:"plan"`
-	Executed    bool             `json:"executed"`
-	Rebooted    bool             `json:"rebooted"`
-	Output      string           `json:"output"`
-	ExitCode    int              `json:"exit_code"`
-	StartedAt   time.Time        `json:"started_at"`
-	CompletedAt time.Time        `json:"completed_at"`
+	Executed    bool              `json:"executed"`
+	Rebooted    bool              `json:"rebooted"`
+	Output      string            `json:"output"`
+	ExitCode    int               `json:"exit_code"`
+	StartedAt   time.Time         `json:"started_at"`
+	CompletedAt time.Time         `json:"completed_at"`
 }
 
 type FirmwareFlashOptions struct {
@@ -82,7 +82,7 @@ func PlanFirmwareFlash(opts FirmwareFlashOptions) (*FirmwareFlashPlan, error) {
 		ToolArgs:           append([]string(nil), opts.ToolArgs...),
 		RebootToBootloader: opts.RebootToBootloader,
 		RebootCommand:      rebootCmd,
-		EstimatedCommand:    command,
+		EstimatedCommand:   command,
 	}, nil
 }
 
@@ -97,10 +97,10 @@ func ExecuteFirmwareFlash(ctx context.Context, plan FirmwareFlashPlan) (Firmware
 	started := time.Now()
 	output, err := cmd.CombinedOutput()
 	result := FirmwareFlashResult{
-		Plan:        plan,
-		Executed:    true,
-		StartedAt:   started,
-		Output:      strings.TrimSpace(string(output)),
+		Plan:      plan,
+		Executed:  true,
+		StartedAt: started,
+		Output:    strings.TrimSpace(string(output)),
 	}
 	result.CompletedAt = time.Now()
 	if err != nil {

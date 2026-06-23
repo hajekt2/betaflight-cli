@@ -8,16 +8,16 @@ import (
 func TestCapabilityMetadataUsesKnownOperations(t *testing.T) {
 	registry := capabilityMetadataRegistry()
 	allowed := map[string]bool{
-		"offline":                    true,
-		"offline_or_read_only_probe": true,
-		"offline_dangerous_plan":     true,
-		"read_only":                  true,
+		"offline":                         true,
+		"offline_or_read_only_probe":      true,
+		"offline_dangerous_plan":          true,
+		"read_only":                       true,
 		"read_only_or_write_or_dangerous": true,
-		"write":                      true,
-		"write_when_apply_is_set":    true,
-		"plan":                       true,
-		"plan_or_write":              true,
-		"dangerous":                  true,
+		"write":                           true,
+		"write_when_apply_is_set":         true,
+		"plan":                            true,
+		"plan_or_write":                   true,
+		"dangerous":                       true,
 	}
 
 	for path, meta := range registry {
@@ -33,9 +33,9 @@ func TestCapabilityMetadataUsesKnownOperations(t *testing.T) {
 func TestCapabilityMetadataOfflineCommandClassifications(t *testing.T) {
 	registry := capabilityMetadataRegistry()
 	for _, tt := range []struct {
-		path                string
-		requiresConnection  bool
-		operation           string
+		path               string
+		requiresConnection bool
+		operation          string
 	}{
 		{"betaflight-cli schema", false, "offline"},
 		{"betaflight-cli capabilities coverage", false, "offline"},
@@ -59,17 +59,17 @@ func TestCapabilityMetadataOfflineCommandClassifications(t *testing.T) {
 func TestCapabilityMetadataOperationSafetyContracts(t *testing.T) {
 	registry := capabilityMetadataRegistry()
 	yesRequired := map[string]bool{
-		"write":                      true,
-		"plan_or_write":              true,
-		"dangerous":                  true,
-		"write_when_apply_is_set":    true,
+		"write":                   true,
+		"plan_or_write":           true,
+		"dangerous":               true,
+		"write_when_apply_is_set": true,
 	}
 
 	offlinedOperations := map[string]bool{
-		"offline":                true,
+		"offline":                    true,
 		"offline_or_read_only_probe": true,
-		"offline_dangerous_plan": true,
-		"plan":                  true,
+		"offline_dangerous_plan":     true,
+		"plan":                       true,
 	}
 
 	for path, meta := range registry {

@@ -20,29 +20,29 @@ const (
 )
 
 type motorTestPlan struct {
-	Kind                 string               `json:"kind"`
-	Applied              bool                 `json:"applied"`
-	Dangerous            bool                 `json:"dangerous"`
-	AllMotors            bool                 `json:"all_motors"`
-	MotorCount           int                  `json:"motor_count,omitempty"`
-	MotorIndexes         []int                `json:"motor_indexes,omitempty"`
+	Kind                  string               `json:"kind"`
+	Applied               bool                 `json:"applied"`
+	Dangerous             bool                 `json:"dangerous"`
+	AllMotors             bool                 `json:"all_motors"`
+	MotorCount            int                  `json:"motor_count,omitempty"`
+	MotorIndexes          []int                `json:"motor_indexes,omitempty"`
 	MotorIndex            int                  `json:"motor_index"`
-	Value                int                  `json:"value"`
-	DurationMS           int64                `json:"duration_ms"`
-	CommandPreview       string               `json:"command_preview"`
-	StopCommandPreview   string               `json:"stop_command_preview"`
-	CommandPreviews      []string             `json:"command_previews"`
-	StopCommandPreviews  []string             `json:"stop_command_previews"`
-	Stopped              bool                 `json:"stopped"`
-	Preflight            *motorTestPreflight  `json:"preflight,omitempty"`
-	PostStop             *motorTestPostStop   `json:"post_stop,omitempty"`
-	Comparison           *motorTestComparison `json:"comparison,omitempty"`
-	Audit                *motorTestAudit      `json:"audit,omitempty"`
-	ResponseLines        map[string][]string  `json:"response_lines,omitempty"`
+	Value                 int                  `json:"value"`
+	DurationMS            int64                `json:"duration_ms"`
+	CommandPreview        string               `json:"command_preview"`
+	StopCommandPreview    string               `json:"stop_command_preview"`
+	CommandPreviews       []string             `json:"command_previews"`
+	StopCommandPreviews   []string             `json:"stop_command_previews"`
+	Stopped               bool                 `json:"stopped"`
+	Preflight             *motorTestPreflight  `json:"preflight,omitempty"`
+	PostStop              *motorTestPostStop   `json:"post_stop,omitempty"`
+	Comparison            *motorTestComparison `json:"comparison,omitempty"`
+	Audit                 *motorTestAudit      `json:"audit,omitempty"`
+	ResponseLines         map[string][]string  `json:"response_lines,omitempty"`
 	RequiredConfirmations []string             `json:"required_confirmations"`
-	SafetyChecks         []safetyCheck        `json:"safety_checks"`
+	SafetyChecks          []safetyCheck        `json:"safety_checks"`
 	RecommendedPreflight  []string             `json:"recommended_preflight"`
-	ApplyMessage         string               `json:"apply_message"`
+	ApplyMessage          string               `json:"apply_message"`
 }
 
 type motorTestPreflight struct {
@@ -386,4 +386,3 @@ func buildMotorTestPlan(motor int, all bool, motorCount int, value int, duration
 		ApplyMessage:         "test-plan is offline only; use test-apply with all confirmations to run the bounded motor output command",
 	}, nil
 }
-

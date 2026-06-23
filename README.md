@@ -408,6 +408,8 @@ When added, it must use the strictest safety gate and automatic stop behavior.
 
 The implementation target is the latest stable Go release.
 The CLI will use Cobra.
+CI runs formatting, unit and command-contract tests, and the release artifact matrix verification.
+The optional generated-metadata verification workflow can be dispatched when a checked-out Betaflight source path is available.
 Serial transport should use `go.bug.st/serial`.
 Initial transport support is USB serial only.
 Windows COM ports, macOS `/dev/tty.*`, Linux `/dev/ttyACM*`, Linux `/dev/ttyUSB*`, and ARM64 builds are first-class targets from day one.

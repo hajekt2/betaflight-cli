@@ -80,17 +80,17 @@ type SimplifiedTuning struct {
 }
 
 type SimplifiedPIDs struct {
-	Mode                    uint8  `json:"mode"`
-	MasterMultiplier        uint8  `json:"master_multiplier"`
-	RollPitchRatio          uint8  `json:"roll_pitch_ratio"`
-	IGain                   uint8  `json:"i_gain"`
-	DGain                   uint8  `json:"d_gain"`
-	PIGain                  uint8  `json:"pi_gain"`
-	DMaxGain                uint8  `json:"d_max_gain"`
-	FeedforwardGain         uint8  `json:"feedforward_gain"`
-	PitchPIGain             uint8  `json:"pitch_pi_gain"`
-	Reserved1               uint32 `json:"reserved_1,omitempty"`
-	Reserved2               uint32 `json:"reserved_2,omitempty"`
+	Mode             uint8  `json:"mode"`
+	MasterMultiplier uint8  `json:"master_multiplier"`
+	RollPitchRatio   uint8  `json:"roll_pitch_ratio"`
+	IGain            uint8  `json:"i_gain"`
+	DGain            uint8  `json:"d_gain"`
+	PIGain           uint8  `json:"pi_gain"`
+	DMaxGain         uint8  `json:"d_max_gain"`
+	FeedforwardGain  uint8  `json:"feedforward_gain"`
+	PitchPIGain      uint8  `json:"pitch_pi_gain"`
+	Reserved1        uint32 `json:"reserved_1,omitempty"`
+	Reserved2        uint32 `json:"reserved_2,omitempty"`
 }
 
 type SimplifiedFilter struct {
@@ -113,12 +113,12 @@ type SimplifiedTuningSetResult struct {
 }
 
 type SimplifiedTuningPreview struct {
-	Input      SimplifiedTuning       `json:"input"`
-	PIDGains   []SimplifiedCalculatedPID `json:"pid_gains"`
-	Dterm      SimplifiedFilter       `json:"dterm"`
-	Gyro       SimplifiedFilter       `json:"gyro"`
-	MSPNames   []string               `json:"msp_names"`
-	ReadOnly   bool                   `json:"read_only"`
+	Input    SimplifiedTuning          `json:"input"`
+	PIDGains []SimplifiedCalculatedPID `json:"pid_gains"`
+	Dterm    SimplifiedFilter          `json:"dterm"`
+	Gyro     SimplifiedFilter          `json:"gyro"`
+	MSPNames []string                  `json:"msp_names"`
+	ReadOnly bool                      `json:"read_only"`
 }
 
 type SimplifiedCalculatedPID struct {
@@ -131,12 +131,12 @@ type SimplifiedCalculatedPID struct {
 }
 
 type SimplifiedTuningValidation struct {
-	PIDsMatch  bool `json:"pids_match"`
-	GyroMatch  bool `json:"gyro_match"`
-	DtermMatch bool `json:"dterm_match"`
-	MSPName    string `json:"msp_name"`
-	ReadOnly   bool   `json:"read_only"`
-	TrailingBytesIgnored int `json:"trailing_bytes_ignored,omitempty"`
+	PIDsMatch            bool   `json:"pids_match"`
+	GyroMatch            bool   `json:"gyro_match"`
+	DtermMatch           bool   `json:"dterm_match"`
+	MSPName              string `json:"msp_name"`
+	ReadOnly             bool   `json:"read_only"`
+	TrailingBytesIgnored int    `json:"trailing_bytes_ignored,omitempty"`
 }
 
 type RateProfile struct {
@@ -415,13 +415,13 @@ func ValidateSimplifiedTuning(tuning SimplifiedTuning) error {
 	}
 	for name, value := range map[string]uint8{
 		"master_multiplier": tuning.PIDs.MasterMultiplier,
-		"roll_pitch_ratio":   tuning.PIDs.RollPitchRatio,
-		"i_gain":             tuning.PIDs.IGain,
-		"d_gain":             tuning.PIDs.DGain,
-		"pi_gain":            tuning.PIDs.PIGain,
-		"d_max_gain":         tuning.PIDs.DMaxGain,
-		"feedforward_gain":   tuning.PIDs.FeedforwardGain,
-		"pitch_pi_gain":      tuning.PIDs.PitchPIGain,
+		"roll_pitch_ratio":  tuning.PIDs.RollPitchRatio,
+		"i_gain":            tuning.PIDs.IGain,
+		"d_gain":            tuning.PIDs.DGain,
+		"pi_gain":           tuning.PIDs.PIGain,
+		"d_max_gain":        tuning.PIDs.DMaxGain,
+		"feedforward_gain":  tuning.PIDs.FeedforwardGain,
+		"pitch_pi_gain":     tuning.PIDs.PitchPIGain,
 	} {
 		if value > 200 {
 			return fmt.Errorf("pids.%s must be <= 200", name)
@@ -837,11 +837,11 @@ func DecodeSimplifiedTuningValidation(payload []byte) (*SimplifiedTuningValidati
 		return nil, err
 	}
 	return &SimplifiedTuningValidation{
-		PIDsMatch: pids != 0,
-		GyroMatch: gyro != 0,
-		DtermMatch: dterm != 0,
-		MSPName: "MSP_VALIDATE_SIMPLIFIED_TUNING",
-		ReadOnly: true,
+		PIDsMatch:            pids != 0,
+		GyroMatch:            gyro != 0,
+		DtermMatch:           dterm != 0,
+		MSPName:              "MSP_VALIDATE_SIMPLIFIED_TUNING",
+		ReadOnly:             true,
 		TrailingBytesIgnored: r.Remaining(),
 	}, nil
 }

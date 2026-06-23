@@ -163,6 +163,7 @@ They should not send random writes and hope the firmware rejects them.
 - Unit tests pass.
 - CLI contract tests pass.
 - Fake Flight Controller workflow tests pass.
+- CI formatting, unit test, and release build jobs pass.
 - Optional read-only hardware integration tests run when hardware is available.
 - Cross-platform build matrix passes.
 - Dangerous command safety tests pass.

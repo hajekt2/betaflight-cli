@@ -995,6 +995,26 @@ func TestBlackboxConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestBlackboxListWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"blackbox", "list", "--size", "512"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	list := data["blackbox_logs"].(map[string]any)
+	if list["log_count"].(float64) < 1 || list["bytes_read"].(float64) == 0 {
+		t.Fatalf("list = %+v", list)
+	}
+	logs := list["logs"].([]any)
+	first := logs[0].(map[string]any)
+	if first["product"] == "" || first["firmware_revision"] == "" {
+		t.Fatalf("first log = %+v", first)
+	}
+}
+
 func TestBlackboxExportWithFakeFC(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exported.bbl")
 	env, err := runTestCommand(t, []string{"blackbox", "export", path, "--size", "64"}, nil)

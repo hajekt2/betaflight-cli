@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
@@ -49,6 +50,18 @@ type blackboxExport struct {
 	Completed     bool                    `json:"completed"`
 	Inspection    *pkgblackbox.Inspection `json:"inspection,omitempty"`
 	Dataflash     dataflashExport         `json:"dataflash_export"`
+}
+
+type blackboxLogList struct {
+	Kind          string                     `json:"kind"`
+	Offset        uint32                     `json:"offset"`
+	RequestedSize *uint32                    `json:"requested_size,omitempty"`
+	BytesRead     uint32                     `json:"bytes_read"`
+	BlockSize     uint16                     `json:"block_size"`
+	LogCount      int                        `json:"log_count"`
+	Logs          []pkgblackbox.LogSummary   `json:"logs"`
+	Blackbox      *bfcommands.BlackboxConfig `json:"blackbox,omitempty"`
+	Storage       *bfcommands.StorageStatus  `json:"storage,omitempty"`
 }
 
 type exportOptionError struct {
@@ -159,6 +172,65 @@ func (a *app) blackboxExportCommand() *cobra.Command {
 	return cmd
 }
 
+func (a *app) blackboxListCommand() *cobra.Command {
+	var offset uint32
+	var size uint32
+	var blockSize uint16
+	cmd := &cobra.Command{
+		Use:   "list",
+		Short: "List onboard Blackbox logs found in Dataflash storage",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if blockSize == 0 {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", "--block-size must be positive"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				config, err := bfcommands.ReadBlackboxConfig(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				data, storage, warnings, env := a.readDataflashBytes(cmd, client, &target, dataflashExportOptions{
+					Offset:    offset,
+					Size:      size,
+					BlockSize: blockSize,
+				})
+				if env != nil {
+					return *env
+				}
+				logs := []pkgblackbox.LogSummary{}
+				if len(data) > 0 {
+					var err error
+					logs, err = pkgblackbox.ListLogs(bytes.NewReader(data))
+					if err != nil {
+						return output.Failure(commandPath(cmd), &target, "blackbox_parse_error", err.Error())
+					}
+				}
+				result := blackboxLogList{
+					Kind:      "blackbox_log_list",
+					Offset:    offset,
+					BytesRead: uint32(len(data)),
+					BlockSize: blockSize,
+					LogCount:  len(logs),
+					Logs:      logs,
+					Blackbox:  config,
+					Storage:   storage,
+				}
+				if size != 0 {
+					result.RequestedSize = &size
+				}
+				envValue := output.Success(commandPath(cmd), &target, map[string]any{
+					"blackbox_logs": result,
+				})
+				addStringWarnings(&envValue, warnings)
+				return envValue
+			})
+		},
+	}
+	cmd.Flags().Uint32Var(&offset, "offset", 0, "start address within onboard Blackbox storage")
+	cmd.Flags().Uint32Var(&size, "size", 0, "number of bytes to scan, defaulting to used bytes from offset")
+	cmd.Flags().Uint16Var(&blockSize, "block-size", defaultDataflashBlockSize, "requested MSP_DATAFLASH_READ block size")
+	return cmd
+}
+
 func validateDataflashExportOptions(opts dataflashExportOptions) error {
 	if opts.BlockSize == 0 {
 		return exportOptionError{code: "validation_error", message: "--block-size must be positive"}
@@ -191,26 +263,9 @@ func AsExportOptionError(err error, target *exportOptionError) bool {
 }
 
 func (a *app) performDataflashExport(cmd *cobra.Command, client *connection.Client, target *output.Target, opts dataflashExportOptions) (dataflashExport, []string, *output.Envelope) {
-	storage, warnings, err := bfcommands.ReadStorageStatus(cmd.Context(), client)
-	if err != nil {
-		env := a.failure(commandPath(cmd), target, err)
-		return dataflashExport{}, nil, &env
-	}
-	if storage.Dataflash == nil || !storage.Dataflash.Supported {
-		env := output.Failure(commandPath(cmd), target, "unsupported_storage", "dataflash is not supported on this target")
-		return dataflashExport{}, nil, &env
-	}
-	if !storage.Dataflash.Ready {
-		env := output.Failure(commandPath(cmd), target, "storage_unavailable", "dataflash is not ready")
-		return dataflashExport{}, nil, &env
-	}
-	if opts.Offset > storage.Dataflash.UsedBytes {
-		env := output.Failure(commandPath(cmd), target, "validation_error", fmt.Sprintf("--offset %d exceeds used dataflash bytes %d", opts.Offset, storage.Dataflash.UsedBytes))
-		return dataflashExport{}, nil, &env
-	}
-	sizeToRead := storage.Dataflash.UsedBytes - opts.Offset
-	if opts.Size != 0 {
-		sizeToRead = opts.Size
+	data, storage, warnings, env := a.readDataflashBytes(cmd, client, target, opts)
+	if env != nil {
+		return dataflashExport{}, nil, env
 	}
 	export := dataflashExport{
 		Kind:      "dataflash_export",
@@ -223,16 +278,60 @@ func (a *app) performDataflashExport(cmd *cobra.Command, client *connection.Clie
 	if opts.Size != 0 {
 		export.RequestedSize = &opts.Size
 	}
-	if sizeToRead == 0 {
+	if err := os.WriteFile(opts.Path, data, 0o600); err != nil {
+		failure := output.Failure(commandPath(cmd), target, "file_error", err.Error())
+		return dataflashExport{}, nil, &failure
+	}
+	export.ExportedBytes = uint32(len(data))
+	if len(data) == 0 {
 		export.Completed = true
 		return export, warnings, nil
 	}
-	file, err := os.OpenFile(opts.Path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		env := output.Failure(commandPath(cmd), target, "file_error", err.Error())
-		return dataflashExport{}, nil, &env
+	address := opts.Offset
+	remaining := uint32(len(data))
+	for remaining > 0 {
+		chunkSize := opts.BlockSize
+		if remaining < uint32(chunkSize) {
+			chunkSize = uint16(remaining)
+		}
+		export.Chunks = append(export.Chunks, dataflashExportChunk{
+			Address:    address,
+			DataLength: chunkSize,
+		})
+		export.ChunkCount++
+		address += uint32(chunkSize)
+		remaining -= uint32(chunkSize)
 	}
-	defer file.Close()
+	export.Completed = true
+	return export, warnings, nil
+}
+
+func (a *app) readDataflashBytes(cmd *cobra.Command, client *connection.Client, target *output.Target, opts dataflashExportOptions) ([]byte, *bfcommands.StorageStatus, []string, *output.Envelope) {
+	storage, warnings, err := bfcommands.ReadStorageStatus(cmd.Context(), client)
+	if err != nil {
+		failure := a.failure(commandPath(cmd), target, err)
+		return nil, nil, nil, &failure
+	}
+	if storage.Dataflash == nil || !storage.Dataflash.Supported {
+		failure := output.Failure(commandPath(cmd), target, "unsupported_storage", "dataflash is not supported on this target")
+		return nil, nil, nil, &failure
+	}
+	if !storage.Dataflash.Ready {
+		failure := output.Failure(commandPath(cmd), target, "storage_unavailable", "dataflash is not ready")
+		return nil, nil, nil, &failure
+	}
+	if opts.Offset > storage.Dataflash.UsedBytes {
+		failure := output.Failure(commandPath(cmd), target, "validation_error", fmt.Sprintf("--offset %d exceeds used dataflash bytes %d", opts.Offset, storage.Dataflash.UsedBytes))
+		return nil, nil, nil, &failure
+	}
+	sizeToRead := storage.Dataflash.UsedBytes - opts.Offset
+	if opts.Size != 0 {
+		sizeToRead = opts.Size
+	}
+	if sizeToRead == 0 {
+		return nil, storage, warnings, nil
+	}
+	buffer := bytes.NewBuffer(make([]byte, 0, sizeToRead))
 	address := opts.Offset
 	remaining := sizeToRead
 	for remaining > 0 {
@@ -246,27 +345,20 @@ func (a *app) performDataflashExport(cmd *cobra.Command, client *connection.Clie
 			AllowCompression: false,
 		})
 		if err != nil {
-			env := a.failure(commandPath(cmd), target, err)
-			return dataflashExport{}, nil, &env
+			failure := a.failure(commandPath(cmd), target, err)
+			return nil, nil, nil, &failure
 		}
 		if chunk.Address != address {
-			env := output.Failure(commandPath(cmd), target, "protocol_error", fmt.Sprintf("dataflash chunk address 0x%08x does not match requested address 0x%08x", chunk.Address, address))
-			return dataflashExport{}, nil, &env
+			failure := output.Failure(commandPath(cmd), target, "protocol_error", fmt.Sprintf("dataflash chunk address 0x%08x does not match requested address 0x%08x", chunk.Address, address))
+			return nil, nil, nil, &failure
 		}
 		if chunk.DataLength == 0 {
-			export.Truncated = true
 			break
 		}
-		if _, err := file.Write(chunk.Data); err != nil {
-			env := output.Failure(commandPath(cmd), target, "file_error", err.Error())
-			return dataflashExport{}, nil, &env
+		if _, err := buffer.Write(chunk.Data); err != nil {
+			failure := output.Failure(commandPath(cmd), target, "file_error", err.Error())
+			return nil, nil, nil, &failure
 		}
-		export.Chunks = append(export.Chunks, dataflashExportChunk{
-			Address:    chunk.Address,
-			DataLength: chunk.DataLength,
-		})
-		export.ExportedBytes += uint32(chunk.DataLength)
-		export.ChunkCount++
 		address += uint32(chunk.DataLength)
 		if remaining < uint32(chunk.DataLength) {
 			remaining = 0
@@ -274,12 +366,10 @@ func (a *app) performDataflashExport(cmd *cobra.Command, client *connection.Clie
 			remaining -= uint32(chunk.DataLength)
 		}
 		if uint16(len(chunk.Data)) < requestSize {
-			export.Truncated = remaining > 0
 			break
 		}
 	}
-	export.Completed = !export.Truncated && export.ExportedBytes == sizeToRead
-	return export, warnings, nil
+	return buffer.Bytes(), storage, warnings, nil
 }
 
 func inspectBlackboxReader(reader io.Reader) (pkgblackbox.Inspection, error) {

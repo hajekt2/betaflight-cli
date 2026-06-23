@@ -59,10 +59,10 @@ betaflight-cli backup create --raw-cli --format text --port /dev/tty.usbmodem01 
 betaflight-cli backup diff --port /dev/tty.usbmodem01
 betaflight-cli cli interactive --port /dev/tty.usbmodem01
 betaflight-cli restore plan --file backup.txt
-betaflight-cli restore apply --file backup.txt --port /dev/tty.usbmodem01
+betaflight-cli restore apply --file backup.txt --port /dev/tty.usbmodem01 --yes
 betaflight-cli firmware flash --image /path/to/betaflight.bin --tool dfu-util --tool-arg -a --tool-arg 0 --tool-arg -s --tool-arg 0x08000000:leave --tool-arg /path/to/betaflight.bin --execute --yes
 betaflight-cli presets plan --file preset.cli
-betaflight-cli presets apply --file preset.cli --port /dev/tty.usbmodem01
+betaflight-cli presets apply --file preset.cli --port /dev/tty.usbmodem01 --yes
 betaflight-cli blackbox config --port /dev/tty.usbmodem01
 betaflight-cli blackbox inspect flight.bbl
 betaflight-cli sensors status --port /dev/tty.usbmodem01
@@ -73,11 +73,11 @@ betaflight-cli motors test-plan --motor 0 --value 1050 --duration 1s --props-off
 betaflight-cli motors test-apply --motor 0 --value 1050 --duration 1s --props-off --battery-aware --yes --port /dev/tty.usbmodem01
 betaflight-cli servos status --port /dev/tty.usbmodem01
 betaflight-cli settings get gyro_lpf1_static_hz --port /dev/tty.usbmodem01
-betaflight-cli settings set gyro_lpf1_static_hz 0 --port /dev/tty.usbmodem01 --apply
+betaflight-cli settings set gyro_lpf1_static_hz 0 --port /dev/tty.usbmodem01 --apply --yes
 betaflight-cli features list --port /dev/tty.usbmodem01
 betaflight-cli features status --port /dev/tty.usbmodem01
 betaflight-cli features enable GPS --port /dev/tty.usbmodem01
-betaflight-cli features enable GPS --port /dev/tty.usbmodem01 --apply
+betaflight-cli features enable GPS --port /dev/tty.usbmodem01 --apply --yes
 betaflight-cli serial list --port /dev/tty.usbmodem01
 betaflight-cli modes list --port /dev/tty.usbmodem01
 betaflight-cli modes active --port /dev/tty.usbmodem01
@@ -153,7 +153,8 @@ Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.
 `restore plan` and `presets plan` convert local Betaflight CLI text into audited change plans without connecting.
 They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosave` lines are included only with `--include-defaults`.
-`restore apply --include-defaults` and `presets apply --include-defaults` require `--yes` because defaults reset configuration before applying later lines.
+`restore apply`, `presets apply`, and `configuration apply` require `--yes`.
+`--include-defaults` escalates the operation class to dangerous because `defaults nosave` resets configuration before applying later lines.
 `reboot firmware`, `reboot bootloader`, `reboot bootloader-flash`, `reboot msc`, and `reboot msc-utc` send reviewed `MSP_REBOOT` requests and always require `--yes`.
 `blackbox config` reads current Blackbox configuration over MSP and returns decoded device, sample rate, and enabled or disabled field selections.
 `blackbox list` scans onboard Blackbox storage and returns detected log boundaries with per-log inspection summaries, without writing a local file.

@@ -82,8 +82,8 @@ func (a *app) presetsFetchCommand() *cobra.Command {
 					"applied": false,
 				}))
 			}
-			if opts.includeDefaults && !a.opts.yes {
-				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--include-defaults requires --yes because defaults nosave resets configuration before applying lines"))
+			if !a.opts.yes {
+				return a.render(importApplyConfirmationFailure(cmd, opts.save))
 			}
 			op := connection.Write
 			if opts.includeDefaults {
@@ -129,8 +129,8 @@ func (a *app) importApplyCommand(use, short, kind, sourceFormat string) *cobra.C
 		Use:   use,
 		Short: short,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if opts.includeDefaults && !a.opts.yes {
-				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--include-defaults requires --yes because defaults nosave resets configuration before applying lines"))
+			if !a.opts.yes {
+				return a.render(importApplyConfirmationFailure(cmd, opts.save))
 			}
 			imported, err := a.readImportPlan(opts, kind, sourceFormat)
 			if err != nil {
@@ -221,8 +221,8 @@ func (a *app) fetchImportPlan(ctx context.Context, opts presetFetchOptions, kind
 }
 
 func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, opts importCommandOptions, op connection.OperationClass) error {
-	if opts.save && !a.opts.yes {
-		return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--save requires --yes because it persists and usually reboots the flight controller"))
+	if !a.opts.yes {
+		return a.render(importApplyConfirmationFailure(cmd, opts.save))
 	}
 	if opts.save {
 		op = connection.Dangerous
@@ -253,6 +253,14 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 		}
 		return env
 	})
+}
+
+func importApplyConfirmationFailure(cmd *cobra.Command, save bool) output.Envelope {
+	message := "apply requires --yes"
+	if save {
+		message = "--save requires --yes because it persists and usually reboots the flight controller"
+	}
+	return output.Failure(commandPath(cmd), nil, "confirmation_required", message)
 }
 
 func importPlanData(imported batch.ImportResult, opts importCommandOptions, applied bool) map[string]any {

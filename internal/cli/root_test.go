@@ -304,7 +304,7 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 		t.Fatalf("configuration plan capability = %+v", configurationPlan)
 	}
 	configurationApply := byCommand["betaflight-cli configuration apply"]
-	if configurationApply["operation"] != "plan_or_write" || configurationApply["requires_connection"] != true || configurationApply["confirmation"] != "--yes with --include-defaults or --save" || configurationApply["runnable"] != true {
+	if configurationApply["operation"] != "write" || configurationApply["requires_connection"] != true || configurationApply["confirmation"] != "--yes" || configurationApply["runnable"] != true {
 		t.Fatalf("configuration apply capability = %+v", configurationApply)
 	}
 	settingsDiff := byCommand["betaflight-cli settings diff"]
@@ -955,7 +955,7 @@ func TestConfigurationPlanSkipsUnsupportedLines(t *testing.T) {
 
 func TestConfigurationApplyUsesWriteOperation(t *testing.T) {
 	var gotOp connection.OperationClass
-	env, err := runTestCommandWithInput(t, []string{"configuration", "apply"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommandWithInput(t, []string{"configuration", "apply", "--yes"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		gotOp = op
 		return nil, connection.TargetInfo{}, &connection.CodedError{Code: "test_stop", Message: "stop before hardware"}
 	})
@@ -971,6 +971,23 @@ func TestConfigurationApplyUsesWriteOperation(t *testing.T) {
 	data := env.Data.(map[string]any)
 	if data["kind"] != "configuration" {
 		t.Fatalf("plan = %+v", data)
+	}
+}
+
+func TestConfigurationApplyRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"configuration", "apply"}, "feature GPS\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatalf("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after configuration apply confirmation failure")
 	}
 }
 
@@ -3535,7 +3552,7 @@ func TestBatchPlanValidatesSetMetadata(t *testing.T) {
 }
 
 func TestBatchApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommandWithInput(t, []string{"batch", "apply"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
+	env, err := runTestCommandWithInput(t, []string{"batch", "apply", "--yes"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3548,6 +3565,23 @@ func TestBatchApplyWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 2 {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBatchApplyRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"batch", "apply"}, "feature GPS\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after batch apply confirmation failure")
 	}
 }
 
@@ -3645,6 +3679,23 @@ func TestRestoreApplyWithJSONFileAndYes(t *testing.T) {
 	}
 }
 
+func TestRestoreApplyRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply"}, "feature GPS\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after restore confirmation failure")
+	}
+}
+
 func TestRestoreApplyIncludeDefaultsRequiresYesDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--include-defaults"}, "defaults nosave\nfeature GPS\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
@@ -3680,7 +3731,7 @@ func TestRestoreApplyIncludeDefaultsUsesDangerousOperation(t *testing.T) {
 }
 
 func TestRestoreApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommandWithInput(t, []string{"restore", "apply"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--yes"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3835,6 +3886,32 @@ func TestPresetsFetchApplyUsesConnection(t *testing.T) {
 	}
 	if env.Data.(map[string]any)["applied"] != true {
 		t.Fatalf("data = %+v", env.Data)
+	}
+}
+
+func TestPresetsFetchApplyRequiresYesDoesNotConnect(t *testing.T) {
+	presetBody := "feature GPS\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(presetBody)); err != nil {
+			t.Fatalf("write response = %v", err)
+		}
+	}))
+	defer server.Close()
+
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"presets", "fetch", server.URL, "--apply"}, "", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after preset fetch confirmation failure")
 	}
 }
 

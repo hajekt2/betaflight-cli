@@ -233,7 +233,7 @@ The unsupported-mode warning must appear in JSON output.
 There are three risk classes:
 
 - Read: no confirmation.
-- Configuration write: requires explicit apply intent.
+- Configuration write: requires explicit apply intent and `--yes`.
 - Dangerous action: requires explicit confirmation and extra domain checks.
 
 Configuration writes should default to planning the change.

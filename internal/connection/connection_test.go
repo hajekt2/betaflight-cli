@@ -88,7 +88,7 @@ func TestClientRequestRespectsContextCancel(t *testing.T) {
 
 func TestCheckSupportedFirmwareVersion(t *testing.T) {
 	t.Run("supportedVersions", func(t *testing.T) {
-		for _, version := range []string{"2025.12.0", "2025.12.1", "2026.0.0", "2027.3.2"} {
+		for _, version := range []string{"2025.12.0", "2025.12.1", "2026.0.0", "2027.3.2", "2025.12.0-rc.1"} {
 			if !isSupportedFirmwareVersion(version) {
 				t.Fatalf("isSupportedFirmwareVersion(%q) = false, want true", version)
 			}
@@ -96,7 +96,7 @@ func TestCheckSupportedFirmwareVersion(t *testing.T) {
 	})
 
 	t.Run("unsupportedVersions", func(t *testing.T) {
-		for _, version := range []string{"2025.11.0", "2024.99.0", "foo", "", "abc.def"} {
+		for _, version := range []string{"2025.11.0", "2024.99.0", "foo", "", "abc.def", "2025.-1.0"} {
 			if isSupportedFirmwareVersion(version) {
 				t.Fatalf("isSupportedFirmwareVersion(%q) = true, want false", version)
 			}

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 	"time"
 
 	"go.bug.st/serial"
@@ -161,18 +162,37 @@ func isSupportedFirmwareVersion(version string) bool {
 	if len(parts) < 2 {
 		return false
 	}
-	year, err := strconv.Atoi(parts[0])
+	year, err := parseLeadingInt(parts[0])
 	if err != nil || year < 2025 {
 		return false
 	}
 	if year > 2025 {
 		return true
 	}
-	month, err := strconv.Atoi(parts[1])
+	month, err := parseLeadingInt(parts[1])
 	if err != nil || month < 12 {
 		return false
 	}
 	return true
+}
+
+func parseLeadingInt(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, fmt.Errorf("empty version component")
+	}
+	digits := make([]rune, 0, len(raw))
+	for _, ch := range raw {
+		if unicode.IsDigit(ch) {
+			digits = append(digits, ch)
+			continue
+		}
+		break
+	}
+	if len(digits) == 0 {
+		return 0, fmt.Errorf("no digits in %q", raw)
+	}
+	return strconv.Atoi(string(digits))
 }
 
 func autoDetect(ctx context.Context, cfg Config) (*Client, TargetInfo, error) {

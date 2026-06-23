@@ -341,8 +341,12 @@ Successful battery config writes include a `battery_config` side effect.
 Successful battery profile writes include a `battery_profile` side effect.
 `battery set-voltage-meter` returns a `voltage_meter_config` object with meter ID, scale, divider value, divider multiplier, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful voltage meter writes include a `voltage_meter_config` side effect.
+`battery set-voltage-meter-json` accepts either a voltage meter config object or an object with `voltage_meter_config`, `config`, `voltage_meter_configs`, or `battery.voltage_meter_configs`.
+It returns the same `voltage_meter_config` object as `battery set-voltage-meter`.
 `battery set-current-meter` returns a `current_meter_config` object with meter ID, scale, offset, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful current meter writes include a `current_meter_config` side effect.
+`battery set-current-meter-json` accepts either a current meter config object or an object with `current_meter_config`, `config`, `current_meter_configs`, or `battery.current_meter_configs`.
+It returns the same `current_meter_config` object as `battery set-current-meter`.
 
 `failsafe status` returns a `failsafe` object decoded from `MSP_ARMING_CONFIG`, `MSP_FAILSAFE_CONFIG`, `MSP_BOARD_ALIGNMENT_CONFIG`, and `MSP_STATUS_EX`.
 The object includes arming configuration, failsafe stage and procedure configuration, board alignment, active arming-disable flags, a firmware-reported arming flag catalog, and source metadata for each MSP message.

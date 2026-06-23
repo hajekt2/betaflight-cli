@@ -535,9 +535,17 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if voltageMeter["operation"] != "write" || voltageMeter["confirmation"] != "--yes" || voltageMeter["requires_connection"] != true || voltageMeter["output_root"] != "voltage_meter_config" || voltageMeter["runnable"] != true {
 		t.Fatalf("voltage meter capability = %+v", voltageMeter)
 	}
+	voltageMeterJSON := byCommand["betaflight-cli battery set-voltage-meter-json"]
+	if voltageMeterJSON["operation"] != "write" || voltageMeterJSON["confirmation"] != "--yes" || voltageMeterJSON["requires_connection"] != true || voltageMeterJSON["output_root"] != "voltage_meter_config" || voltageMeterJSON["runnable"] != true {
+		t.Fatalf("voltage meter JSON capability = %+v", voltageMeterJSON)
+	}
 	currentMeter := byCommand["betaflight-cli battery set-current-meter"]
 	if currentMeter["operation"] != "write" || currentMeter["confirmation"] != "--yes" || currentMeter["requires_connection"] != true || currentMeter["output_root"] != "current_meter_config" || currentMeter["runnable"] != true {
 		t.Fatalf("current meter capability = %+v", currentMeter)
+	}
+	currentMeterJSON := byCommand["betaflight-cli battery set-current-meter-json"]
+	if currentMeterJSON["operation"] != "write" || currentMeterJSON["confirmation"] != "--yes" || currentMeterJSON["requires_connection"] != true || currentMeterJSON["output_root"] != "current_meter_config" || currentMeterJSON["runnable"] != true {
+		t.Fatalf("current meter JSON capability = %+v", currentMeterJSON)
 	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
@@ -7028,8 +7036,49 @@ func TestBatterySetVoltageMeterRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestBatterySetVoltageMeterJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"battery":{"voltage_meter_configs":[{"id":10,"sensor_type":0,"vbat_scale":110,"vbat_res_div_val":10,"vbat_res_div_multiplier":1}]}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"battery", "set-voltage-meter-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after voltage meter confirmation failure")
+	}
+}
+
 func TestBatterySetVoltageMeterWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"battery", "set-voltage-meter", "10", "110", "10", "1", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["voltage_meter_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["id"] != float64(10) || config["vbat_scale"] != float64(110) || config["vbat_res_div_val"] != float64(10) || config["vbat_res_div_multiplier"] != float64(1) {
+		t.Fatalf("voltage meter config = %+v", result)
+	}
+	if result["msp_name"] != "MSP_SET_VOLTAGE_METER_CONFIG" || result["save_required"] != true {
+		t.Fatalf("voltage meter config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "voltage_meter_config" || env.SideEffects[0].Command != "MSP_SET_VOLTAGE_METER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBatterySetVoltageMeterJSONWithFakeFC(t *testing.T) {
+	input := `{"battery":{"voltage_meter_configs":[{"id":10,"sensor_type":0,"vbat_scale":110,"vbat_res_div_val":10,"vbat_res_div_multiplier":1}]}}`
+	env, err := runTestCommandWithInput(t, []string{"battery", "set-voltage-meter-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -7084,8 +7133,49 @@ func TestBatterySetCurrentMeterRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestBatterySetCurrentMeterJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"battery":{"current_meter_configs":[{"id":10,"sensor_type":1,"scale":400,"offset":-10}]}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"battery", "set-current-meter-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after current meter confirmation failure")
+	}
+}
+
 func TestBatterySetCurrentMeterWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "10", "400", "-10", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["current_meter_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["id"] != float64(10) || config["scale"] != float64(400) || config["offset"] != float64(-10) {
+		t.Fatalf("current meter config = %+v", result)
+	}
+	if result["msp_name"] != "MSP_SET_CURRENT_METER_CONFIG" || result["save_required"] != true {
+		t.Fatalf("current meter config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "current_meter_config" || env.SideEffects[0].Command != "MSP_SET_CURRENT_METER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBatterySetCurrentMeterJSONWithFakeFC(t *testing.T) {
+	input := `{"battery":{"current_meter_configs":[{"id":10,"sensor_type":1,"scale":400,"offset":-10}]}}`
+	env, err := runTestCommandWithInput(t, []string{"battery", "set-current-meter-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

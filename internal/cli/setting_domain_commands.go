@@ -111,7 +111,9 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.batterySetConfigJSONCommand())
 		cmd.AddCommand(a.batterySetProfileJSONCommand())
 		cmd.AddCommand(a.batteryVoltageMeterCommand())
+		cmd.AddCommand(a.batteryVoltageMeterJSONCommand())
 		cmd.AddCommand(a.batteryCurrentMeterCommand())
+		cmd.AddCommand(a.batteryCurrentMeterJSONCommand())
 	}
 	if domain.use == "failsafe" {
 		cmd.AddCommand(a.failsafeStatusCommand())
@@ -2009,6 +2011,69 @@ func (a *app) batteryVoltageMeterCommand() *cobra.Command {
 	}
 }
 
+func (a *app) batteryVoltageMeterJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-voltage-meter-json FILE",
+		Short: "Set voltage meter calibration from JSON through MSP_SET_VOLTAGE_METER_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseVoltageMeterConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "voltage meter calibration changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVoltageMeterConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"voltage_meter_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "voltage_meter_config",
+					Command: "MSP_SET_VOLTAGE_METER_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseVoltageMeterConfigJSON(data []byte) (bfcommands.VoltageMeterConfig, error) {
+	var wrapped struct {
+		VoltageMeterConfig  *bfcommands.VoltageMeterConfig `json:"voltage_meter_config"`
+		Config              *bfcommands.VoltageMeterConfig `json:"config"`
+		VoltageMeterConfigs []bfcommands.VoltageMeterConfig `json:"voltage_meter_configs"`
+		Battery             *struct {
+			VoltageMeterConfigs []bfcommands.VoltageMeterConfig `json:"voltage_meter_configs"`
+		} `json:"battery"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.VoltageMeterConfig{}, err
+	}
+	switch {
+	case wrapped.VoltageMeterConfig != nil:
+		return *wrapped.VoltageMeterConfig, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	case len(wrapped.VoltageMeterConfigs) > 0:
+		return wrapped.VoltageMeterConfigs[0], nil
+	case wrapped.Battery != nil && len(wrapped.Battery.VoltageMeterConfigs) > 0:
+		return wrapped.Battery.VoltageMeterConfigs[0], nil
+	}
+	var config bfcommands.VoltageMeterConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.VoltageMeterConfig{}, err
+	}
+	return config, nil
+}
+
 func (a *app) batteryCurrentMeterCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-current-meter ID SCALE OFFSET",
@@ -2051,6 +2116,69 @@ func (a *app) batteryCurrentMeterCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) batteryCurrentMeterJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-current-meter-json FILE",
+		Short: "Set current meter calibration from JSON through MSP_SET_CURRENT_METER_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseCurrentMeterConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "current meter calibration changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetCurrentMeterConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"current_meter_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "current_meter_config",
+					Command: "MSP_SET_CURRENT_METER_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseCurrentMeterConfigJSON(data []byte) (bfcommands.CurrentMeterConfig, error) {
+	var wrapped struct {
+		CurrentMeterConfig  *bfcommands.CurrentMeterConfig `json:"current_meter_config"`
+		Config              *bfcommands.CurrentMeterConfig `json:"config"`
+		CurrentMeterConfigs []bfcommands.CurrentMeterConfig `json:"current_meter_configs"`
+		Battery             *struct {
+			CurrentMeterConfigs []bfcommands.CurrentMeterConfig `json:"current_meter_configs"`
+		} `json:"battery"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.CurrentMeterConfig{}, err
+	}
+	switch {
+	case wrapped.CurrentMeterConfig != nil:
+		return *wrapped.CurrentMeterConfig, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	case len(wrapped.CurrentMeterConfigs) > 0:
+		return wrapped.CurrentMeterConfigs[0], nil
+	case wrapped.Battery != nil && len(wrapped.Battery.CurrentMeterConfigs) > 0:
+		return wrapped.Battery.CurrentMeterConfigs[0], nil
+	}
+	var config bfcommands.CurrentMeterConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.CurrentMeterConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) failsafeStatusCommand() *cobra.Command {

@@ -168,6 +168,7 @@ It preserves extended flight-mode bytes so new Betaflight modes beyond the legac
 `resources set-json` plans or applies native `resource KIND INDEX TARGET` CLI rows from a JSON object, array, or object with `resource`, `resources`, `row`, or `rows`.
 It defaults to dry-run planning and requires `--yes` when applying or saving.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
+`profiles select-json` accepts `profile`/`pid_profile`, `rate_profile`/`rateprofile`, and `battery_profile` indexes, returns a native CLI `change_plan`, and can apply all requested selector changes together with `--apply --yes`.
 `profiles copy` copies PID or rate profiles through `MSP_COPY_PROFILE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `text set` writes pilot, craft, PID profile, rate profile, or battery profile names through `MSP2_SET_TEXT`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

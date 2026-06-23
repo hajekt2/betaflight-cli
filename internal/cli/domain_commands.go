@@ -691,8 +691,89 @@ func (a *app) profilesCommand() *cobra.Command {
 			})
 		},
 	}
-	cmd.AddCommand(profile, rate, battery, copyProfile)
+	cmd.AddCommand(profile, rate, battery, a.profileSelectJSONCommand(), copyProfile)
 	return cmd
+}
+
+func (a *app) profileSelectJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "select-json FILE",
+		Short: "Plan or select PID, rate, and battery profiles from JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			lines, err := parseProfileSelectionJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.planOrApplyCLI(cmd, lines, "profiles", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseProfileSelectionJSON(data []byte) ([]string, error) {
+	type profileSelection struct {
+		Profile        *int `json:"profile"`
+		PIDProfile     *int `json:"pid_profile"`
+		RateProfile    *int `json:"rate_profile"`
+		Rateprofile    *int `json:"rateprofile"`
+		BatteryProfile *int `json:"battery_profile"`
+	}
+	var wrapped struct {
+		Profiles *profileSelection `json:"profiles"`
+		profileSelection
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	selection := wrapped.profileSelection
+	if wrapped.Profiles != nil {
+		selection = *wrapped.Profiles
+	}
+	var lines []string
+	if selection.Profile != nil && selection.PIDProfile != nil && *selection.Profile != *selection.PIDProfile {
+		return nil, fmt.Errorf("profile and pid_profile disagree")
+	}
+	if index := firstIntPtr(selection.PIDProfile, selection.Profile); index != nil {
+		if *index < 0 {
+			return nil, fmt.Errorf("pid profile index must be >= 0")
+		}
+		lines = append(lines, fmt.Sprintf("profile %d", *index))
+	}
+	if selection.RateProfile != nil && selection.Rateprofile != nil && *selection.RateProfile != *selection.Rateprofile {
+		return nil, fmt.Errorf("rate_profile and rateprofile disagree")
+	}
+	if index := firstIntPtr(selection.RateProfile, selection.Rateprofile); index != nil {
+		if *index < 0 {
+			return nil, fmt.Errorf("rate profile index must be >= 0")
+		}
+		lines = append(lines, fmt.Sprintf("rateprofile %d", *index))
+	}
+	if selection.BatteryProfile != nil {
+		if *selection.BatteryProfile < 0 {
+			return nil, fmt.Errorf("battery profile index must be >= 0")
+		}
+		lines = append(lines, fmt.Sprintf("battery_profile %d", *selection.BatteryProfile))
+	}
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("profile selection JSON must include profile, pid_profile, rate_profile, rateprofile, or battery_profile")
+	}
+	return lines, nil
+}
+
+func firstIntPtr(values ...*int) *int {
+	for _, value := range values {
+		if value != nil {
+			return value
+		}
+	}
+	return nil
 }
 
 func (a *app) rateprofilesCommand() *cobra.Command {

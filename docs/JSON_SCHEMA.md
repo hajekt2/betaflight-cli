@@ -242,6 +242,8 @@ Successful mode range writes include a `mode_ranges` or `mode_range` side effect
 
 `profiles status` returns a `profiles` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes active PID, rate, and battery profile indexes, profile counts when supplied by firmware, native CLI selector commands, and reboot-required state when supplied by firmware.
+`profiles select-json` accepts `profile`/`pid_profile`, `rate_profile`/`rateprofile`, and `battery_profile` indexes, either directly or under `profiles`.
+It returns a `change_plan` with exact native CLI selector lines, and applying it requires `--apply --yes`.
 `profiles copy` returns a `profile_copy` object with kind, source index, destination index, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful profile copy responses include a `profile_copy` side effect.
 

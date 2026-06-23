@@ -6409,6 +6409,61 @@ func TestProfilesBatterySelectApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestProfilesSelectJSONPlanDoesNotConnect(t *testing.T) {
+	input := `{"profiles":{"pid_profile":1,"rate_profile":2,"battery_profile":1}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"profiles", "select-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 3 || lines[0] != "profile 1" || lines[1] != "rateprofile 2" || lines[2] != "battery_profile 1" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only profile select-json command")
+	}
+}
+
+func TestProfilesSelectJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"profile":1,"pid_profile":2}`
+	env, err := runTestCommandWithInput(t, []string{"profiles", "select-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for conflicting profile JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestProfilesSelectJSONApplyWithFakeFC(t *testing.T) {
+	input := `{"pid_profile":1,"rateprofile":2,"battery_profile":1}`
+	env, err := runTestCommandWithInput(t, []string{"profiles", "select-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 3 || env.SideEffects[0].Command != "profile 1" || env.SideEffects[1].Command != "rateprofile 2" || env.SideEffects[2].Command != "battery_profile 1" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestProfilesCopyRejectsUnsupportedKindDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"profiles", "copy", "battery", "0", "1", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

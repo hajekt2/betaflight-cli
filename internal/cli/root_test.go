@@ -158,6 +158,11 @@ func TestStatusWithFakeFC(t *testing.T) {
 	if len(activeNames) != 2 || activeNames[0] != "accelerometer" || activeNames[1] != "gyro" {
 		t.Fatalf("active_sensor_names = %+v", activeNames)
 	}
+	flightModes := status["flight_modes"].(map[string]any)
+	modeNames := flightModes["active_names"].([]any)
+	if len(modeNames) != 1 || modeNames[0] != "ANGLE" {
+		t.Fatalf("flight mode names = %+v", modeNames)
+	}
 	arming := status["arming"].(map[string]any)
 	if arming["source"] != "MSP_STATUS_EX" {
 		t.Fatalf("arming = %+v", arming)

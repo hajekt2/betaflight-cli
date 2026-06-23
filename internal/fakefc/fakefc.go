@@ -569,6 +569,9 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, 20)
 		payload = appendS16(payload, 900)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetSensorAlignment:
+		unsupported := len(frame.Payload) != 4 && len(frame.Payload) != 10
+		f.out.Write(response(frame.Code, nil, unsupported))
 	case msp.MSPCompassConfig:
 		payload := appendS16(nil, 123)
 		f.out.Write(response(frame.Code, payload, false))

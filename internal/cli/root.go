@@ -371,8 +371,65 @@ func (a *app) sensorsCommand() *cobra.Command {
 	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-accelerometer", "Calibrate the accelerometer over MSP", bfcommands.SensorCalibrationAccelerometer))
 	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-magnetometer", "Calibrate the magnetometer over MSP", bfcommands.SensorCalibrationMagnetometer))
 	cmd.AddCommand(a.sensorHardwareConfigCommand())
+	cmd.AddCommand(a.sensorAlignmentCommand())
 	cmd.AddCommand(a.sensorCompassDeclinationCommand())
 	return cmd
+}
+
+func (a *app) sensorAlignmentCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-alignment MAG_ALIGNMENT GYRO_ENABLED_MASK [MAG_ROLL MAG_PITCH MAG_YAW]",
+		Short: "Set sensor alignment through MSP_SET_SENSOR_ALIGNMENT",
+		Args:  cobra.MatchAll(cobra.MinimumNArgs(2), cobra.MaximumNArgs(5)),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 2 && len(args) != 5 {
+				return validationFailureMessage(a, cmd, "expected either 2 arguments or 5 arguments with custom magnetometer roll, pitch, and yaw")
+			}
+			magAlignment, err := parseUint8Arg("mag_alignment", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			gyroEnabledMask, err := parseUint8Arg("gyro_enabled_mask", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			config := bfcommands.SensorAlignmentSetConfig{
+				MagnetometerAlign: magAlignment,
+				GyroEnabledMask:   gyroEnabledMask,
+			}
+			if len(args) == 5 {
+				roll, err := parseInt16Arg("mag_roll", args[2])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				pitch, err := parseInt16Arg("mag_pitch", args[3])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				yaw, err := parseInt16Arg("mag_yaw", args[4])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				config.MagCustomAlignment = &bfcommands.Axis3i16{Roll: roll, Pitch: pitch, Yaw: yaw}
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "sensor alignment changes sensor settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetSensorAlignment(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"sensor_alignment": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "sensor_alignment",
+					Command: "MSP_SET_SENSOR_ALIGNMENT",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) sensorHardwareConfigCommand() *cobra.Command {

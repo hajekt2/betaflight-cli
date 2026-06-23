@@ -339,6 +339,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if sensorConfig["operation"] != "write" || sensorConfig["confirmation"] != "--yes" || sensorConfig["requires_connection"] != true || sensorConfig["output_root"] != "sensor_config" || sensorConfig["runnable"] != true {
 		t.Fatalf("sensor config capability = %+v", sensorConfig)
 	}
+	sensorAlignment := byCommand["betaflight-cli sensors set-alignment"]
+	if sensorAlignment["operation"] != "write" || sensorAlignment["confirmation"] != "--yes" || sensorAlignment["requires_connection"] != true || sensorAlignment["output_root"] != "sensor_alignment" || sensorAlignment["runnable"] != true {
+		t.Fatalf("sensor alignment capability = %+v", sensorAlignment)
+	}
 	compassConfig := byCommand["betaflight-cli sensors set-compass-declination"]
 	if compassConfig["operation"] != "write" || compassConfig["confirmation"] != "--yes" || compassConfig["requires_connection"] != true || compassConfig["output_root"] != "compass_config" || compassConfig["runnable"] != true {
 		t.Fatalf("compass config capability = %+v", compassConfig)
@@ -3252,6 +3256,55 @@ func TestSensorsSetConfigWithFakeFC(t *testing.T) {
 		t.Fatalf("sensor config result = %+v", result)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_config" || env.SideEffects[0].Command != "MSP_SET_SENSOR_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSensorsSetAlignmentRejectsPartialCustomAlignmentBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-alignment", "2", "3", "-10", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSensorsSetAlignmentRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-alignment", "2", "3", "-10", "20", "900"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSensorsSetAlignmentWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-alignment", "2", "3", "-10", "20", "900", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["sensor_alignment"].(map[string]any)
+	config := result["config"].(map[string]any)
+	custom := config["mag_custom_alignment"].(map[string]any)
+	if config["magnetometer_alignment"] != float64(2) || config["gyro_enabled_mask"] != float64(3) || custom["yaw"] != float64(900) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_SENSOR_ALIGNMENT" || result["save_required"] != true {
+		t.Fatalf("sensor alignment result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_alignment" || env.SideEffects[0].Command != "MSP_SET_SENSOR_ALIGNMENT" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

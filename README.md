@@ -69,6 +69,7 @@ betaflight-cli blackbox config --port /dev/tty.usbmodem01
 betaflight-cli blackbox inspect flight.bbl
 betaflight-cli sensors status --port /dev/tty.usbmodem01
 betaflight-cli sensors set-config 1 2 3 4 --port /dev/tty.usbmodem01 --yes
+betaflight-cli sensors set-alignment 2 3 -10 20 900 --port /dev/tty.usbmodem01 --yes
 betaflight-cli sensors set-compass-declination 123 --port /dev/tty.usbmodem01 --yes
 betaflight-cli sensors calibrate-accelerometer --port /dev/tty.usbmodem01 --yes
 betaflight-cli sensors calibrate-magnetometer --port /dev/tty.usbmodem01 --yes
@@ -200,6 +201,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `filters status` reads loop timing, motor protocol, gyro, D-term, dynamic notch, and RPM filter configuration over MSP.
 `sensors status` reads configured sensor hardware, active sensor hardware, active gyro hardware, raw IMU data, sensor alignment, active sensor flags, and compass declination over MSP.
 `sensors set-config` writes accelerometer, barometer, magnetometer, and rangefinder hardware IDs through `MSP_SET_SENSOR_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`sensors set-alignment` writes magnetometer alignment, gyro enabled mask, and optional custom magnetometer roll, pitch, and yaw through `MSP_SET_SENSOR_ALIGNMENT`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `sensors set-compass-declination` writes compass declination in deci-degrees through `MSP_SET_COMPASS_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `sensors calibrate-accelerometer` and `sensors calibrate-magnetometer` send typed MSP calibration requests, require `--yes`, and report the calibration side effect.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.

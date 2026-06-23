@@ -88,6 +88,18 @@ func TestDecodeSensorAlignmentAndCompass(t *testing.T) {
 	if alignment.MagCustomAlignment == nil || alignment.MagCustomAlignment.Roll != -10 || alignment.MagCustomAlignment.Yaw != 900 {
 		t.Fatalf("alignment = %+v", alignment)
 	}
+	encoded := EncodeSensorAlignment(SensorAlignmentSetConfig{
+		MagnetometerAlign: 2,
+		GyroEnabledMask:   3,
+		MagCustomAlignment: &Axis3i16{
+			Roll:  -10,
+			Pitch: 20,
+			Yaw:   900,
+		},
+	})
+	if !bytes.Equal(encoded, []byte{0, 0, 2, 3, 0xf6, 0xff, 20, 0, 0x84, 0x03}) {
+		t.Fatalf("encoded = %v", encoded)
+	}
 	compass, err := DecodeCompassConfig([]byte{123, 0})
 	if err != nil {
 		t.Fatalf("DecodeCompassConfig() error = %v", err)

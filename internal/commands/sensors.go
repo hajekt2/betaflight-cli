@@ -66,6 +66,20 @@ type SensorAlignment struct {
 	MagCustomAlignment *Axis3i16 `json:"mag_custom_alignment,omitempty"`
 }
 
+type SensorAlignmentSetConfig struct {
+	MagnetometerAlign  uint8     `json:"magnetometer_alignment"`
+	GyroEnabledMask    uint8     `json:"gyro_enabled_mask"`
+	MagCustomAlignment *Axis3i16 `json:"mag_custom_alignment,omitempty"`
+}
+
+type SensorAlignmentSetResult struct {
+	Config       SensorAlignmentSetConfig `json:"config"`
+	MSPCode      uint16                   `json:"msp_code"`
+	MSPName      string                   `json:"msp_name"`
+	Acknowledged bool                     `json:"acknowledged"`
+	SaveRequired bool                     `json:"save_required"`
+}
+
 type Axis3i16 struct {
 	Roll  int16 `json:"roll"`
 	Pitch int16 `json:"pitch"`
@@ -193,6 +207,29 @@ func SetSensorHardwareConfig(ctx context.Context, client *connection.Client, con
 	}, nil
 }
 
+func SetSensorAlignment(ctx context.Context, client *connection.Client, config SensorAlignmentSetConfig) (*SensorAlignmentSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetSensorAlignment, EncodeSensorAlignment(config)); err != nil {
+		return nil, fmt.Errorf("sensor alignment request failed: %w", err)
+	}
+	return &SensorAlignmentSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetSensorAlignment,
+		MSPName:      "MSP_SET_SENSOR_ALIGNMENT",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeSensorAlignment(config SensorAlignmentSetConfig) []byte {
+	payload := []byte{0, 0, config.MagnetometerAlign, config.GyroEnabledMask}
+	if config.MagCustomAlignment != nil {
+		payload = appendS16Payload(payload, config.MagCustomAlignment.Roll)
+		payload = appendS16Payload(payload, config.MagCustomAlignment.Pitch)
+		payload = appendS16Payload(payload, config.MagCustomAlignment.Yaw)
+	}
+	return payload
+}
+
 func EncodeSensorHardwareConfig(config SensorHardwareConfig) []byte {
 	return []byte{config.Accelerometer, config.Barometer, config.Magnetometer, config.Rangefinder}
 }
@@ -200,6 +237,11 @@ func EncodeSensorHardwareConfig(config SensorHardwareConfig) []byte {
 func EncodeCompassConfig(declinationDeciDegrees int16) []byte {
 	v := uint16(declinationDeciDegrees)
 	return []byte{byte(v), byte(v >> 8)}
+}
+
+func appendS16Payload(dst []byte, value int16) []byte {
+	v := uint16(value)
+	return append(dst, byte(v), byte(v>>8))
 }
 
 func sensorCalibrationCommand(kind SensorCalibrationKind) (uint16, string, error) {

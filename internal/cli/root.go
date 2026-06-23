@@ -1271,6 +1271,7 @@ func (a *app) rebootModeCommand(use, short string, mode bfcommands.RebootMode, s
 func (a *app) mspCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "msp", Short: "Raw MSP diagnostics"}
 	var payloadHex string
+	var decodePayload bool
 	var directionFilter, sourceFilter, protocolFilter, nameFilter string
 	listCmd := &cobra.Command{
 		Use:   "list",
@@ -1393,11 +1394,29 @@ func (a *app) mspCommand() *cobra.Command {
 				if op != connection.ReadOnly {
 					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "raw_msp", Detail: "raw MSP write-like command sent"})
 				}
+				if decodePayload {
+					decoded, supported, decodeErr := decodeMSPPayload(code, frame.Payload)
+					if decodeErr != nil {
+						env.Warnings = append(env.Warnings, output.Warning{
+							Code:    "decode_failed",
+							Message: decodeErr.Error(),
+						})
+					}
+					if supported {
+						env.Data.(map[string]any)["decoded"] = decoded
+						env.Data.(map[string]any)["decode_supported"] = true
+						env.Data.(map[string]any)["decode_requested"] = true
+					} else {
+						env.Data.(map[string]any)["decode_supported"] = false
+						env.Data.(map[string]any)["decode_requested"] = true
+					}
+				}
 				return env
 			})
 		},
 	})
 	cmd.PersistentFlags().StringVar(&payloadHex, "payload-hex", "", "hex payload bytes")
+	cmd.PersistentFlags().BoolVar(&decodePayload, "decode", false, "decode known payloads into structured JSON")
 	return cmd
 }
 

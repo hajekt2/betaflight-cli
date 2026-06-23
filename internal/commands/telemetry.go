@@ -183,12 +183,24 @@ func decodeStatus(payload []byte, extended bool) (*Status, error) {
 	return status, nil
 }
 
+func DecodeStatus(payload []byte) (*Status, error) {
+	return decodeStatus(payload, false)
+}
+
+func DecodeStatusEx(payload []byte) (*Status, error) {
+	return decodeStatus(payload, true)
+}
+
 func readAttitude(ctx context.Context, client *connection.Client) (*Attitude, error) {
 	frame, err := client.Request(ctx, msp.MSPAttitude, nil)
 	if err != nil {
 		return nil, fmt.Errorf("attitude unavailable: %w", err)
 	}
-	r := msp.NewPayloadReader(frame.Payload)
+	return decodeAttitude(frame.Payload)
+}
+
+func decodeAttitude(payload []byte) (*Attitude, error) {
+	r := msp.NewPayloadReader(payload)
 	roll, err := r.S16()
 	if err != nil {
 		return nil, err
@@ -206,6 +218,10 @@ func readAttitude(ctx context.Context, client *connection.Client) (*Attitude, er
 		PitchDegrees: float64(pitch) / 10,
 		YawDegrees:   yaw,
 	}, nil
+}
+
+func DecodeAttitude(payload []byte) (*Attitude, error) {
+	return decodeAttitude(payload)
 }
 
 func readBattery(ctx context.Context, client *connection.Client) (*Battery, error) {
@@ -259,6 +275,22 @@ func readRC(ctx context.Context, client *connection.Client) ([]uint16, error) {
 		return nil, fmt.Errorf("rc unavailable: %w", err)
 	}
 	r := msp.NewPayloadReader(frame.Payload)
+	var values []uint16
+	for r.Remaining() >= 2 {
+		v, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		values = append(values, v)
+	}
+	if len(values) == 0 {
+		return nil, errors.New("MSP_RC returned no channels")
+	}
+	return values, nil
+}
+
+func DecodeRC(payload []byte) ([]uint16, error) {
+	r := msp.NewPayloadReader(payload)
 	var values []uint16
 	for r.Remaining() >= 2 {
 		v, err := r.U16()

@@ -1467,6 +1467,46 @@ func TestMSPRequestNumericFallbackUsesCodeName(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeReturnsStructuredPayload(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_NAME", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	if data["decode_requested"] != true {
+		t.Fatalf("decode_requested = %v", data["decode_requested"])
+	}
+	if data["decoded"] != "BetaFlight" {
+		t.Fatalf("decoded = %v", data["decoded"])
+	}
+}
+
+func TestMSPRequestWithDecodeUnsupportedCodeFallsBackToRaw(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "0xFFFF", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != false {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	if data["decode_requested"] != true {
+		t.Fatalf("decode_requested = %v", data["decode_requested"])
+	}
+	if _, ok := data["decoded"]; ok {
+		t.Fatalf("decoded should be absent for unsupported code: %+v", data["decoded"])
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

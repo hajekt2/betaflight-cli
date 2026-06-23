@@ -229,6 +229,9 @@ func EncodeRSSIChannel(channel uint8) []byte {
 }
 
 func SetRCMap(ctx context.Context, client *connection.Client, mapping []uint8) (*RCMapSetResult, error) {
+	if err := ValidateRCMap(mapping); err != nil {
+		return nil, err
+	}
 	if _, err := client.Request(ctx, msp.MSPSetRXMap, EncodeRCMap(mapping)); err != nil {
 		return nil, fmt.Errorf("receiver map request failed: %w", err)
 	}
@@ -245,6 +248,23 @@ func SetRCMap(ctx context.Context, client *connection.Client, mapping []uint8) (
 
 func EncodeRCMap(mapping []uint8) []byte {
 	return append([]byte(nil), mapping...)
+}
+
+func ValidateRCMap(mapping []uint8) error {
+	if len(mapping) != 4 {
+		return fmt.Errorf("receiver map must contain exactly 4 values")
+	}
+	seen := map[uint8]bool{}
+	for _, value := range mapping {
+		if value > 3 {
+			return fmt.Errorf("receiver map values must be in [0..3]")
+		}
+		if seen[value] {
+			return fmt.Errorf("receiver map values must be a permutation of 0,1,2,3")
+		}
+		seen[value] = true
+	}
+	return nil
 }
 
 func SetRXFailChannel(ctx context.Context, client *connection.Client, channel RXFailChannel) (*RXFailChannelSetResult, error) {

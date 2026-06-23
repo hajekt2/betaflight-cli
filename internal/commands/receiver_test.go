@@ -113,6 +113,24 @@ func TestEncodeRCMap(t *testing.T) {
 	}
 }
 
+func TestValidateRCMap(t *testing.T) {
+	if err := ValidateRCMap([]uint8{0, 1, 3, 2}); err != nil {
+		t.Fatalf("ValidateRCMap() error = %v", err)
+	}
+}
+
+func TestValidateRCMapRejectsDuplicateValues(t *testing.T) {
+	if err := ValidateRCMap([]uint8{0, 1, 1, 2}); err == nil {
+		t.Fatal("ValidateRCMap() error = nil, want duplicate value error")
+	}
+}
+
+func TestValidateRCMapRejectsWrongLength(t *testing.T) {
+	if err := ValidateRCMap([]uint8{0, 1, 2}); err == nil {
+		t.Fatal("ValidateRCMap() error = nil, want length error")
+	}
+}
+
 func TestDecodeAndEncodeRCDeadband(t *testing.T) {
 	config, err := DecodeRCDeadband([]byte{5, 7, 3, 50, 0})
 	if err != nil {

@@ -67,6 +67,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.receiverSetRXFailJSONCommand())
 		cmd.AddCommand(a.receiverRSSIChannelCommand())
 		cmd.AddCommand(a.receiverMapCommand())
+		cmd.AddCommand(a.receiverMapJSONCommand())
 		cmd.AddCommand(a.receiverDeadbandCommand())
 	}
 	if domain.use == "gps" {
@@ -479,17 +480,10 @@ func (a *app) receiverMapCommand() *cobra.Command {
 				if err != nil {
 					return validationFailure(a, cmd, err)
 				}
-				if value > 3 {
-					return validationFailureMessage(a, cmd, "receiver map values must be in [0..3]")
-				}
 				mapping[i] = value
 			}
-			seen := map[uint8]bool{}
-			for _, value := range mapping {
-				if seen[value] {
-					return validationFailureMessage(a, cmd, "receiver map values must be a permutation of 0,1,2,3")
-				}
-				seen[value] = true
+			if err := bfcommands.ValidateRCMap(mapping); err != nil {
+				return validationFailure(a, cmd, err)
 			}
 			if !a.opts.yes {
 				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver map changes receiver configuration; pass --yes"))
@@ -509,6 +503,69 @@ func (a *app) receiverMapCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) receiverMapJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-map-json FILE",
+		Short: "Set receiver channel map from JSON through MSP_SET_RX_MAP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			mapping, err := parseRCMapJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if err := bfcommands.ValidateRCMap(mapping); err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver map changes receiver configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRCMap(cmd.Context(), client, mapping)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rc_map": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rc_map",
+					Command: "MSP_SET_RX_MAP",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseRCMapJSON(data []byte) ([]uint8, error) {
+	var wrapped struct {
+		RCMap    []uint8 `json:"rc_map"`
+		Map      []uint8 `json:"map"`
+		Receiver *struct {
+			RCMap []uint8 `json:"rc_map"`
+		} `json:"receiver"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	switch {
+	case wrapped.RCMap != nil:
+		return append([]uint8(nil), wrapped.RCMap...), nil
+	case wrapped.Map != nil:
+		return append([]uint8(nil), wrapped.Map...), nil
+	case wrapped.Receiver != nil && wrapped.Receiver.RCMap != nil:
+		return append([]uint8(nil), wrapped.Receiver.RCMap...), nil
+	}
+	var mapping []uint8
+	if err := json.Unmarshal(data, &mapping); err != nil {
+		return nil, err
+	}
+	return mapping, nil
 }
 
 func (a *app) receiverDeadbandCommand() *cobra.Command {

@@ -311,6 +311,8 @@ It returns an `rx_fail_table` object with normalized channel rows, channel count
 Successful receiver failsafe table writes include an `rx_fail` side effect.
 `receiver set-map` returns an `rc_map` object with numeric channel map indexes, decoded channel names, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful receiver map writes include an `rc_map` side effect.
+`receiver set-map-json` accepts either a JSON array of four RC map indexes or an object with `rc_map`, `map`, or `receiver.rc_map`.
+It returns the same `rc_map` object as `receiver set-map`.
 `receiver set-deadband` returns an `rc_deadband` object with deadband, yaw deadband, position-hold deadband, 3D throttle deadband, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful RC deadband writes include an `rc_deadband` side effect.
 

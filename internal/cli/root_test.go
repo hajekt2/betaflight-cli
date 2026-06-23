@@ -1376,6 +1376,9 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 	if audit["safety_passed"] != true || audit["preflight_captured"] != true || audit["post_stop_captured"] != true || audit["stop_succeeded"] != true {
 		t.Fatalf("audit = %+v", audit)
 	}
+	if audit["requested_duration_ms"] != float64(1) || audit["elapsed_duration_ms"].(float64) < 0 {
+		t.Fatalf("audit timing = %+v", audit)
+	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "motor_output" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}

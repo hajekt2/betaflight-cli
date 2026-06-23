@@ -57,18 +57,19 @@ type motorTestPostStop struct {
 }
 
 type motorTestAudit struct {
-	Source            string   `json:"source"`
-	ReadOnlyEvidence  bool     `json:"read_only_evidence"`
-	DurationMS        int64    `json:"duration_ms"`
-	StartCommand      string   `json:"start_command"`
-	StopCommand       string   `json:"stop_command"`
-	Confirmations     []string `json:"confirmations"`
-	SafetyPassed      bool     `json:"safety_passed"`
-	PreflightCaptured bool     `json:"preflight_captured"`
-	PostStopCaptured  bool     `json:"post_stop_captured"`
-	StopAttempted     bool     `json:"stop_attempted"`
-	StopSucceeded     bool     `json:"stop_succeeded"`
-	WarningMessages   []string `json:"warning_messages,omitempty"`
+	Source              string   `json:"source"`
+	ReadOnlyEvidence    bool     `json:"read_only_evidence"`
+	RequestedDurationMS int64    `json:"requested_duration_ms"`
+	ElapsedDurationMS   int64    `json:"elapsed_duration_ms"`
+	StartCommand        string   `json:"start_command"`
+	StopCommand         string   `json:"stop_command"`
+	Confirmations       []string `json:"confirmations"`
+	SafetyPassed        bool     `json:"safety_passed"`
+	PreflightCaptured   bool     `json:"preflight_captured"`
+	PostStopCaptured    bool     `json:"post_stop_captured"`
+	StopAttempted       bool     `json:"stop_attempted"`
+	StopSucceeded       bool     `json:"stop_succeeded"`
+	WarningMessages     []string `json:"warning_messages,omitempty"`
 }
 
 type safetyCheck struct {
@@ -133,6 +134,7 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		}
 		plan.Preflight = preflight
 		responses := map[string][]string{}
+		startedAt := time.Now()
 		startLines, err := client.ExecCLI(cmd.Context(), plan.CommandPreview)
 		if err != nil {
 			return a.failure(commandPath(cmd), &target, err)
@@ -147,6 +149,7 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		case <-timer.C:
 		}
 		stopLines, stopErr := client.ExecCLI(context.Background(), plan.StopCommandPreview)
+		elapsedMS := time.Since(startedAt).Milliseconds()
 		responses[plan.StopCommandPreview] = stopLines
 		plan.Applied = true
 		plan.Stopped = stopErr == nil
@@ -158,7 +161,7 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		} else {
 			plan.PostStop = postStop
 		}
-		plan.Audit = buildMotorTestAudit(plan, stopErr, postStopWarnings)
+		plan.Audit = buildMotorTestAudit(plan, elapsedMS, stopErr, postStopWarnings)
 		env := output.Success(commandPath(cmd), &target, map[string]any{
 			"motor_test_plan": plan,
 		})
@@ -233,20 +236,21 @@ func motorSafetyPassed(plan motorTestPlan, name string) bool {
 	return false
 }
 
-func buildMotorTestAudit(plan motorTestPlan, stopErr error, warnings []string) *motorTestAudit {
+func buildMotorTestAudit(plan motorTestPlan, elapsedMS int64, stopErr error, warnings []string) *motorTestAudit {
 	return &motorTestAudit{
-		Source:            "motor test apply",
-		ReadOnlyEvidence:  true,
-		DurationMS:        plan.DurationMS,
-		StartCommand:      plan.CommandPreview,
-		StopCommand:       plan.StopCommandPreview,
-		Confirmations:     append([]string(nil), plan.RequiredConfirmations...),
-		SafetyPassed:      motorSafetyPassed(plan, "props_off") && motorSafetyPassed(plan, "battery_awareness"),
-		PreflightCaptured: plan.Preflight != nil,
-		PostStopCaptured:  plan.PostStop != nil,
-		StopAttempted:     true,
-		StopSucceeded:     stopErr == nil,
-		WarningMessages:   append([]string(nil), warnings...),
+		Source:              "motor test apply",
+		ReadOnlyEvidence:    true,
+		RequestedDurationMS: plan.DurationMS,
+		ElapsedDurationMS:   elapsedMS,
+		StartCommand:        plan.CommandPreview,
+		StopCommand:         plan.StopCommandPreview,
+		Confirmations:       append([]string(nil), plan.RequiredConfirmations...),
+		SafetyPassed:        motorSafetyPassed(plan, "props_off") && motorSafetyPassed(plan, "battery_awareness"),
+		PreflightCaptured:   plan.Preflight != nil,
+		PostStopCaptured:    plan.PostStop != nil,
+		StopAttempted:       true,
+		StopSucceeded:       stopErr == nil,
+		WarningMessages:     append([]string(nil), warnings...),
 	}
 }
 

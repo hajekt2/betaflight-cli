@@ -173,6 +173,35 @@ func TestStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestConfigurationStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"configuration", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	configuration := data["configuration"].(map[string]any)
+	summary := configuration["summary"].(map[string]any)
+	if summary["configuration_state"] != "CONFIGURED" || summary["configured"] != true {
+		t.Fatalf("summary = %+v", summary)
+	}
+	if summary["reboot_required"] != false || summary["arming_blocked"] != true {
+		t.Fatalf("runtime summary = %+v", summary)
+	}
+	if summary["pid_profile"] != float64(0) || summary["battery_profile"] != float64(1) {
+		t.Fatalf("profile summary = %+v", summary)
+	}
+	guidance := configuration["guidance"].(map[string]any)
+	if guidance["read_only_snapshot"] != true || guidance["plan_before_apply"] != true || guidance["save_is_explicit"] != true {
+		t.Fatalf("guidance = %+v", guidance)
+	}
+	if configuration["system"] == nil || configuration["runtime"] == nil || configuration["profiles"] == nil {
+		t.Fatalf("sections = %+v", configuration)
+	}
+}
+
 func TestTasksStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"tasks", "status"}, nil)
 	if err != nil {

@@ -92,6 +92,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.targetCommand())
 	root.AddCommand(a.textCommand())
 	root.AddCommand(a.statusCommand())
+	root.AddCommand(a.configurationCommand())
 	root.AddCommand(a.systemCommand())
 	root.AddCommand(a.tasksCommand())
 	root.AddCommand(a.telemetryCommand())
@@ -529,6 +530,25 @@ func (a *app) statusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) configurationCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "configuration", Short: "Inspect configuration state and write readiness"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read configuration state, profiles, arming blockers, and write guidance",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				status, warnings := bfcommands.ReadConfigurationStatus(cmd.Context(), client)
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"configuration": status,
+				})
+				addStringWarnings(&env, warnings)
+				return env
+			})
+		},
+	})
+	return cmd
 }
 
 func (a *app) tasksCommand() *cobra.Command {

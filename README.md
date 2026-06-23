@@ -44,6 +44,7 @@ betaflight-cli doctor
 betaflight-cli info --port /dev/tty.usbmodem01
 betaflight-cli firmware status --port /dev/tty.usbmodem01
 betaflight-cli target status --port /dev/tty.usbmodem01
+betaflight-cli configuration status --port /dev/tty.usbmodem01
 betaflight-cli text status --port /dev/tty.usbmodem01
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01
@@ -124,6 +125,7 @@ Those commands expose domain-specific list and set operations while preserving t
 `status` reads compact runtime status from `MSP_STATUS_EX`, including active sensor names, active flight mode names, arming-disable state, and reboot-required state.
 It includes a decoded health object for CPU load, cycle time, CPU temperature, I2C errors, arming-blocked state, and configuration-state flags.
 It preserves extended flight-mode bytes so new Betaflight modes beyond the legacy 32-bit mask can still be represented.
+`configuration status` reads configuration state, reboot-required state, active profile selectors, arming blockers, active modes, and write guidance for agents before planning changes.
 `tasks status` reads Betaflight scheduler task diagnostics through the read-only `tasks` CLI command and returns parsed task rows plus raw lines.
 `system status` reads Betaflight's CLI `status` output and returns parsed config, device, uptime, runtime, voltage, GPS, OSD, storage, build-key, and arming lines plus raw text.
 `resources status` reads Betaflight's `resource show all` output and returns parsed resource, timer, and DMA assignments plus raw text.

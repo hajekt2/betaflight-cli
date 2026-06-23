@@ -173,6 +173,9 @@ The `health` object includes CPU load as percent and fraction, cycle time, CPU t
 The raw runtime object keeps the legacy first 32 mode bits in `mode_flags` and the full packed mode bitset in `mode_flags_bytes`.
 Flight mode records include `byte_index` and `bit_index` so modes above bit 31 remain addressable when Betaflight adds more modes.
 
+`configuration status` returns a `configuration` object composed from runtime status, CLI system status, and active profile selectors.
+The object includes a compact summary for configured state, reboot-required state, arming blockers, active flight modes, active PID/rate/battery profiles, config storage usage, and write guidance that reminds agents to plan before apply and save explicitly.
+
 `tasks status` returns a `tasks` object parsed from the Betaflight `tasks` CLI command.
 The object includes raw lines, parsed task rows, optional check-function stats, optional total load, parser warnings, and a `task_stats_reset` side effect because Betaflight resets max task execution statistics after printing them.
 

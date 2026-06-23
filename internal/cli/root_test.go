@@ -339,6 +339,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if profileCopy["operation"] != "write" || profileCopy["confirmation"] != "--yes" || profileCopy["requires_connection"] != true || profileCopy["output_root"] != "profile_copy" || profileCopy["runnable"] != true {
 		t.Fatalf("profile copy capability = %+v", profileCopy)
 	}
+	textSet := byCommand["betaflight-cli text set"]
+	if textSet["operation"] != "write" || textSet["confirmation"] != "--yes" || textSet["requires_connection"] != true || textSet["output_root"] != "text" || textSet["runnable"] != true {
+		t.Fatalf("text set capability = %+v", textSet)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -1669,6 +1673,59 @@ func TestTextStatusWithFakeFC(t *testing.T) {
 	fields := text["fields"].([]any)
 	if len(fields) != 7 {
 		t.Fatalf("fields = %+v", fields)
+	}
+}
+
+func TestTextSetRejectsReadOnlyFieldDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"text", "set", "build_key", "abc", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after read-only text field validation failure")
+	}
+}
+
+func TestTextSetRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"text", "set", "craft_name", "Quad"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after text set confirmation failure")
+	}
+}
+
+func TestTextSetWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"text", "set", "craft_name", "Quad", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	text := data["text"].(map[string]any)
+	request := text["request"].(map[string]any)
+	if request["key"] != "craft_name" || request["value"] != "Quad" || text["msp_name"] != "MSP2_SET_TEXT" || text["save_required"] != true {
+		t.Fatalf("text set = %+v", text)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "text_set" || env.SideEffects[0].Command != "MSP2_SET_TEXT" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

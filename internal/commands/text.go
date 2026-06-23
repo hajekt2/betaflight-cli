@@ -37,6 +37,19 @@ type TextValue struct {
 	Value string `json:"value"`
 }
 
+type TextSetRequest struct {
+	TextField
+	Value string `json:"value"`
+}
+
+type TextSetResult struct {
+	Request      TextSetRequest `json:"request"`
+	MSPCode      uint16         `json:"msp_code"`
+	MSPName      string         `json:"msp_name"`
+	Acknowledged bool           `json:"acknowledged"`
+	SaveRequired bool           `json:"save_required"`
+}
+
 func ReadTextStatus(ctx context.Context, client *connection.Client) (*TextStatus, error) {
 	status := &TextStatus{
 		Source: "MSP2_GET_TEXT",
@@ -57,6 +70,57 @@ func ReadTextStatus(ctx context.Context, client *connection.Client) (*TextStatus
 		return nil, fmt.Errorf("no MSP2 text fields available")
 	}
 	return status, nil
+}
+
+func SetText(ctx context.Context, client *connection.Client, request TextSetRequest) (*TextSetResult, error) {
+	payload, err := EncodeTextSet(request)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSP2SetText, payload); err != nil {
+		return nil, fmt.Errorf("text set request failed: %w", err)
+	}
+	return &TextSetResult{
+		Request:      request,
+		MSPCode:      msp.MSP2SetText,
+		MSPName:      "MSP2_SET_TEXT",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeTextSet(request TextSetRequest) ([]byte, error) {
+	if request.ReadOnly {
+		return nil, fmt.Errorf("%s is read-only", request.Key)
+	}
+	maxLen := textFieldMaxLength(request.Type)
+	if maxLen == 0 {
+		return nil, fmt.Errorf("unsupported text type %d", request.Type)
+	}
+	if len(request.Value) > maxLen {
+		return nil, fmt.Errorf("%s is %d byte(s), maximum is %d", request.Key, len(request.Value), maxLen)
+	}
+	payload := []byte{request.Type, byte(len(request.Value))}
+	return append(payload, []byte(request.Value)...), nil
+}
+
+func TextFieldByKey(key string) (TextField, bool) {
+	for _, field := range defaultTextFields {
+		if field.Key == key {
+			return field, true
+		}
+	}
+	return TextField{}, false
+}
+
+func WritableTextFields() []TextField {
+	fields := []TextField{}
+	for _, field := range defaultTextFields {
+		if !field.ReadOnly {
+			fields = append(fields, field)
+		}
+	}
+	return fields
 }
 
 func readText(ctx context.Context, client *connection.Client, textType uint8) (string, error) {
@@ -88,4 +152,15 @@ func DecodeTextResponse(payload []byte, wantType uint8) (string, error) {
 		return "", fmt.Errorf("MSP2_GET_TEXT returned %d trailing byte(s)", r.Remaining())
 	}
 	return text, nil
+}
+
+func textFieldMaxLength(textType uint8) int {
+	switch textType {
+	case msp.MSP2TextPilotName, msp.MSP2TextCraftName:
+		return 16
+	case msp.MSP2TextPIDProfileName, msp.MSP2TextRateProfileName, msp.MSP2TextBatteryProfileName:
+		return 8
+	default:
+		return 0
+	}
 }

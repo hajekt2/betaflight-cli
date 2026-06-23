@@ -244,6 +244,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 	case msp.MSP2GetText:
 		payload, ok := fakeTextPayload(frame.Payload)
 		f.out.Write(response(frame.Code, payload, !ok))
+	case msp.MSP2SetText:
+		f.out.Write(response(frame.Code, nil, !fakeTextSetPayloadValid(frame.Payload)))
 	case msp.MSPBoardInfo:
 		payload := []byte("F405")
 		payload = appendU16(payload, 0)
@@ -768,6 +770,24 @@ func fakeTextPayload(request []byte) ([]byte, bool) {
 	payload := []byte{request[0]}
 	payload = appendPString(payload, value)
 	return payload, true
+}
+
+func fakeTextSetPayloadValid(payload []byte) bool {
+	if len(payload) < 2 {
+		return false
+	}
+	textLength := int(payload[1])
+	if len(payload) != textLength+2 {
+		return false
+	}
+	switch payload[0] {
+	case msp.MSP2TextPilotName, msp.MSP2TextCraftName:
+		return textLength <= 16
+	case msp.MSP2TextPIDProfileName, msp.MSP2TextRateProfileName, msp.MSP2TextBatteryProfileName:
+		return textLength <= 8
+	default:
+		return false
+	}
 }
 
 func appendU16(dst []byte, v uint16) []byte {

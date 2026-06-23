@@ -832,7 +832,7 @@ func (a *app) targetCommand() *cobra.Command {
 }
 
 func (a *app) textCommand() *cobra.Command {
-	cmd := &cobra.Command{Use: "text", Short: "Read Betaflight text metadata"}
+	cmd := &cobra.Command{Use: "text", Short: "Read and update Betaflight text metadata"}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "status",
 		Short: "Read pilot, craft, profile, build, and release text over MSP",
@@ -848,7 +848,47 @@ func (a *app) textCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "set FIELD VALUE",
+		Short: "Set writable pilot, craft, or profile text over MSP",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			field, ok := bfcommands.TextFieldByKey(args[0])
+			if !ok {
+				return validationFailureMessage(a, cmd, fmt.Sprintf("field must be one of: %s", writableTextFieldKeys()))
+			}
+			request := bfcommands.TextSetRequest{TextField: field, Value: args[1]}
+			if _, err := bfcommands.EncodeTextSet(request); err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "text set changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetText(cmd.Context(), client, request)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"text": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "text_set",
+					Command: "MSP2_SET_TEXT",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	})
 	return cmd
+}
+
+func writableTextFieldKeys() string {
+	fields := bfcommands.WritableTextFields()
+	keys := make([]string, 0, len(fields))
+	for _, field := range fields {
+		keys = append(keys, field.Key)
+	}
+	return strings.Join(keys, ", ")
 }
 
 func (a *app) statusCommand() *cobra.Command {

@@ -52,6 +52,7 @@ betaflight-cli configuration validate --file backup.txt
 betaflight-cli configuration compare --file backup.txt --port /dev/tty.usbmodem01
 betaflight-cli configuration export --source full --raw-cli --format text --port /dev/tty.usbmodem01 > backup.cli
 betaflight-cli text status --port /dev/tty.usbmodem01
+betaflight-cli text set craft_name Quad --port /dev/tty.usbmodem01 --yes
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
 betaflight-cli debug set-accelerometer-trim -12 34 --port /dev/tty.usbmodem01 --yes
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01
@@ -151,6 +152,7 @@ It preserves extended flight-mode bytes so new Betaflight modes beyond the legac
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 `profiles copy` copies PID or rate profiles through `MSP_COPY_PROFILE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
+`text set` writes pilot, craft, PID profile, rate profile, or battery profile names through `MSP2_SET_TEXT`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `debug status` reads live debug channels and accelerometer trims over MSP.
 `debug set-accelerometer-trim` writes accelerometer pitch/roll trim through `MSP_SET_ACC_TRIM` and requires `--yes`.
 `environment status` reads altitude, vario, rangefinder altitude, and legacy analog telemetry over MSP.

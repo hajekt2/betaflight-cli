@@ -260,7 +260,7 @@ func inferCapabilityMetadata(path string, runnable bool, meta capabilityMetadata
 func coverageDomains(commandSet map[string]bool) []coverageDomain {
 	domains := []coverageDomain{
 		implementedDomain("firmware-flashing", commandSet, []string{"betaflight-cli firmware flash"}, nil, []string{"betaflight-cli firmware flash"}, []string{"firmware_flashing"}, "External firmware flashing is supported with explicit confirmation and a preflight plan."),
-		implementedDomain("identity", commandSet, []string{"betaflight-cli info", "betaflight-cli firmware status", "betaflight-cli target status", "betaflight-cli text status"}, nil, nil, []string{"info", "firmware", "target", "text"}, "MSP identity, board, MCU, UID, build, support policy, and text metadata are typed."),
+		implementedDomain("identity", commandSet, []string{"betaflight-cli info", "betaflight-cli firmware status", "betaflight-cli target status", "betaflight-cli text status"}, []string{"betaflight-cli text set"}, nil, []string{"info", "firmware", "target", "text"}, "MSP identity, board, MCU, UID, build, support policy, and text metadata are typed; writable text fields can be changed through confirmed MSP2."),
 		implementedDomain("connection-diagnostics", commandSet, []string{"betaflight-cli ports list", "betaflight-cli ports diagnose", "betaflight-cli doctor"}, nil, nil, []string{"ports", "diagnostics"}, "USB serial discovery is implemented; non-USB transports remain intentionally out of scope."),
 		implementedDomain("configuration-backup", commandSet, []string{
 			"betaflight-cli backup create",
@@ -435,6 +435,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli rtc set": {RequiresConnection: true, Operation: "write", Confirmation: "--yes", OutputRoot: "rtc", Tags: []string{"rtc", "write"}},
 		"betaflight-cli debug set-accelerometer-trim": {RequiresConnection: true, Operation: "write", Confirmation: "--yes", OutputRoot: "accelerometer_trim", Tags: []string{"debug", "write"}},
 		"betaflight-cli profiles copy": {RequiresConnection: true, Operation: "write", Confirmation: "--yes", OutputRoot: "profile_copy", Tags: []string{"profiles", "write"}},
+		"betaflight-cli text set": {RequiresConnection: true, Operation: "write", Confirmation: "--yes", OutputRoot: "text", Tags: []string{"text", "write"}},
 		"betaflight-cli save": dangerous,
 	}
 	for _, path := range []string{

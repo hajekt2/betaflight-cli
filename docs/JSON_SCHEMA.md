@@ -197,6 +197,8 @@ Successful profile copy responses include a `profile_copy` side effect.
 `text status` returns a `text` object decoded from `MSP2_GET_TEXT`.
 The object includes text fields for pilot name, craft name, active PID profile name, active rate profile name, active battery profile name, build key, and release name.
 The object also includes a `by_key` map for direct agent lookup and per-field warnings when custom firmware rejects one text type.
+`text set` returns a `text` object with the requested field, value, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful text writes include a `text_set` side effect.
 
 `firmware status` returns a `firmware` object built from MSP identity requests and compiled metadata.
 The object includes variant, firmware version, MSP API, support-policy result, target and board identifiers, build metadata, MCU, UID, configuration-state capabilities, and settings metadata source details.

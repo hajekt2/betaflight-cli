@@ -1,7 +1,15 @@
 package cli
 
 import (
+	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
+	"io"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -27,6 +35,70 @@ func (a *app) presetsCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "presets", Short: "Plan and apply local Betaflight preset files"}
 	cmd.AddCommand(a.importPlanCommand("plan", "Validate and print a local preset plan without connecting", "preset", "preset_text"))
 	cmd.AddCommand(a.importApplyCommand("apply", "Apply a local preset plan", "preset", "preset_text"))
+	cmd.AddCommand(a.presetsFetchCommand())
+	return cmd
+}
+
+type presetFetchOptions struct {
+	file            string
+	includeDefaults bool
+	apply           bool
+	save            bool
+	httpTimeout     time.Duration
+}
+
+type presetFetchMetadata struct {
+	URL          string `json:"url"`
+	HTTPStatus   int    `json:"http_status"`
+	ContentType  string `json:"content_type"`
+	ContentLength int64 `json:"content_length"`
+	ChecksumSHA256 string `json:"checksum_sha256"`
+	FetchedAt    string `json:"fetched_at"`
+	ETag         string `json:"etag,omitempty"`
+	LastModified string `json:"last_modified,omitempty"`
+}
+
+func (a *app) presetsFetchCommand() *cobra.Command {
+	var opts presetFetchOptions
+	cmd := &cobra.Command{
+		Use:   "fetch URL",
+		Short: "Fetch a remote preset, validate it, and optionally apply",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			opts.file = args[0]
+			imported, metadata, err := a.fetchImportPlan(cmd.Context(), opts, "preset")
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			env, ok := a.validateChangePlan(cmd, imported.Plan, planValidationOptions{allowDefaultsNoSave: opts.includeDefaults})
+			if !ok {
+				return a.render(env)
+			}
+			if !opts.apply {
+				return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+					"source":  metadata,
+					"plan":    importPlanData(imported, importCommandOptions{includeDefaults: opts.includeDefaults, save: opts.save}, false),
+					"kind":    imported.Plan.Kind,
+					"applied": false,
+				}))
+			}
+			if opts.includeDefaults && !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--include-defaults requires --yes because defaults nosave resets configuration before applying lines"))
+			}
+			op := connection.Write
+			if opts.includeDefaults {
+				op = connection.Dangerous
+			}
+			return a.applyImportPlan(cmd, imported, importCommandOptions{
+				includeDefaults: opts.includeDefaults,
+				save:            opts.save,
+			}, op)
+		},
+	}
+	cmd.Flags().BoolVar(&opts.includeDefaults, "include-defaults", false, "include exact defaults nosave lines from the remote preset; apply requires --yes")
+	cmd.Flags().BoolVar(&opts.apply, "apply", false, "apply fetched preset lines instead of previewing plan")
+	cmd.Flags().BoolVar(&opts.save, "save", false, "persist after applying fetched lines; requires --yes")
+	cmd.Flags().DurationVar(&opts.httpTimeout, "timeout", 15*time.Second, "HTTP request timeout for remote preset fetch")
 	return cmd
 }
 
@@ -97,6 +169,55 @@ func (a *app) readImportPlan(opts importCommandOptions, kind, sourceFormat strin
 		SourceFormat:    sourceFormat,
 		IncludeDefaults: opts.includeDefaults,
 	})
+}
+
+func (a *app) fetchImportPlan(ctx context.Context, opts presetFetchOptions, kind string) (batch.ImportResult, presetFetchMetadata, error) {
+	rawURL := strings.TrimSpace(opts.file)
+	parsed, err := url.ParseRequestURI(rawURL)
+	if err != nil {
+		return batch.ImportResult{}, presetFetchMetadata{URL: rawURL}, err
+	}
+	if parsed.Scheme != "https" && parsed.Scheme != "http" {
+		return batch.ImportResult{}, presetFetchMetadata{URL: rawURL}, fmt.Errorf("unsupported preset URL scheme %q", parsed.Scheme)
+	}
+
+	client := &http.Client{Timeout: opts.httpTimeout}
+	request, err := http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
+	if err != nil {
+		return batch.ImportResult{}, presetFetchMetadata{URL: rawURL}, err
+	}
+	request.Header.Set("User-Agent", "betaflight-cli-presets-fetch")
+	response, err := client.Do(request)
+	if err != nil {
+		return batch.ImportResult{}, presetFetchMetadata{URL: rawURL}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return batch.ImportResult{}, presetFetchMetadata{URL: rawURL, HTTPStatus: response.StatusCode}, fmt.Errorf("preset fetch failed with status %d", response.StatusCode)
+	}
+	data, err := io.ReadAll(response.Body)
+	if err != nil {
+		return batch.ImportResult{}, presetFetchMetadata{URL: rawURL}, err
+	}
+	hash := sha256.Sum256(data)
+	imported, err := batch.ImportCLI(data, batch.ImportOptions{
+		Kind:            kind,
+		SourceFormat:    "preset_text",
+		IncludeDefaults: opts.includeDefaults,
+	})
+	if err != nil {
+		return batch.ImportResult{}, presetFetchMetadata{}, err
+	}
+	return imported, presetFetchMetadata{
+		URL:           rawURL,
+		HTTPStatus:    response.StatusCode,
+		ContentType:   response.Header.Get("Content-Type"),
+		ContentLength: int64(len(data)),
+		ChecksumSHA256: hex.EncodeToString(hash[:]),
+		FetchedAt:     time.Now().UTC().Format(time.RFC3339),
+		ETag:          response.Header.Get("ETag"),
+		LastModified:  response.Header.Get("Last-Modified"),
+	}, nil
 }
 
 func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, opts importCommandOptions, op connection.OperationClass) error {

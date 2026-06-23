@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -128,6 +130,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	configuration := byCommand["betaflight-cli configuration"]
 	if configuration["operation"] != "group" || configuration["runnable"] != false {
 		t.Fatalf("configuration capability = %+v", configuration)
+	}
+	presetsFetch := byCommand["betaflight-cli presets fetch"]
+	if presetsFetch["operation"] != "offline" || presetsFetch["requires_connection"] != false || presetsFetch["confirmation"] != "none" || presetsFetch["output_root"] != "change_plan" {
+		t.Fatalf("presets fetch capability = %+v", presetsFetch)
 	}
 	workflows := capabilities["workflows"].([]any)
 	foundBackup := false
@@ -2391,6 +2397,134 @@ func TestPresetsPlanUsesPresetKind(t *testing.T) {
 	data := env.Data.(map[string]any)
 	if data["kind"] != "preset" || data["source_format"] != "preset_text" {
 		t.Fatalf("data = %+v", data)
+	}
+}
+
+func TestPresetsFetchPlanWithoutApply(t *testing.T) {
+	presetBody := "feature GPS\nset small_angle = 25\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("ETag", "\"abc-123\"")
+		w.Header().Set("Last-Modified", "Mon, 01 Jan 2024 12:00:00 GMT")
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(presetBody)); err != nil {
+			t.Fatalf("write response = %v", err)
+		}
+	}))
+	defer server.Close()
+
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"presets", "fetch", server.URL}, "", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for presets fetch plan")
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != false || data["kind"] != "preset" {
+		t.Fatalf("data = %+v", data)
+	}
+	plan := data["plan"].(map[string]any)
+	lines := plan["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "feature GPS" || lines[1] != "set small_angle = 25" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	source := data["source"].(map[string]any)
+	if source["url"] != server.URL || source["http_status"].(float64) != float64(http.StatusOK) || source["content_type"] != "text/plain" {
+		t.Fatalf("source = %+v", source)
+	}
+	if source["checksum_sha256"] == "" || len(source["checksum_sha256"].(string)) != 64 {
+		t.Fatalf("source = %+v", source)
+	}
+	if source["content_length"].(float64) != float64(len(presetBody)) {
+		t.Fatalf("source = %+v", source)
+	}
+}
+
+func TestPresetsFetchRejectsBadURLScheme(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"presets", "fetch", "file:///tmp/preset.cli"}, "", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called for bad URL preset fetch")
+	}
+}
+
+func TestPresetsFetchHTTPError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		if _, err := w.Write([]byte("error")); err != nil {
+			t.Fatalf("write response = %v", err)
+		}
+	}))
+	defer server.Close()
+
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"presets", "fetch", server.URL}, "", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called for failed preset fetch")
+	}
+}
+
+func TestPresetsFetchApplyUsesConnection(t *testing.T) {
+	presetBody := "feature GPS\nset small_angle = 25\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(presetBody)); err != nil {
+			t.Fatalf("write response = %v", err)
+		}
+	}))
+	defer server.Close()
+
+	var op connection.OperationClass
+	env, err := runTestCommandWithInput(t, []string{"presets", "fetch", server.URL, "--apply", "--yes"}, "", func(_ context.Context, _ connection.Config, got connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		op = got
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if op != connection.Write {
+		t.Fatalf("operation = %v, want Write", op)
+	}
+	if env.Data.(map[string]any)["applied"] != true {
+		t.Fatalf("data = %+v", env.Data)
 	}
 }
 

@@ -200,6 +200,35 @@ func TestTasksStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestSystemStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"system", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	system := data["system"].(map[string]any)
+	config := system["config"].(map[string]any)
+	if config["state"] != "CONFIGURED" || config["used_bytes"] != float64(3820) {
+		t.Fatalf("config = %+v", config)
+	}
+	runtime := system["runtime"].(map[string]any)
+	if runtime["cpu_load_percent"] != float64(42) || runtime["gyro_rate_hz"] != float64(4000) {
+		t.Fatalf("runtime = %+v", runtime)
+	}
+	voltage := system["voltage"].(map[string]any)
+	if voltage["voltage_v"] != 15.99 || voltage["cell_count"] != float64(4) {
+		t.Fatalf("voltage = %+v", voltage)
+	}
+	arming := system["arming"].(map[string]any)
+	flags := arming["flags"].([]any)
+	if len(flags) != 2 || flags[0] != "RXLOSS" {
+		t.Fatalf("arming = %+v", arming)
+	}
+}
+
 func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"info"}, nil)
 	if err != nil {

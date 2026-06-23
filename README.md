@@ -120,6 +120,7 @@ Those commands expose domain-specific list and set operations while preserving t
 It includes a decoded health object for CPU load, cycle time, CPU temperature, I2C errors, arming-blocked state, and configuration-state flags.
 It preserves extended flight-mode bytes so new Betaflight modes beyond the legacy 32-bit mask can still be represented.
 `tasks status` reads Betaflight scheduler task diagnostics through the read-only `tasks` CLI command and returns parsed task rows plus raw lines.
+`system status` reads Betaflight's CLI `status` output and returns parsed config, device, uptime, runtime, voltage, GPS, OSD, storage, build-key, and arming lines plus raw text.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `debug status` reads live debug channels and accelerometer trims over MSP.

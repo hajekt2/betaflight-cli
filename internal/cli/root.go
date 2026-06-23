@@ -90,6 +90,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.infoCommand())
 	root.AddCommand(a.textCommand())
 	root.AddCommand(a.statusCommand())
+	root.AddCommand(a.systemCommand())
 	root.AddCommand(a.tasksCommand())
 	root.AddCommand(a.telemetryCommand())
 	root.AddCommand(a.debugCommand())
@@ -452,6 +453,26 @@ func (a *app) tasksCommand() *cobra.Command {
 				})
 				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "task_stats_reset", Command: "tasks", Detail: "Betaflight resets max task execution statistics after printing tasks"})
 				return env
+			})
+		},
+	})
+	return cmd
+}
+
+func (a *app) systemCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "system", Short: "Inspect CLI-backed system diagnostics"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read Betaflight CLI status output as structured diagnostics",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				system, err := bfcommands.ReadSystemStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"system": system,
+				})
 			})
 		},
 	})

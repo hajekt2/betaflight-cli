@@ -112,6 +112,9 @@ The `tasks` CLI command prints scheduler task rows.
 When task statistics are enabled, the output includes rate, max and average execution time, max and average load, total execution time, and optionally late-task counters.
 Firmware resets max task execution statistics after printing the table.
 
+The `status` CLI command prints mixed human diagnostics including configuration state, device counts, sensor lines, GPS and OSD state, flash and storage lines, build key, uptime, CPU/runtime rates, voltage, and arming-disable flags.
+There is no single MSP response containing all of those human-facing lines, so the CLI wrapper keeps raw text and parses stable line prefixes.
+
 `MSP_SONAR_ALTITUDE` returns the latest rangefinder altitude in centimeters.
 
 `MSP_ANALOG` returns legacy voltage, drawn mAh, RSSI, amperage in 0.01A units, and battery voltage in 0.01V units.

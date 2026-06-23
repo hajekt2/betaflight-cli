@@ -164,6 +164,9 @@ Flight mode records include `byte_index` and `bit_index` so modes above bit 31 r
 `tasks status` returns a `tasks` object parsed from the Betaflight `tasks` CLI command.
 The object includes raw lines, parsed task rows, optional check-function stats, optional total load, parser warnings, and a `task_stats_reset` side effect because Betaflight resets max task execution statistics after printing them.
 
+`system status` returns a `system` object parsed from Betaflight's CLI `status` command.
+The object includes raw lines, parsed configuration storage usage, detected device counts, selected raw device lines, build key, uptime, runtime rates, voltage summary, arming-disable flags, and unparsed lines for firmware text drift.
+
 `debug status` returns a `debug` object decoded from `MSP_DEBUG` and `MSP_ACC_TRIM`.
 The object includes signed debug channel values, signed accelerometer pitch/roll trims, source metadata, and per-message warnings when one optional request is unavailable.
 

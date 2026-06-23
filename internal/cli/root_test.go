@@ -5981,6 +5981,74 @@ func TestFeatureEnablePlanDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestFeaturesSetJSONPlanDoesNotConnect(t *testing.T) {
+	input := `{"features":{"enable":["gps","osd"],"disable":["airmode"]}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"features", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 3 || lines[0] != "feature GPS" || lines[1] != "feature OSD" || lines[2] != "feature -AIRMODE" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only feature JSON command")
+	}
+}
+
+func TestFeaturesSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"enable":["gps"],"disable":["GPS"]}`
+	env, err := runTestCommandWithInput(t, []string{"features", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for conflicting feature JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestFeaturesSetJSONApplyWithFakeFC(t *testing.T) {
+	input := `{"enable":["gps"],"disable":["gps"]}`
+	env, err := runTestCommandWithInput(t, []string{"features", "set-json", "-", "--apply", "--yes"}, input, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+
+	input = `{"enable":["gps"],"disable":["airmode"]}`
+	env, err = runTestCommandWithInput(t, []string{"features", "set-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "feature GPS" || lines[1] != "feature -AIRMODE" {
+		t.Fatalf("lines = %+v", lines)
+	}
+	if len(env.SideEffects) != 2 || env.SideEffects[0].Command != "feature GPS" || env.SideEffects[1].Command != "feature -AIRMODE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestReceiverRXFailPlanDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"receiver", "rxfail", "2", "s", "1100"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

@@ -127,6 +127,8 @@ func New() *FC {
 			"set failsafe_procedure = DROP":         {"failsafe_procedure set to DROP"},
 			"feature GPS":                           {"Enabled GPS"},
 			"feature -GPS":                          {"Disabled GPS"},
+			"feature AIRMODE":                       {"Enabled AIRMODE"},
+			"feature -AIRMODE":                      {"Disabled AIRMODE"},
 			"beeper ARMING":                         {"Beeper ARMING enabled"},
 			"beeper -ARMING":                        {"Beeper ARMING disabled"},
 			"set transponder_provider = ARCITIMER":  {"transponder_provider set to ARCITIMER"},

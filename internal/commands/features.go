@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
@@ -67,6 +68,22 @@ type FeatureMaskSetResult struct {
 	MSPName      string        `json:"msp_name"`
 	Acknowledged bool          `json:"acknowledged"`
 	SaveRequired bool          `json:"save_required"`
+}
+
+func NormalizeFeatureName(name string) (string, bool) {
+	normalized := strings.ToUpper(strings.TrimSpace(name))
+	_, ok := LookupFeatureDefinition(normalized)
+	return normalized, ok
+}
+
+func LookupFeatureDefinition(name string) (FeatureDefinition, bool) {
+	normalized := strings.ToUpper(strings.TrimSpace(name))
+	for _, definition := range featureDefinitions {
+		if definition.Name == normalized {
+			return definition, true
+		}
+	}
+	return FeatureDefinition{}, false
 }
 
 func ReadFeatureStatus(ctx context.Context, client *connection.Client) (*FeatureStatus, error) {

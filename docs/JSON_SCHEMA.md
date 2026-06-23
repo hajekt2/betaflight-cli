@@ -198,6 +198,8 @@ Successful VTX table writes include `vtxtable_band` or `vtxtable_power` side eff
 
 `features status` returns a `features` object decoded from `MSP_FEATURE_CONFIG`.
 The object includes the raw feature mask, enabled feature names, per-feature bit catalog, and an unknown mask for future firmware bits this binary does not yet name.
+`features set-json` accepts an object with `enable`/`enabled` and `disable`/`disabled` feature-name arrays, either directly or under `features`, `feature`, or `plan`.
+It returns a `change_plan` with exact native CLI `feature` lines, and applying it requires `--apply --yes`.
 `features set-mask` returns a `feature_mask` object with the decoded feature status for the requested mask, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful feature mask writes include a `feature_mask` side effect.
 

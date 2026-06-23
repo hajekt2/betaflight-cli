@@ -152,6 +152,7 @@ Expected command families include identity, telemetry, backup, CLI, settings, pr
 The current CLI includes first domain commands for features, serial ports, AUX modes, resources, and profile selectors.
 These commands read from parsed `dump all` output and use Betaflight CLI text lines for plan/apply writes.
 `features status` reads the active feature mask over MSP and returns decoded feature names with a bit catalog for agent reasoning.
+`features set-json` accepts `enable`/`enabled` and `disable`/`disabled` feature-name arrays, validates names against the known Betaflight feature catalog, and returns a native CLI `change_plan` unless `--apply --yes` is supplied.
 It also includes CLI-row table commands for VTX tables, LED strips, servos, adjustment ranges, and receiver channel ranges.
 It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.

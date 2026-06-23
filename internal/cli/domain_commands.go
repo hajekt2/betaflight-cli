@@ -66,8 +66,93 @@ func (a *app) featuresCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(disable, &disableFlags)
-	cmd.AddCommand(enable, disable, a.featureSetMaskCommand())
+	cmd.AddCommand(enable, disable, a.featureSetJSONCommand(), a.featureSetMaskCommand())
 	return cmd
+}
+
+func (a *app) featureSetJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Plan or apply feature enable and disable operations from JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			lines, err := parseFeatureOperationsJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.planOrApplyCLI(cmd, lines, "feature", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseFeatureOperationsJSON(data []byte) ([]string, error) {
+	type featureOps struct {
+		Enable   []string `json:"enable"`
+		Enabled  []string `json:"enabled"`
+		Disable  []string `json:"disable"`
+		Disabled []string `json:"disabled"`
+	}
+	var wrapped struct {
+		Features *featureOps `json:"features"`
+		Feature  *featureOps `json:"feature"`
+		Plan     *featureOps `json:"plan"`
+		featureOps
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	ops := wrapped.featureOps
+	switch {
+	case wrapped.Features != nil:
+		ops = *wrapped.Features
+	case wrapped.Feature != nil:
+		ops = *wrapped.Feature
+	case wrapped.Plan != nil:
+		ops = *wrapped.Plan
+	}
+	enable := append(append([]string{}, ops.Enable...), ops.Enabled...)
+	disable := append(append([]string{}, ops.Disable...), ops.Disabled...)
+	seen := map[string]string{}
+	var lines []string
+	for _, raw := range enable {
+		name, ok := bfcommands.NormalizeFeatureName(raw)
+		if !ok {
+			return nil, fmt.Errorf("%q is not a known Betaflight feature", raw)
+		}
+		if previous := seen[name]; previous != "" {
+			if previous == "disable" {
+				return nil, fmt.Errorf("%s cannot be both enabled and disabled", name)
+			}
+			continue
+		}
+		seen[name] = "enable"
+		lines = append(lines, "feature "+name)
+	}
+	for _, raw := range disable {
+		name, ok := bfcommands.NormalizeFeatureName(raw)
+		if !ok {
+			return nil, fmt.Errorf("%q is not a known Betaflight feature", raw)
+		}
+		if previous := seen[name]; previous != "" {
+			if previous == "enable" {
+				return nil, fmt.Errorf("%s cannot be both enabled and disabled", name)
+			}
+			continue
+		}
+		seen[name] = "disable"
+		lines = append(lines, "feature -"+name)
+	}
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("feature JSON must include at least one enable or disable entry")
+	}
+	return lines, nil
 }
 
 func (a *app) featureSetMaskCommand() *cobra.Command {

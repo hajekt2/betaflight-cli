@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"strings"
 
@@ -22,13 +23,21 @@ type Info struct {
 }
 
 type BoardInfo struct {
-	Identifier         string `json:"identifier,omitempty"`
-	HardwareRevision   uint16 `json:"hardware_revision,omitempty"`
-	BoardType          uint8  `json:"board_type,omitempty"`
-	TargetCapabilities uint8  `json:"target_capabilities,omitempty"`
-	TargetName         string `json:"target_name,omitempty"`
-	BoardName          string `json:"board_name,omitempty"`
-	ManufacturerID     string `json:"manufacturer_id,omitempty"`
+	Identifier             string                 `json:"identifier,omitempty"`
+	HardwareRevision       uint16                 `json:"hardware_revision,omitempty"`
+	BoardType              uint8                  `json:"board_type,omitempty"`
+	TargetCapabilities     uint8                  `json:"target_capabilities,omitempty"`
+	TargetName             string                 `json:"target_name,omitempty"`
+	BoardName              string                 `json:"board_name,omitempty"`
+	ManufacturerID         string                 `json:"manufacturer_id,omitempty"`
+	SignatureHex           string                 `json:"signature_hex,omitempty"`
+	MCUTypeID              *uint8                 `json:"mcu_type_id,omitempty"`
+	ConfigurationState     *uint8                 `json:"configuration_state,omitempty"`
+	ConfigurationStateName string                 `json:"configuration_state_name,omitempty"`
+	SampleRateHz           *uint16                `json:"sample_rate_hz,omitempty"`
+	ConfigurationProblems  *ConfigurationProblems `json:"configuration_problems,omitempty"`
+	SPIDeviceCount         *uint8                 `json:"spi_device_count,omitempty"`
+	I2CDeviceCount         *uint8                 `json:"i2c_device_count,omitempty"`
 }
 
 type MCUInfo struct {
@@ -42,6 +51,12 @@ type DeviceUID struct {
 	Words                  []uint32 `json:"words"`
 	Hex                    string   `json:"hex"`
 	ConfiguratorIdentifier string   `json:"configurator_identifier,omitempty"`
+}
+
+type ConfigurationProblems struct {
+	Mask        uint32   `json:"mask"`
+	Names       []string `json:"names,omitempty"`
+	UnknownMask uint32   `json:"unknown_mask,omitempty"`
 }
 
 type BuildInfo struct {
@@ -146,19 +161,78 @@ func DecodeBoardInfo(payload []byte) (*BoardInfo, error) {
 		TargetCapabilities: caps,
 	}
 	if r.Remaining() > 0 {
-		if s, err := r.PString(); err == nil {
-			info.TargetName = s
+		s, err := r.PString()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "target name")
 		}
+		info.TargetName = s
 	}
 	if r.Remaining() > 0 {
-		if s, err := r.PString(); err == nil {
-			info.BoardName = s
+		s, err := r.PString()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "board name")
 		}
+		info.BoardName = s
 	}
 	if r.Remaining() > 0 {
-		if s, err := r.PString(); err == nil {
-			info.ManufacturerID = s
+		s, err := r.PString()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "manufacturer ID")
 		}
+		info.ManufacturerID = s
+	}
+	if r.Remaining() > 0 {
+		signature, err := r.Bytes(32)
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "board signature")
+		}
+		info.SignatureHex = hex.EncodeToString(signature)
+	}
+	if r.Remaining() > 0 {
+		mcuTypeID, err := r.U8()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "MCU type ID")
+		}
+		info.MCUTypeID = &mcuTypeID
+	}
+	if r.Remaining() > 0 {
+		state, err := r.U8()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "configuration state")
+		}
+		info.ConfigurationState = &state
+		info.ConfigurationStateName = configurationStateName(state)
+	}
+	if r.Remaining() > 0 {
+		sampleRate, err := r.U16()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "gyro sample rate")
+		}
+		info.SampleRateHz = &sampleRate
+	}
+	if r.Remaining() > 0 {
+		problems, err := r.U32()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "configuration problems")
+		}
+		info.ConfigurationProblems = decodeConfigurationProblems(problems)
+	}
+	if r.Remaining() > 0 {
+		spiCount, err := r.U8()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "SPI device count")
+		}
+		info.SPIDeviceCount = &spiCount
+	}
+	if r.Remaining() > 0 {
+		i2cCount, err := r.U8()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "I2C device count")
+		}
+		info.I2CDeviceCount = &i2cCount
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP_BOARD_INFO returned %d trailing byte(s)", r.Remaining())
 	}
 	return info, nil
 }
@@ -256,6 +330,40 @@ func DecodeBuildInfo(payload []byte) (*BuildInfo, error) {
 
 func DecodeName(payload []byte) string {
 	return strings.TrimRight(string(payload), "\x00")
+}
+
+func configurationStateName(state uint8) string {
+	switch state {
+	case 0:
+		return "UNCONFIGURED"
+	case 1:
+		return "CONFIGURED"
+	default:
+		return ""
+	}
+}
+
+func decodeConfigurationProblems(mask uint32) *ConfigurationProblems {
+	problems := &ConfigurationProblems{Mask: mask}
+	unknown := mask
+	for _, problem := range configurationProblemDefinitions {
+		if mask&(1<<problem.Bit) != 0 {
+			problems.Names = append(problems.Names, problem.Name)
+			unknown &^= 1 << problem.Bit
+		}
+	}
+	problems.UnknownMask = unknown
+	return problems
+}
+
+type configurationProblemDefinition struct {
+	Bit  uint
+	Name string
+}
+
+var configurationProblemDefinitions = []configurationProblemDefinition{
+	{Bit: 0, Name: "ACC_NEEDS_CALIBRATION"},
+	{Bit: 1, Name: "MOTOR_PROTOCOL_DISABLED"},
 }
 
 func decodeBuildOption(code uint16) BuildOption {

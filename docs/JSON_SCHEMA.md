@@ -114,6 +114,7 @@ The object includes file sizes, header metadata, ordered header names, parsed fi
 The marker counts and candidate frame index are approximate until full binary frame decoding is implemented.
 
 `info` returns flight-controller identity from the initial handshake plus optional `board`, `mcu`, `uid`, `build`, and `legacy_name` fields.
+The `board` object is decoded from `MSP_BOARD_INFO` and includes board identity, target capabilities, optional target signature, MCU type ID, configuration state, gyro sample rate, configuration problem names, and SPI/I2C device counts when supplied by firmware.
 The `mcu` object is decoded from `MSP2_MCU_INFO` and includes the firmware-reported MCU type ID and MCU name.
 The `uid` object is decoded from `MSP_UID` and includes three firmware words, a padded hex identifier, and the Configurator-style unpadded identifier.
 The `build` object is decoded from `MSP_BUILD_INFO` and includes fixed build date, build time, short git revision, raw build option codes, decoded option names, and unknown option codes.

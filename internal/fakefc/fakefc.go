@@ -206,6 +206,13 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendPString(payload, "STM32F405")
 		payload = appendPString(payload, "FAKEF405")
 		payload = appendPString(payload, "FAKE")
+		for i := 0; i < 32; i++ {
+			payload = append(payload, byte(i))
+		}
+		payload = append(payload, 254, 1)
+		payload = appendU16(payload, 8000)
+		payload = appendU32(payload, 3)
+		payload = append(payload, 2, 1)
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBuildInfo:
 		payload := []byte("Jan 01 2026")

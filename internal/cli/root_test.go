@@ -93,6 +93,14 @@ func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	if data["legacy_name"] != "BetaFlight" {
 		t.Fatalf("legacy name = %+v", data["legacy_name"])
 	}
+	board := data["board"].(map[string]any)
+	if board["configuration_state_name"] != "CONFIGURED" || board["sample_rate_hz"] != float64(8000) {
+		t.Fatalf("board = %+v", board)
+	}
+	problems := board["configuration_problems"].(map[string]any)
+	if problems["mask"] != float64(3) {
+		t.Fatalf("configuration problems = %+v", problems)
+	}
 	mcu := data["mcu"].(map[string]any)
 	if mcu["source"] != "MSP2_MCU_INFO" || mcu["id"] != float64(254) || mcu["name"] != "STM32F405" {
 		t.Fatalf("mcu = %+v", mcu)

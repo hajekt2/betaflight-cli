@@ -2,6 +2,50 @@ package commands
 
 import "testing"
 
+func TestDecodeBoardInfoModernPayload(t *testing.T) {
+	payload := []byte("F405")
+	payload = appendU16Test(payload, 1)
+	payload = append(payload, 0, 65)
+	payload = append(payload, byte(len("STM32F405")))
+	payload = append(payload, []byte("STM32F405")...)
+	payload = append(payload, byte(len("FAKEF405")))
+	payload = append(payload, []byte("FAKEF405")...)
+	payload = append(payload, byte(len("FAKE")))
+	payload = append(payload, []byte("FAKE")...)
+	for i := 0; i < 32; i++ {
+		payload = append(payload, byte(i))
+	}
+	payload = append(payload, 254, 1)
+	payload = appendU16Test(payload, 8000)
+	payload = appendU32Test(payload, 3)
+	payload = append(payload, 2, 1)
+	board, err := DecodeBoardInfo(payload)
+	if err != nil {
+		t.Fatalf("DecodeBoardInfo() error = %v", err)
+	}
+	if board.Identifier != "F405" || board.TargetName != "STM32F405" || board.SignatureHex != "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f" {
+		t.Fatalf("board identity = %+v", board)
+	}
+	if board.MCUTypeID == nil || *board.MCUTypeID != 254 || board.ConfigurationState == nil || *board.ConfigurationState != 1 || board.ConfigurationStateName != "CONFIGURED" {
+		t.Fatalf("board state = %+v", board)
+	}
+	if board.SampleRateHz == nil || *board.SampleRateHz != 8000 || board.SPIDeviceCount == nil || *board.SPIDeviceCount != 2 || board.I2CDeviceCount == nil || *board.I2CDeviceCount != 1 {
+		t.Fatalf("board rates/counts = %+v", board)
+	}
+	if board.ConfigurationProblems == nil || board.ConfigurationProblems.Mask != 3 || len(board.ConfigurationProblems.Names) != 2 || board.ConfigurationProblems.UnknownMask != 0 {
+		t.Fatalf("configuration problems = %+v", board.ConfigurationProblems)
+	}
+}
+
+func TestDecodeBoardInfoRejectsShortModernPayload(t *testing.T) {
+	payload := []byte("F405")
+	payload = appendU16Test(payload, 1)
+	payload = append(payload, 0, 65, 0, 0, 0, 1, 2, 3)
+	if _, err := DecodeBoardInfo(payload); err == nil {
+		t.Fatal("DecodeBoardInfo() error = nil, want short modern payload error")
+	}
+}
+
 func TestDecodeBuildInfo(t *testing.T) {
 	payload := []byte("Jan 01 2026")
 	payload = append(payload, []byte("12:34:56")...)

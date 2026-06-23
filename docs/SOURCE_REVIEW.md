@@ -68,6 +68,9 @@ Configurator reads it into `FC.MCU_INFO` for API 1.47 and newer.
 `MSP_UID` returns three little-endian 32-bit words.
 Configurator stores those words and concatenates their hex values into `deviceIdentifier`.
 
+Modern `MSP_BOARD_INFO` payloads continue after board and manufacturer names with a 32-byte signature, MCU type ID, configuration state, gyro sample rate, configuration problem mask, and SPI/I2C device counts.
+Configurator currently reads through the configuration problem mask and ignores the trailing device counts.
+
 `MSP2_GET_TEXT` is defined in `src/main/msp/msp_protocol_v2_betaflight.h`.
 Firmware returns the requested text type byte followed by a one-byte length and the text bytes.
 Configurator uses this for pilot name, craft name, active profile names, build key, and release name.

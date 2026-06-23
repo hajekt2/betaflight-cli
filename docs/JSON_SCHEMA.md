@@ -177,6 +177,8 @@ The object includes VTX device type, band, channel, power, pit mode, frequency, 
 Successful VTX config writes include a `vtx_config` side effect.
 `osd set-canvas` returns an `osd_canvas` object with requested columns/rows, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
 Successful OSD canvas writes include an `osd_canvas` side effect.
+`osd set-position`, `osd set-stat`, and `osd set-timer` return `osd_position`, `osd_stat`, and `osd_timer` objects with the requested value, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful OSD config writes include `osd_position`, `osd_stat`, or `osd_timer` side effects.
 `vtxtable set-band` returns a `vtxtable_band` object with the requested band row, MSP command name/code, acknowledgement flag, and `save_required`.
 `vtxtable set-power` returns a `vtxtable_power` object with the requested power row, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful VTX table writes include `vtxtable_band` or `vtxtable_power` side effects.

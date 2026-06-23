@@ -483,6 +483,18 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if osdCanvas["operation"] != "write" || osdCanvas["confirmation"] != "--yes" || osdCanvas["requires_connection"] != true || osdCanvas["output_root"] != "osd_canvas" || osdCanvas["runnable"] != true {
 		t.Fatalf("osd canvas capability = %+v", osdCanvas)
 	}
+	osdPosition := byCommand["betaflight-cli osd set-position"]
+	if osdPosition["operation"] != "write" || osdPosition["confirmation"] != "--yes" || osdPosition["requires_connection"] != true || osdPosition["output_root"] != "osd_position" || osdPosition["runnable"] != true {
+		t.Fatalf("osd position capability = %+v", osdPosition)
+	}
+	osdStat := byCommand["betaflight-cli osd set-stat"]
+	if osdStat["operation"] != "write" || osdStat["confirmation"] != "--yes" || osdStat["requires_connection"] != true || osdStat["output_root"] != "osd_stat" || osdStat["runnable"] != true {
+		t.Fatalf("osd stat capability = %+v", osdStat)
+	}
+	osdTimer := byCommand["betaflight-cli osd set-timer"]
+	if osdTimer["operation"] != "write" || osdTimer["confirmation"] != "--yes" || osdTimer["requires_connection"] != true || osdTimer["output_root"] != "osd_timer" || osdTimer["runnable"] != true {
+		t.Fatalf("osd timer capability = %+v", osdTimer)
+	}
 	vtxTableBand := byCommand["betaflight-cli vtxtable set-band"]
 	if vtxTableBand["operation"] != "write" || vtxTableBand["confirmation"] != "--yes" || vtxTableBand["requires_connection"] != true || vtxTableBand["output_root"] != "vtxtable_band" || vtxTableBand["runnable"] != true {
 		t.Fatalf("vtxtable band capability = %+v", vtxTableBand)
@@ -3459,6 +3471,83 @@ func TestOSDSetCanvasRequiresConfirmationBeforeConnect(t *testing.T) {
 
 func TestOSDSetCanvasValidationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"osd", "set-canvas", "300", "20", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetPositionWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-position", "7", "2122", "1", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_position"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["index"] != float64(7) || config["raw"] != float64(2122) || config["screen"] != float64(1) || result["save_required"] != true {
+		t.Fatalf("osd_position = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_OSD_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestOSDSetStatWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-stat", "3", "true", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_stat"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["index"] != float64(3) || config["enabled"] != true || result["save_required"] != true {
+		t.Fatalf("osd_stat = %+v", result)
+	}
+}
+
+func TestOSDSetTimerWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-timer", "1", "1110", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_timer"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["index"] != float64(1) || config["value"] != float64(1110) || result["save_required"] != true {
+		t.Fatalf("osd_timer = %+v", result)
+	}
+}
+
+func TestOSDSetPositionRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-position", "7", "2122"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetStatValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-stat", "3", "maybe", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})

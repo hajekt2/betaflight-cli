@@ -103,6 +103,46 @@ type OSDCanvasSetResult struct {
 	RebootPossible bool               `json:"reboot_possible"`
 }
 
+type OSDPositionSetConfig struct {
+	Index  uint8  `json:"index"`
+	Raw    uint16 `json:"raw"`
+	Screen uint8  `json:"screen"`
+}
+
+type OSDPositionSetResult struct {
+	Config       OSDPositionSetConfig `json:"config"`
+	MSPCode      uint16               `json:"msp_code"`
+	MSPName      string               `json:"msp_name"`
+	Acknowledged bool                 `json:"acknowledged"`
+	SaveRequired bool                 `json:"save_required"`
+}
+
+type OSDStatSetConfig struct {
+	Index   uint8 `json:"index"`
+	Enabled bool  `json:"enabled"`
+}
+
+type OSDStatSetResult struct {
+	Config       OSDStatSetConfig `json:"config"`
+	MSPCode      uint16           `json:"msp_code"`
+	MSPName      string           `json:"msp_name"`
+	Acknowledged bool             `json:"acknowledged"`
+	SaveRequired bool             `json:"save_required"`
+}
+
+type OSDTimerSetConfig struct {
+	Index uint8  `json:"index"`
+	Value uint16 `json:"value"`
+}
+
+type OSDTimerSetResult struct {
+	Config       OSDTimerSetConfig `json:"config"`
+	MSPCode      uint16            `json:"msp_code"`
+	MSPName      string            `json:"msp_name"`
+	Acknowledged bool              `json:"acknowledged"`
+	SaveRequired bool              `json:"save_required"`
+}
+
 func ReadOSDStatus(ctx context.Context, client *connection.Client) (*OSDStatus, []string, error) {
 	status := &OSDStatus{}
 	warnings := []string{}
@@ -144,6 +184,60 @@ func SetOSDCanvas(ctx context.Context, client *connection.Client, config OSDCanv
 
 func EncodeOSDCanvas(config OSDCanvasSetConfig) []byte {
 	return []byte{config.Columns, config.Rows}
+}
+
+func SetOSDPosition(ctx context.Context, client *connection.Client, config OSDPositionSetConfig) (*OSDPositionSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetOSDConfig, EncodeOSDPosition(config)); err != nil {
+		return nil, fmt.Errorf("osd position request failed: %w", err)
+	}
+	return &OSDPositionSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetOSDConfig,
+		MSPName:      "MSP_SET_OSD_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeOSDPosition(config OSDPositionSetConfig) []byte {
+	payload := appendU16Payload([]byte{config.Index}, config.Raw)
+	return append(payload, config.Screen)
+}
+
+func SetOSDStat(ctx context.Context, client *connection.Client, config OSDStatSetConfig) (*OSDStatSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetOSDConfig, EncodeOSDStat(config)); err != nil {
+		return nil, fmt.Errorf("osd statistic request failed: %w", err)
+	}
+	return &OSDStatSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetOSDConfig,
+		MSPName:      "MSP_SET_OSD_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeOSDStat(config OSDStatSetConfig) []byte {
+	payload := appendU16Payload([]byte{config.Index}, uint16(boolByte(config.Enabled)))
+	return append(payload, 0)
+}
+
+func SetOSDTimer(ctx context.Context, client *connection.Client, config OSDTimerSetConfig) (*OSDTimerSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetOSDConfig, EncodeOSDTimer(config)); err != nil {
+		return nil, fmt.Errorf("osd timer request failed: %w", err)
+	}
+	return &OSDTimerSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetOSDConfig,
+		MSPName:      "MSP_SET_OSD_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeOSDTimer(config OSDTimerSetConfig) []byte {
+	payload := []byte{254, config.Index}
+	return appendU16Payload(payload, config.Value)
 }
 
 func DecodeOSDConfig(payload []byte) (*OSDConfig, error) {

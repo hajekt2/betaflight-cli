@@ -60,6 +60,30 @@ func TestSetOSDCanvasPayload(t *testing.T) {
 	}
 }
 
+func TestEncodeOSDPosition(t *testing.T) {
+	payload := EncodeOSDPosition(OSDPositionSetConfig{Index: 7, Raw: 0x084a, Screen: 1})
+	want := []byte{7, 0x4a, 0x08, 1}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
+func TestEncodeOSDStat(t *testing.T) {
+	payload := EncodeOSDStat(OSDStatSetConfig{Index: 3, Enabled: true})
+	want := []byte{3, 1, 0, 0}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
+func TestEncodeOSDTimer(t *testing.T) {
+	payload := EncodeOSDTimer(OSDTimerSetConfig{Index: 1, Value: 0x0456})
+	want := []byte{254, 1, 0x56, 0x04}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodeOSDWarnings(t *testing.T) {
 	warnings, err := DecodeOSDWarnings([]byte{2, 11, 'L', 'O', 'W', ' ', 'B', 'A', 'T', 'T', 'E', 'R', 'Y'})
 	if err != nil {

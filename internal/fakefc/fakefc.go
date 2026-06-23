@@ -774,6 +774,14 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 70)
 		payload = appendS16(payload, -95)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetOSDConfig:
+		ok := false
+		if len(frame.Payload) == 4 && frame.Payload[0] == 254 {
+			ok = true
+		} else if len(frame.Payload) == 4 {
+			ok = true
+		}
+		f.out.Write(response(frame.Code, nil, !ok))
 	case msp.MSPOSDCanvas:
 		f.out.Write(response(frame.Code, []byte{53, 20}, false))
 	case msp.MSPSetOSDCanvas:

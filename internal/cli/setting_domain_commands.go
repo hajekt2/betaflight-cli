@@ -75,6 +75,9 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
 		cmd.AddCommand(a.osdSetCanvasCommand())
+		cmd.AddCommand(a.osdSetPositionCommand())
+		cmd.AddCommand(a.osdSetStatCommand())
+		cmd.AddCommand(a.osdSetTimerCommand())
 	}
 	if domain.use == "pid" {
 		cmd.AddCommand(a.pidStatusCommand())
@@ -693,6 +696,106 @@ func (a *app) osdSetCanvasCommand() *cobra.Command {
 					Command: "MSP_SET_OSD_CANVAS",
 					Detail:  "canvas changed; firmware may save and reboot when switching to HD MSP displayport",
 				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) osdSetPositionCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-position INDEX RAW [SCREEN]",
+		Short: "Set one OSD element position over MSP",
+		Args:  cobra.RangeArgs(2, 3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			raw, err := parseUint16Arg("raw", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			screen := uint8(1)
+			if len(args) == 3 {
+				screen, err = parseUint8Arg("screen", args[2])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD element position changes require --yes"))
+			}
+			config := bfcommands.OSDPositionSetConfig{Index: index, Raw: raw, Screen: screen}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDPosition(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_position": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "osd_position", Command: "MSP_SET_OSD_CONFIG", Detail: "OSD element position changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) osdSetStatCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-stat INDEX ENABLED",
+		Short: "Set one post-flight OSD statistic flag over MSP",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			enabled, err := parseBoolArg("enabled", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD statistic changes require --yes"))
+			}
+			config := bfcommands.OSDStatSetConfig{Index: index, Enabled: enabled}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDStat(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_stat": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "osd_stat", Command: "MSP_SET_OSD_CONFIG", Detail: "OSD statistic changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) osdSetTimerCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-timer INDEX VALUE",
+		Short: "Set one OSD timer value over MSP",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			value, err := parseUint16Arg("value", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD timer changes require --yes"))
+			}
+			config := bfcommands.OSDTimerSetConfig{Index: index, Value: value}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDTimer(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_timer": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "osd_timer", Command: "MSP_SET_OSD_CONFIG", Detail: "OSD timer changed but not saved"})
 				return env
 			})
 		},

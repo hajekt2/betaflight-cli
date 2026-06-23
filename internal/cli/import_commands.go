@@ -48,14 +48,14 @@ type presetFetchOptions struct {
 }
 
 type presetFetchMetadata struct {
-	URL          string `json:"url"`
-	HTTPStatus   int    `json:"http_status"`
-	ContentType  string `json:"content_type"`
-	ContentLength int64 `json:"content_length"`
+	URL            string `json:"url"`
+	HTTPStatus     int    `json:"http_status"`
+	ContentType    string `json:"content_type"`
+	ContentLength  int64  `json:"content_length"`
 	ChecksumSHA256 string `json:"checksum_sha256"`
-	FetchedAt    string `json:"fetched_at"`
-	ETag         string `json:"etag,omitempty"`
-	LastModified string `json:"last_modified,omitempty"`
+	FetchedAt      string `json:"fetched_at"`
+	ETag           string `json:"etag,omitempty"`
+	LastModified   string `json:"last_modified,omitempty"`
 }
 
 func (a *app) presetsFetchCommand() *cobra.Command {
@@ -209,14 +209,14 @@ func (a *app) fetchImportPlan(ctx context.Context, opts presetFetchOptions, kind
 		return batch.ImportResult{}, presetFetchMetadata{}, err
 	}
 	return imported, presetFetchMetadata{
-		URL:           rawURL,
-		HTTPStatus:    response.StatusCode,
-		ContentType:   response.Header.Get("Content-Type"),
-		ContentLength: int64(len(data)),
+		URL:            rawURL,
+		HTTPStatus:     response.StatusCode,
+		ContentType:    response.Header.Get("Content-Type"),
+		ContentLength:  int64(len(data)),
 		ChecksumSHA256: hex.EncodeToString(hash[:]),
-		FetchedAt:     time.Now().UTC().Format(time.RFC3339),
-		ETag:          response.Header.Get("ETag"),
-		LastModified:  response.Header.Get("Last-Modified"),
+		FetchedAt:      time.Now().UTC().Format(time.RFC3339),
+		ETag:           response.Header.Get("ETag"),
+		LastModified:   response.Header.Get("Last-Modified"),
 	}, nil
 }
 
@@ -228,31 +228,42 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 		op = connection.Dangerous
 	}
 	data := importPlanData(imported, opts, true)
-	return a.withClient(cmd.Context(), commandPath(cmd), op, func(client *connection.Client, target output.Target) output.Envelope {
-		responses := map[string][]string{}
-		for _, line := range imported.Plan.CLILines {
-			responseLines, err := client.ExecCLI(cmd.Context(), line)
-			if err != nil {
-				return a.failure(commandPath(cmd), &target, err)
-			}
-			responses[line] = responseLines
+	connect := a.connect
+	if connect == nil {
+		connect = connection.Connect
+	}
+	client, targetInfo, err := connect(cmd.Context(), a.connectionConfig(), op)
+	target := toOutputTarget(targetInfo)
+	if err != nil {
+		env := a.failure(commandPath(cmd), &target, err)
+		env.Data = data
+		return a.render(env)
+	}
+	defer client.Close()
+
+	responses := map[string][]string{}
+	for _, line := range imported.Plan.CLILines {
+		responseLines, err := client.ExecCLI(cmd.Context(), line)
+		if err != nil {
+			return a.render(a.failure(commandPath(cmd), &target, err))
 		}
-		data["response_lines"] = responses
-		env := output.Success(commandPath(cmd), &target, data)
-		for _, line := range imported.Plan.CLILines {
-			env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
+		responses[line] = responseLines
+	}
+	data["response_lines"] = responses
+	env := output.Success(commandPath(cmd), &target, data)
+	for _, line := range imported.Plan.CLILines {
+		env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
+	}
+	if opts.save {
+		saveLines, err := client.ExecCLI(cmd.Context(), "save")
+		if err != nil {
+			addStringWarnings(&env, []string{fmt.Sprintf("save command may have rebooted or disconnected before response completed: %v", err)})
 		}
-		if opts.save {
-			saveLines, err := client.ExecCLI(cmd.Context(), "save")
-			if err != nil {
-				addStringWarnings(&env, []string{fmt.Sprintf("save command may have rebooted or disconnected before response completed: %v", err)})
-			}
-			data["saved"] = true
-			data["save_response_lines"] = saveLines
-			env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
-		}
-		return env
-	})
+		data["saved"] = true
+		data["save_response_lines"] = saveLines
+		env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
+	}
+	return a.render(env)
 }
 
 func importApplyConfirmationFailure(cmd *cobra.Command, save bool) output.Envelope {

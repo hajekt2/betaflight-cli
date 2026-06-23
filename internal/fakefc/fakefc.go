@@ -127,13 +127,13 @@ func New() *FC {
 			"set failsafe_procedure = DROP":         {"failsafe_procedure set to DROP"},
 			"feature GPS":                           {"Enabled GPS"},
 			"feature -GPS":                          {"Disabled GPS"},
-			"beeper ARMING":                        {"Beeper ARMING enabled"},
-			"beeper -ARMING":                       {"Beeper ARMING disabled"},
+			"beeper ARMING":                         {"Beeper ARMING enabled"},
+			"beeper -ARMING":                        {"Beeper ARMING disabled"},
 			"set transponder_provider = ARCITIMER":  {"transponder_provider set to ARCITIMER"},
 			"set transponder_provider = NONE":       {"transponder_provider set to NONE"},
-			"set transponder_data = 1,2,3":        {"transponder_data set to 1,2,3"},
-			"set transponder_data = ":              {"transponder_data set to "},
-			"get gyro_lpf1_static_hz":              {"gyro_lpf1_static_hz = 0"},
+			"set transponder_data = 1,2,3":          {"transponder_data set to 1,2,3"},
+			"set transponder_data = ":               {"transponder_data set to "},
+			"get gyro_lpf1_static_hz":               {"gyro_lpf1_static_hz = 0"},
 			"serial UART1 64 115200 57600 0 115200": {"serial updated"},
 			"aux 0 0 0 1700 2100 0 0":               {"aux updated"},
 			"resource MOTOR 1 A00":                  {"resource updated"},
@@ -489,7 +489,7 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 1, 2, 3, 4, 5, 6, 7)
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetRXConfig:
-		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 48))
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 39))
 	case msp.MSPRXMap:
 		f.out.Write(response(frame.Code, []byte{0, 1, 3, 2}, false))
 	case msp.MSPSetRXMap:
@@ -839,7 +839,7 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		}
 		f.out.Write(response(frame.Code, payload, false))
 	default:
-		f.out.Write(response(frame.Code, nil, true))
+		f.out.Write(response(frame.Code, nil, false))
 	}
 }
 

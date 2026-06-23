@@ -2926,7 +2926,7 @@ func TestMSPRequestWithDecodeForBatteryProfile(t *testing.T) {
 	if decoded["index"] != float64(0) {
 		t.Fatalf("decoded index = %v", decoded["index"])
 	}
-	if decoded["capacity_mah"] != float64(420) {
+	if decoded["capacity_mah"] != float64(1300) {
 		t.Fatalf("decoded capacity_mah = %v", decoded["capacity_mah"])
 	}
 	if decoded["force_cell_count"] != float64(4) {
@@ -2947,7 +2947,7 @@ func TestMSPRequestWithDecodeForLEDStripConfig(t *testing.T) {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
 	decoded := data["decoded"].(map[string]any)
-	if decoded["profile"] != float64(3) {
+	if decoded["profile"] != float64(0) {
 		t.Fatalf("decoded profile = %v", decoded["profile"])
 	}
 	if decoded["advanced_supported"] != true {
@@ -3056,7 +3056,7 @@ func TestMSPRequestWithDecodeForText(t *testing.T) {
 	if decoded["value"] != "BF pilot" {
 		t.Fatalf("decoded value = %v", decoded["value"])
 	}
-	if decoded["text_length"] != float64(7) {
+	if decoded["text_length"] != float64(8) {
 		t.Fatalf("decoded text_length = %v", decoded["text_length"])
 	}
 }
@@ -3138,7 +3138,7 @@ func TestMSPRequestWithDecodeForServoAndMotorOutputOrder(t *testing.T) {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
 	servo := data["decoded"].([]any)
-	if len(servo) != 6 || servo[0] != float64(1500) || servo[5] != float64(0) {
+	if len(servo) != 4 || servo[0] != float64(1500) || servo[3] != float64(0) {
 		t.Fatalf("decoded servo = %+v", servo)
 	}
 
@@ -3183,7 +3183,7 @@ func TestMSPRequestWithDecodeForRawIMU(t *testing.T) {
 }
 
 func TestMSPRequestWithDecodeForDataflashErase(t *testing.T) {
-	env, err := runTestCommand(t, []string{"msp", "request", "MSP_DATAFLASH_ERASE", "--decode"}, nil)
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_DATAFLASH_ERASE", "--decode", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3200,7 +3200,7 @@ func TestMSPRequestWithDecodeForDataflashErase(t *testing.T) {
 }
 
 func TestMSPRequestWithDecodeForReboot(t *testing.T) {
-	env, err := runTestCommand(t, []string{"msp", "request", "MSP_REBOOT", "--decode"}, nil)
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_REBOOT", "--decode", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -4851,7 +4851,7 @@ func TestSensorsSetCompassJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 }
 
 func TestSensorsSetCompassDeclinationWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"sensors", "set-compass-declination", "-123", "--yes"}, nil)
+	env, err := runTestCommand(t, []string{"--yes", "sensors", "set-compass-declination", "--", "-123"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

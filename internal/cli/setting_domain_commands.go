@@ -2033,15 +2033,17 @@ func (a *app) ratesSetProfileJSONCommand() *cobra.Command {
 }
 
 func parseRateProfileJSON(data []byte) (bfcommands.RateProfile, error) {
+	var wrapped struct {
+		RateProfile *bfcommands.RateProfile `json:"rate_profile"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.RateProfile{}, err
+	}
 	var profile bfcommands.RateProfile
-	if err := json.Unmarshal(data, &profile); err != nil {
-		var wrapped struct {
-			RateProfile bfcommands.RateProfile `json:"rate_profile"`
-		}
-		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
-			return bfcommands.RateProfile{}, err
-		}
-		profile = wrapped.RateProfile
+	if wrapped.RateProfile != nil {
+		profile = *wrapped.RateProfile
+	} else if err := json.Unmarshal(data, &profile); err != nil {
+		return bfcommands.RateProfile{}, err
 	}
 	if len(profile.Axes) != 3 {
 		return bfcommands.RateProfile{}, fmt.Errorf("rate profile must include exactly three axes")
@@ -2153,15 +2155,17 @@ func (a *app) filtersSetFilterJSONCommand() *cobra.Command {
 }
 
 func parseAdvancedConfigJSON(data []byte) (bfcommands.AdvancedConfig, error) {
+	var wrapped struct {
+		AdvancedConfig *bfcommands.AdvancedConfig `json:"advanced_config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.AdvancedConfig{}, err
+	}
 	var config bfcommands.AdvancedConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		var wrapped struct {
-			AdvancedConfig bfcommands.AdvancedConfig `json:"advanced_config"`
-		}
-		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
-			return bfcommands.AdvancedConfig{}, err
-		}
-		config = wrapped.AdvancedConfig
+	if wrapped.AdvancedConfig != nil {
+		config = *wrapped.AdvancedConfig
+	} else if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.AdvancedConfig{}, err
 	}
 	if config.DebugModeCount != 0 && config.DebugMode >= config.DebugModeCount {
 		return bfcommands.AdvancedConfig{}, fmt.Errorf("debug_mode must be lower than debug_mode_count")
@@ -2170,15 +2174,17 @@ func parseAdvancedConfigJSON(data []byte) (bfcommands.AdvancedConfig, error) {
 }
 
 func parseFilterConfigJSON(data []byte) (bfcommands.FilterConfig, error) {
+	var wrapped struct {
+		FilterConfig *bfcommands.FilterConfig `json:"filter_config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.FilterConfig{}, err
+	}
 	var config bfcommands.FilterConfig
-	if err := json.Unmarshal(data, &config); err != nil {
-		var wrapped struct {
-			FilterConfig bfcommands.FilterConfig `json:"filter_config"`
-		}
-		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
-			return bfcommands.FilterConfig{}, err
-		}
-		config = wrapped.FilterConfig
+	if wrapped.FilterConfig != nil {
+		config = *wrapped.FilterConfig
+	} else if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.FilterConfig{}, err
 	}
 	if err := bfcommands.ValidateFilterConfig(config); err != nil {
 		return bfcommands.FilterConfig{}, err

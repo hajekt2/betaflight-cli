@@ -503,8 +503,10 @@ func (c *Client) readUntil(ctx context.Context, want byte) error {
 		ctx = context.Background()
 	}
 	var deadline time.Time
+	contextDeadline := false
 	if d, ok := ctx.Deadline(); ok {
 		deadline = d
+		contextDeadline = true
 	} else {
 		deadline = time.Now().Add(c.timeout)
 	}
@@ -535,6 +537,9 @@ func (c *Client) readUntil(ctx context.Context, want byte) error {
 	}
 	if ctx.Err() != nil {
 		return mapContextError(ctx.Err())
+	}
+	if contextDeadline {
+		return &CodedError{Code: "context_deadline_exceeded", Message: context.DeadlineExceeded.Error()}
 	}
 	return fmt.Errorf("timed out waiting for byte 0x%02x", want)
 }

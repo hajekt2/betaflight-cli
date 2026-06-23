@@ -78,7 +78,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPServo:                  decodeVia(commands.DecodeU16Array),
 	msp.MSP2GetOSDWarnings:        decodeVia(commands.DecodeOSDWarnings),
 	msp.MSPMotor:                  decodeVia(commands.DecodeU16Array),
-	msp.MSP2MotorOutputReordering: decodeVia(commands.DecodeMotorOutputOrder),
+	msp.MSP2MotorOutputReordering: decodeUint8SliceVia(commands.DecodeMotorOutputOrder),
 	msp.MSPGPSConfig:              decodeVia(commands.DecodeGPSConfig),
 	msp.MSPRawGPS:                 decodeVia(commands.DecodeGPSPosition),
 	msp.MSPGPSRescue:              decodeVia(commands.DecodeGPSRescue),
@@ -141,6 +141,20 @@ func decodeStringSlice(fn func([]byte) []string) mspPayloadDecoder {
 func decodeByteSlice(fn func([]byte) []uint8) mspPayloadDecoder {
 	return func(payload []byte) (any, error) {
 		raw := fn(payload)
+		out := make([]any, len(raw))
+		for i, value := range raw {
+			out[i] = float64(value)
+		}
+		return out, nil
+	}
+}
+
+func decodeUint8SliceVia(fn func([]byte) ([]uint8, error)) mspPayloadDecoder {
+	return func(payload []byte) (any, error) {
+		raw, err := fn(payload)
+		if err != nil {
+			return nil, err
+		}
 		out := make([]any, len(raw))
 		for i, value := range raw {
 			out[i] = float64(value)

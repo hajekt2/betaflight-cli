@@ -836,6 +836,9 @@ func (a *app) planOrApplyCLIWithOperation(cmd *cobra.Command, lines []string, ki
 		"applied":   false,
 		"saved":     false,
 	}
+	if len(lines) == 1 {
+		plan["command_preview"] = lines[0]
+	}
 	if !flags.apply {
 		return a.render(output.Success(commandPath(cmd), nil, plan))
 	}

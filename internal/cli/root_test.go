@@ -261,6 +261,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
 	}
+	vtxList := byCommand["betaflight-cli vtx list"]
+	if vtxList["operation"] != "read_only" || vtxList["confirmation"] != "none" || vtxList["requires_connection"] != true || vtxList["runnable"] != true {
+		t.Fatalf("vtx list capability = %+v", vtxList)
+	}
 	mspRequest := byCommand["betaflight-cli msp request"]
 	if mspRequest["operation"] != "read_only" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "none" || mspRequest["runnable"] != true {
 		t.Fatalf("msp request capability = %+v", mspRequest)

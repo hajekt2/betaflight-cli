@@ -126,6 +126,7 @@ The object includes file sizes, header metadata, ordered header names, parsed fi
 `frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.
 `decoded_frames` is a capped best-effort sample decoder for simple variable-byte frame payloads and reports unsupported encodings or frame types instead of guessing.
 It also includes `streams`, a per-frame-field summary with count, first, last, min, max, delta, monotonicity, and last byte offset for decoded samples.
+`decoded_frames.groups` classifies recognized stream names into typed buckets such as timing, gyro, accelerometer, motors, RC command, setpoint, PID, attitude, battery, and radio link.
 The marker counts and candidate frame index are approximate until full binary frame decoding covers every Blackbox encoding.
 
 `capabilities` returns a `capabilities` object without connecting to hardware.

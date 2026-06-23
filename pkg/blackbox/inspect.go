@@ -67,6 +67,7 @@ type DecodedFrameSummary struct {
 	UnsupportedFrameTypes map[string]int         `json:"unsupported_frame_types,omitempty"`
 	ByType                map[string]DecodedStat `json:"by_type"`
 	Streams               map[string]StreamStat  `json:"streams,omitempty"`
+	Groups                map[string]StreamGroup `json:"groups,omitempty"`
 	Samples               []DecodedFrame         `json:"samples,omitempty"`
 	Warnings              []string               `json:"warnings,omitempty"`
 }
@@ -96,6 +97,12 @@ type StreamStat struct {
 	Delta      int    `json:"delta"`
 	Monotonic  bool   `json:"monotonic"`
 	LastOffset int64  `json:"last_offset"`
+}
+
+type StreamGroup struct {
+	Name    string       `json:"name"`
+	Fields  []string     `json:"fields"`
+	Streams []StreamStat `json:"streams"`
 }
 
 func Inspect(r io.Reader) (Inspection, error) {
@@ -350,6 +357,8 @@ func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDe
 	}
 	if len(out.Streams) == 0 {
 		out.Streams = nil
+	} else {
+		out.Groups = groupStreams(out.Streams)
 	}
 	for frameType, stat := range out.ByType {
 		if stat.Failed > 0 {
@@ -358,6 +367,73 @@ func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDe
 	}
 	sort.Strings(out.Warnings)
 	return out
+}
+
+func groupStreams(streams map[string]StreamStat) map[string]StreamGroup {
+	groups := map[string]StreamGroup{}
+	keys := make([]string, 0, len(streams))
+	for key := range streams {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		stat := streams[key]
+		groupName := classifyStreamField(stat.Field)
+		if groupName == "" {
+			continue
+		}
+		group := groups[groupName]
+		if group.Name == "" {
+			group.Name = groupName
+		}
+		group.Fields = append(group.Fields, stat.Field)
+		group.Streams = append(group.Streams, stat)
+		groups[groupName] = group
+	}
+	if len(groups) == 0 {
+		return nil
+	}
+	for name, group := range groups {
+		sort.Strings(group.Fields)
+		sort.Slice(group.Streams, func(i, j int) bool {
+			if group.Streams[i].FrameType == group.Streams[j].FrameType {
+				return group.Streams[i].Field < group.Streams[j].Field
+			}
+			return group.Streams[i].FrameType < group.Streams[j].FrameType
+		})
+		groups[name] = group
+	}
+	return groups
+}
+
+func classifyStreamField(field string) string {
+	normalized := strings.ToLower(field)
+	switch {
+	case normalized == "time" || normalized == "looptime" || normalized == "loopiteration" || strings.Contains(normalized, "iteration"):
+		return "timing"
+	case strings.HasPrefix(normalized, "gyro") || strings.Contains(normalized, "gyro"):
+		return "gyro"
+	case strings.HasPrefix(normalized, "acc") || strings.Contains(normalized, "accsmooth"):
+		return "accelerometer"
+	case strings.HasPrefix(normalized, "motor") || strings.HasPrefix(normalized, "motor["):
+		return "motors"
+	case strings.HasPrefix(normalized, "rccommand") || strings.HasPrefix(normalized, "rccommands") || strings.HasPrefix(normalized, "rccommand["):
+		return "rc_command"
+	case strings.HasPrefix(normalized, "setpoint"):
+		return "setpoint"
+	case strings.HasPrefix(normalized, "axisp") || strings.HasPrefix(normalized, "axisi") || strings.HasPrefix(normalized, "axisd") || strings.HasPrefix(normalized, "axisf"):
+		return "pid"
+	case strings.HasPrefix(normalized, "pid"):
+		return "pid"
+	case strings.HasPrefix(normalized, "attitude") || strings.Contains(normalized, "heading"):
+		return "attitude"
+	case strings.Contains(normalized, "vbat") || strings.Contains(normalized, "amperage") || strings.Contains(normalized, "current") || strings.Contains(normalized, "mah"):
+		return "battery"
+	case strings.Contains(normalized, "rssi") || strings.Contains(normalized, "linkquality") || strings.Contains(normalized, "rxsignal"):
+		return "radio_link"
+	default:
+		return ""
+	}
 }
 
 func (out *DecodedFrameSummary) recordStreams(frame DecodedFrame) {

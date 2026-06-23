@@ -949,6 +949,10 @@ func TestBlackboxInspectDoesNotConnect(t *testing.T) {
 	if streams["I.time"] == nil {
 		t.Fatalf("streams = %+v", streams)
 	}
+	groups := decoded["groups"].(map[string]any)
+	if groups["timing"] == nil {
+		t.Fatalf("groups = %+v", groups)
+	}
 	if called {
 		t.Fatal("connector was called for offline blackbox inspect")
 	}

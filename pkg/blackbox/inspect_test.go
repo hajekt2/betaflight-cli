@@ -58,13 +58,13 @@ func TestInspectHeaderAndFieldDefinitions(t *testing.T) {
 func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
 	log := strings.Join([]string{
 		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
-		"H Field I name:loopIteration,time,axisP[0]",
-		"H Field I signed:0,0,1",
-		"H Field I predictor:6,0,0",
-		"H Field I encoding:1,1,1",
-		"H Field P predictor:0,10,0",
-		"H Field P encoding:1,1,1",
-		"I\x02\x04\x03P\x06\x08\x04P\x07\x0a\x06E",
+		"H Field I name:loopIteration,time,axisP[0],gyroADC[0],motor[0]",
+		"H Field I signed:0,0,1,1,0",
+		"H Field I predictor:6,0,0,0,0",
+		"H Field I encoding:1,1,1,1,1",
+		"H Field P predictor:0,10,0,0,0",
+		"H Field P encoding:1,1,1,1,1",
+		"I\x02\x04\x03\x05\x64P\x06\x08\x04\x06\x65P\x07\x0a\x06\x08\x66E",
 	}, "\n")
 	inspection, err := Inspect(strings.NewReader(log))
 	if err != nil {
@@ -78,11 +78,11 @@ func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
 		t.Fatalf("samples = %+v", decoded.Samples)
 	}
 	first := decoded.Samples[0]
-	if first.Type != "I" || first.Values["loopIteration"] != 2 || first.Values["time"] != 4 || first.Values["axisP[0]"] != -2 {
+	if first.Type != "I" || first.Values["loopIteration"] != 2 || first.Values["time"] != 4 || first.Values["axisP[0]"] != -2 || first.Values["gyroADC[0]"] != -3 || first.Values["motor[0]"] != 100 {
 		t.Fatalf("first sample = %+v", first)
 	}
 	second := decoded.Samples[1]
-	if second.Type != "P" || second.Values["loopIteration"] != 6 || second.Values["time"] != 8 || second.Values["axisP[0]"] != 2 {
+	if second.Type != "P" || second.Values["loopIteration"] != 6 || second.Values["time"] != 8 || second.Values["axisP[0]"] != 2 || second.Values["gyroADC[0]"] != 3 || second.Values["motor[0]"] != 101 {
 		t.Fatalf("second sample = %+v", second)
 	}
 	iTime := decoded.Streams["I.time"]
@@ -96,6 +96,12 @@ func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
 	pTime := decoded.Streams["P.time"]
 	if pTime.Count != 2 || pTime.First != 8 || pTime.Last != 10 || pTime.Delta != 2 || !pTime.Monotonic {
 		t.Fatalf("P.time stream = %+v", pTime)
+	}
+	groups := decoded.Groups
+	for _, group := range []string{"gyro", "motors", "pid", "timing"} {
+		if groups[group].Name != group || len(groups[group].Streams) == 0 {
+			t.Fatalf("group %s = %+v", group, groups[group])
+		}
 	}
 }
 

@@ -128,6 +128,19 @@ The generated diff should make these changes visible:
 - Changed lookup table.
 - Changed scope.
 
+## CLI Safety Classification Updates
+
+Update `internal/cli/cli_classification.go` whenever Betaflight CLI behavior changes for high-frequency commands.
+
+This registry controls:
+
+- how `cli exec` classifies lines as read-only, write, or dangerous
+- which write-classified verbs are allowed in batch plans
+- the default confirmation requirements enforced by `planOrApply`/batch validation flows
+
+Keep this map in sync with any new `settings`/Configurator-driven write patterns.
+If classification changes, add a focused unit test in `internal/cli/root_test.go` and check that `capabilities` outputs still match your safety model.
+
 If the generator cannot resolve a macro-backed range, it should mark the range unresolved instead of inventing a value.
 Human review can then decide whether to add a resolver.
 The first generator extracts literal setting names, `PARAM_NAME_*` names from `parameter_names.h`, value type, scope, mode, parameter group, source line, numeric ranges, macro range expressions, bit positions, string length bounds, and simple lookup tables.

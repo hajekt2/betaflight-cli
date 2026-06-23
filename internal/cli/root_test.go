@@ -26,14 +26,17 @@ func TestClassifyCLI(t *testing.T) {
 		{"diff all", cliReadOnly},
 		{"dump all", cliReadOnly},
 		{"get gyro_lpf1_static_hz", cliReadOnly},
+		{"help", cliReadOnly},
 		{"resource", cliReadOnly},
 		{"resource show", cliReadOnly},
 		{"resource list", cliReadOnly},
 		{"resource serialrx 1 A06", cliWrite},
 		{"set gyro_lpf1_static_hz = 0", cliWrite},
+		{"beeper 1", cliDangerous},
 		{"save", cliDangerous},
 		{"defaults", cliDangerous},
 		{"motor 0 1000", cliDangerous},
+		{"    ", cliReadOnly},
 	}
 	for _, tt := range tests {
 		if got := classifyCLI(tt.command); got != tt.want {
@@ -51,6 +54,10 @@ func TestIsBatchAllowed(t *testing.T) {
 		"diff all":           false,
 		"reboot":             false,
 		"feature GPS":        true,
+		"beeper 1":           true,
+		"map 1 2 3":          true,
+		"timer 2":            true,
+		"dma 1":              true,
 	}
 	for line, want := range tests {
 		if got := isBatchAllowed(line); got != want {

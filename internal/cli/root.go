@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/hajekt2/betaflight-cli/internal/batch"
 	"github.com/hajekt2/betaflight-cli/internal/bfconfig"
 	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
 	"github.com/hajekt2/betaflight-cli/internal/connection"
@@ -534,6 +535,7 @@ func (a *app) statusCommand() *cobra.Command {
 
 func (a *app) configurationCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "configuration", Short: "Inspect configuration state and write readiness"}
+	cmd.AddCommand(a.configurationValidateCommand())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "status",
 		Short: "Read configuration state, profiles, arming blockers, and write guidance",
@@ -564,6 +566,93 @@ func (a *app) configurationCommand() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func (a *app) configurationValidateCommand() *cobra.Command {
+	var file string
+	var includeDefaults bool
+	cmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Validate Betaflight CLI configuration text without connecting",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			data, err := a.readInput(file)
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_error", err.Error()))
+			}
+			lines := strings.Split(string(data), "\n")
+			doc := bfconfig.Parse(lines, settings.DefaultRegistry)
+			result := map[string]any{
+				"source_format":     "cli_text",
+				"line_count":        countNonEmptyInputLines(lines),
+				"section_counts":    countConfigurationSections(doc.Sections),
+				"unknown_count":     len(doc.Unknown),
+				"unknown_settings":  countUnknownConfigurationSettings(doc.Settings),
+				"document":          doc,
+				"include_defaults":  includeDefaults,
+				"raw_authoritative": true,
+			}
+			validation := map[string]any{
+				"valid":  true,
+				"errors": []output.Error{},
+			}
+			imported, err := batch.ImportCLI(data, batch.ImportOptions{
+				Kind:            "configuration_validation",
+				SourceFormat:    "cli_text",
+				IncludeDefaults: includeDefaults,
+			})
+			if err != nil {
+				validation["valid"] = false
+				validation["errors"] = []output.Error{{Code: "validation_error", Message: err.Error()}}
+			} else {
+				result["plan"] = imported.Plan
+				result["skipped_lines"] = imported.Skipped
+				if env, ok := a.validateChangePlan(cmd, imported.Plan, planValidationOptions{allowDefaultsNoSave: includeDefaults}); !ok {
+					validation["valid"] = false
+					validation["errors"] = env.Errors
+				}
+			}
+			if len(doc.Unknown) > 0 || countUnknownConfigurationSettings(doc.Settings) > 0 {
+				validation["review_required"] = true
+			} else {
+				validation["review_required"] = validation["valid"] == false
+			}
+			result["validation"] = validation
+			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+				"configuration_validation": result,
+			}))
+		},
+	}
+	cmd.Flags().StringVar(&file, "file", "-", "configuration text file path, or - for stdin")
+	cmd.Flags().BoolVar(&includeDefaults, "include-defaults", false, "include exact defaults nosave lines in validation")
+	return cmd
+}
+
+func countNonEmptyInputLines(lines []string) int {
+	count := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) != "" {
+			count++
+		}
+	}
+	return count
+}
+
+func countConfigurationSections(sections map[string][]string) map[string]int {
+	counts := map[string]int{}
+	for name, lines := range sections {
+		counts[name] = len(lines)
+	}
+	return counts
+}
+
+func countUnknownConfigurationSettings(settings []bfconfig.Setting) int {
+	count := 0
+	for _, setting := range settings {
+		if !setting.Known {
+			count++
+		}
+	}
+	return count
 }
 
 func (a *app) tasksCommand() *cobra.Command {

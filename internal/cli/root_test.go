@@ -237,6 +237,57 @@ func TestConfigurationSnapshotWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestConfigurationValidateDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"configuration", "validate"}, "# version\nbatch start\nfeature GPS\nset gyro_lpf1_static_hz = 0\nsave\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for configuration validate")
+	}
+	data := env.Data.(map[string]any)
+	validation := data["configuration_validation"].(map[string]any)
+	result := validation["validation"].(map[string]any)
+	if result["valid"] != true || result["review_required"] != false {
+		t.Fatalf("validation = %+v", result)
+	}
+	skipped := validation["skipped_lines"].([]any)
+	if len(skipped) != 3 {
+		t.Fatalf("skipped = %+v", skipped)
+	}
+	plan := validation["plan"].(map[string]any)
+	lines := plan["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "feature GPS" {
+		t.Fatalf("plan = %+v", plan)
+	}
+}
+
+func TestConfigurationValidateReportsDangerousLine(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"configuration", "validate"}, "reboot\nfeature GPS\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	validation := data["configuration_validation"].(map[string]any)["validation"].(map[string]any)
+	if validation["valid"] != false {
+		t.Fatalf("validation = %+v", validation)
+	}
+	errors := validation["errors"].([]any)
+	if len(errors) != 1 || errors[0].(map[string]any)["code"] != "dangerous_action_blocked" {
+		t.Fatalf("errors = %+v", errors)
+	}
+}
+
 func TestTasksStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"tasks", "status"}, nil)
 	if err != nil {

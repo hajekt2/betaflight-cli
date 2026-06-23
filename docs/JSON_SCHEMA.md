@@ -182,6 +182,9 @@ Parsed documents classify Betaflight import metadata and common CLI families suc
 The `timers` and `dma` arrays include decoded assignment fields plus the original raw line for restore fidelity.
 The `mixer`, `mmix`, and `map` arrays include decoded mixer names, custom motor mix coefficients, RC order, and the original raw line.
 
+`configuration validate` returns a `configuration_validation` object built from local Betaflight CLI text without opening a serial connection.
+The object includes the parsed document, section counts, unknown line and unknown setting counts, restore-import skipped lines, the normalized change plan, and a `validation` object with `valid`, `review_required`, and structured errors.
+
 `tasks status` returns a `tasks` object parsed from the Betaflight `tasks` CLI command.
 The object includes raw lines, parsed task rows, optional check-function stats, optional total load, parser warnings, and a `task_stats_reset` side effect because Betaflight resets max task execution statistics after printing them.
 

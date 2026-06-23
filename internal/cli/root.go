@@ -3219,7 +3219,11 @@ func (a *app) mspCommand() *cobra.Command {
 					"length":         len(frame.Payload),
 				})
 				if op != connection.ReadOnly {
-					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "raw_msp", Detail: "raw MSP write-like command sent"})
+					detail := "raw MSP write-like command sent"
+					if unknownCommand {
+						detail = "raw MSP command without compiled metadata sent"
+					}
+					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "raw_msp", Detail: detail})
 				}
 				if decodePayload {
 					decoded, supported, decodeErr := decodeMSPPayload(code, frame.Payload)

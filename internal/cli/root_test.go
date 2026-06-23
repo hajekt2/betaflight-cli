@@ -3149,6 +3149,9 @@ func TestMSPRequestNumericFallbackUsesCodeName(t *testing.T) {
 	if _, ok := data["command_source"].(string); !ok || data["command_source"] != "" {
 		t.Fatalf("command_source = %+v", data["command_source"])
 	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "raw_msp" || !strings.Contains(env.SideEffects[0].Detail, "without compiled metadata") {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
 }
 
 func TestMSPRequestWithDecodeReturnsStructuredPayload(t *testing.T) {

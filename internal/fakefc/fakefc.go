@@ -617,6 +617,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 1000)
 		payload = append(payload, 4, 14, 1, 1)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetMotorConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 8))
 	case msp.MSPMotor:
 		payload := appendU16(nil, 1000)
 		payload = appendU16(payload, 1001)

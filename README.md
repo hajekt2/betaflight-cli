@@ -76,6 +76,7 @@ betaflight-cli sensors calibrate-magnetometer --port /dev/tty.usbmodem01 --yes
 betaflight-cli beeper config --port /dev/tty.usbmodem01
 betaflight-cli mixer status --port /dev/tty.usbmodem01
 betaflight-cli motors status --port /dev/tty.usbmodem01
+betaflight-cli motors set-config 2000 1000 14 1 --port /dev/tty.usbmodem01 --yes
 betaflight-cli motors set-3d-config 1406 1514 1460 --port /dev/tty.usbmodem01 --yes
 betaflight-cli motors test-plan --motor 0 --value 1050 --duration 1s --props-off --battery-aware
 betaflight-cli motors test-apply --motor 0 --value 1050 --duration 1s --props-off --battery-aware --yes --port /dev/tty.usbmodem01
@@ -208,6 +209,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `transponder config` reads IR transponder provider requirements, active provider, code bytes, hex data, and native CLI commands over MSP.
 `mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
+`motors set-config` writes max throttle, min command, motor pole count, and DShot telemetry through `MSP_SET_MOTOR_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `motors set-3d-config` writes 3D deadband low, deadband high, and neutral values through `MSP_SET_MOTOR_3D_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `motors test-plan` builds an offline high-risk motor output plan with bounded value and duration, required confirmations, and preflight checks.
 It never connects to hardware.

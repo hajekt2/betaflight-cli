@@ -26,6 +26,21 @@ type MotorConfig struct {
 	UseESCSensor          *bool  `json:"use_esc_sensor,omitempty"`
 }
 
+type MotorConfigSetConfig struct {
+	MaxThrottle       uint16 `json:"max_throttle"`
+	MinCommand        uint16 `json:"min_command"`
+	MotorPoles        uint8  `json:"motor_poles"`
+	UseDShotTelemetry bool   `json:"use_dshot_telemetry"`
+}
+
+type MotorConfigSetResult struct {
+	Config       MotorConfigSetConfig `json:"config"`
+	MSPCode      uint16               `json:"msp_code"`
+	MSPName      string               `json:"msp_name"`
+	Acknowledged bool                 `json:"acknowledged"`
+	SaveRequired bool                 `json:"save_required"`
+}
+
 type MotorTelemetry struct {
 	Index             int     `json:"index"`
 	RPM               uint32  `json:"rpm"`
@@ -141,6 +156,27 @@ func ReadServoStatus(ctx context.Context, client *connection.Client) (*ServoStat
 	return status, warnings, nil
 }
 
+func SetMotorConfig(ctx context.Context, client *connection.Client, config MotorConfigSetConfig) (*MotorConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetMotorConfig, EncodeMotorConfig(config)); err != nil {
+		return nil, fmt.Errorf("motor config request failed: %w", err)
+	}
+	return &MotorConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetMotorConfig,
+		MSPName:      "MSP_SET_MOTOR_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeMotorConfig(config MotorConfigSetConfig) []byte {
+	payload := appendU16Payload(nil, 0)
+	payload = appendU16Payload(payload, config.MaxThrottle)
+	payload = appendU16Payload(payload, config.MinCommand)
+	payload = append(payload, config.MotorPoles, motorBoolByte(config.UseDShotTelemetry))
+	return payload
+}
+
 func SetMotor3DConfig(ctx context.Context, client *connection.Client, config Motor3DConfig) (*Motor3DConfigSetResult, error) {
 	if _, err := client.Request(ctx, msp.MSPSetMotor3dConfig, EncodeMotor3DConfig(config)); err != nil {
 		return nil, fmt.Errorf("motor 3d config request failed: %w", err)
@@ -163,6 +199,13 @@ func EncodeMotor3DConfig(config Motor3DConfig) []byte {
 
 func appendU16Payload(dst []byte, value uint16) []byte {
 	return append(dst, byte(value), byte(value>>8))
+}
+
+func motorBoolByte(value bool) byte {
+	if value {
+		return 1
+	}
+	return 0
 }
 
 func DecodeMotorConfig(payload []byte) (*MotorConfig, error) {

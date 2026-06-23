@@ -673,10 +673,59 @@ func (a *app) motorsCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(a.motorConfigCommand())
 	cmd.AddCommand(a.motor3DConfigCommand())
 	cmd.AddCommand(a.motorTestPlanCommand())
 	cmd.AddCommand(a.motorTestApplyCommand())
 	return cmd
+}
+
+func (a *app) motorConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config MAX_THROTTLE MIN_COMMAND MOTOR_POLES USE_DSHOT_TELEMETRY",
+		Short: "Set motor configuration through MSP_SET_MOTOR_CONFIG",
+		Args:  cobra.ExactArgs(4),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			maxThrottle, err := parseUint16Arg("max_throttle", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			minCommand, err := parseUint16Arg("min_command", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			motorPoles, err := parseUint8Arg("motor_poles", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			useDShotTelemetry, err := parseBoolFlagArg("use_dshot_telemetry", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "motor configuration changes motor settings; pass --yes"))
+			}
+			config := bfcommands.MotorConfigSetConfig{
+				MaxThrottle:       maxThrottle,
+				MinCommand:        minCommand,
+				MotorPoles:        motorPoles,
+				UseDShotTelemetry: useDShotTelemetry,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetMotorConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"motor_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "motor_config",
+					Command: "MSP_SET_MOTOR_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) motor3DConfigCommand() *cobra.Command {

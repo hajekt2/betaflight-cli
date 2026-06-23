@@ -27,6 +27,15 @@ func TestDecodeMotorConfigAndOutputs(t *testing.T) {
 	if len(outputs) != 2 || outputs[0] != 1000 || outputs[1] != 1001 {
 		t.Fatalf("outputs = %+v", outputs)
 	}
+	motorConfigPayload := EncodeMotorConfig(MotorConfigSetConfig{
+		MaxThrottle:       2000,
+		MinCommand:        1000,
+		MotorPoles:        14,
+		UseDShotTelemetry: true,
+	})
+	if !bytes.Equal(motorConfigPayload, []byte{0, 0, 0xd0, 0x07, 0xe8, 0x03, 14, 1}) {
+		t.Fatalf("motor config payload = %v", motorConfigPayload)
+	}
 }
 
 func TestDecodeMotorTelemetry(t *testing.T) {

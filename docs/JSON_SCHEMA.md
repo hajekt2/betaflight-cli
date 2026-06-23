@@ -302,6 +302,8 @@ The object includes the mixer mode ID, CLI mixer name, display name, expected mo
 
 `motors status` returns a `motors` object decoded from `MSP_MOTOR_CONFIG`, `MSP_MOTOR`, `MSP_MOTOR_TELEMETRY`, `MSP_MOTOR_3D_CONFIG`, and `MSP2_MOTOR_OUTPUT_REORDERING`.
 The object includes motor configuration, current motor outputs, telemetry values with raw and scaled units, 3D motor config, and output reordering.
+`motors set-config` returns a `motor_config` object with max throttle, min command, motor pole count, DShot telemetry flag, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful motor config writes include a `motor_config` side effect.
 `motors set-3d-config` returns a `motor_3d_config` object with deadband low, deadband high, neutral, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful 3D motor config writes include a `motor_3d_config` side effect.
 `motors test-plan` returns a `motor_test_plan` object without connecting to hardware.

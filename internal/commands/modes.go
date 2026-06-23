@@ -49,6 +49,14 @@ type modeRangeExtra struct {
 	HasLinked bool
 }
 
+type ModeRangeSetResult struct {
+	Range        ModeRange `json:"range"`
+	MSPCode      uint16    `json:"msp_code"`
+	MSPName      string    `json:"msp_name"`
+	Acknowledged bool      `json:"acknowledged"`
+	SaveRequired bool      `json:"save_required"`
+}
+
 func ReadModeConfiguration(ctx context.Context, client *connection.Client) (*ModeConfiguration, []string, error) {
 	definitions, err := readModeDefinitions(ctx, client)
 	if err != nil {
@@ -82,6 +90,55 @@ func ReadModeConfiguration(ctx context.Context, client *connection.Client) (*Mod
 		}
 	}
 	return &ModeConfiguration{Definitions: definitions, Ranges: ranges}, warnings, nil
+}
+
+func SetModeRange(ctx context.Context, client *connection.Client, row ModeRange) (*ModeRangeSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetModeRange, EncodeModeRange(row)); err != nil {
+		return nil, fmt.Errorf("mode range request failed: %w", err)
+	}
+	normalized := ModeRange{
+		Index:           row.Index,
+		ID:              row.ID,
+		AuxChannelIndex: row.AuxChannelIndex,
+		AuxChannelName:  fmt.Sprintf("AUX%d", row.AuxChannelIndex+1),
+		Range: StepRange{
+			StartStep: row.Range.StartStep,
+			EndStep:   row.Range.EndStep,
+			StartUS:   stepToMicroseconds(row.Range.StartStep),
+			EndUS:     stepToMicroseconds(row.Range.EndStep),
+		},
+		Active: row.Range.StartStep != 0 || row.Range.EndStep != 0,
+	}
+	if row.ModeLogic != nil {
+		logic := *row.ModeLogic
+		normalized.ModeLogic = &logic
+		normalized.ModeLogicName = modeLogicName(logic)
+	}
+	if row.LinkedTo != nil {
+		linkedTo := *row.LinkedTo
+		normalized.LinkedTo = &linkedTo
+	}
+	return &ModeRangeSetResult{
+		Range:        normalized,
+		MSPCode:      msp.MSPSetModeRange,
+		MSPName:      "MSP_SET_MODE_RANGE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeModeRange(row ModeRange) []byte {
+	payload := []byte{
+		byte(row.Index),
+		row.ID,
+		row.AuxChannelIndex,
+		row.Range.StartStep,
+		row.Range.EndStep,
+	}
+	if row.ModeLogic != nil && row.LinkedTo != nil {
+		payload = append(payload, *row.ModeLogic, *row.LinkedTo)
+	}
+	return payload
 }
 
 func readModeDefinitions(ctx context.Context, client *connection.Client) ([]ModeDefinition, error) {

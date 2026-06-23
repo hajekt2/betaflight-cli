@@ -189,6 +189,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
+`modes set-range` writes one AUX mode range through `MSP_SET_MODE_RANGE` using step values, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver status` reads receiver configuration, channel map, RSSI channel, RC deadband, RX failsafe rows, and live RC channels over MSP.
 `receiver set-rssi-channel` writes the RSSI channel through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-deadband` writes RC deadband, yaw deadband, position-hold deadband, and 3D throttle deadband through `MSP_SET_RC_DEADBAND`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

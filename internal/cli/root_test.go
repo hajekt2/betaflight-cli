@@ -387,6 +387,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if motor3DConfig["operation"] != "write" || motor3DConfig["confirmation"] != "--yes" || motor3DConfig["requires_connection"] != true || motor3DConfig["output_root"] != "motor_3d_config" || motor3DConfig["runnable"] != true {
 		t.Fatalf("motor 3d config capability = %+v", motor3DConfig)
 	}
+	modeRange := byCommand["betaflight-cli modes set-range"]
+	if modeRange["operation"] != "write" || modeRange["confirmation"] != "--yes" || modeRange["requires_connection"] != true || modeRange["output_root"] != "mode_range" || modeRange["runnable"] != true {
+		t.Fatalf("mode range capability = %+v", modeRange)
+	}
 	ledValues := byCommand["betaflight-cli leds set-values"]
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
 		t.Fatalf("led values capability = %+v", ledValues)
@@ -2906,6 +2910,52 @@ func TestModesActiveWithFakeFC(t *testing.T) {
 	beeperMute := ranges[1].(map[string]any)
 	if beeperMute["name"] != "BEEPER MUTE" || beeperMute["mode_logic_name"] != "AND" || beeperMute["linked_to_name"] != "READY" {
 		t.Fatalf("beeper mute range = %+v", beeperMute)
+	}
+}
+
+func TestModesSetRangeWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"modes", "set-range", "1", "52", "2", "16", "32", "1", "53", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["mode_range"].(map[string]any)
+	row := result["range"].(map[string]any)
+	rangeData := row["range"].(map[string]any)
+	if row["index"] != float64(1) || row["mode_logic_name"] != "AND" || row["linked_to"] != float64(53) || rangeData["start_us"] != float64(1300) || result["save_required"] != true {
+		t.Fatalf("mode_range = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_MODE_RANGE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestModesSetRangeRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"modes", "set-range", "1", "52", "2", "16", "32"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestModesSetRangeValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"modes", "set-range", "1", "52", "2", "16", "300", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

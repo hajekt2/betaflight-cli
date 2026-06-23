@@ -42,3 +42,39 @@ func TestDecodeModeRangeExtras(t *testing.T) {
 		t.Fatalf("extras = %+v", extras)
 	}
 }
+
+func TestEncodeModeRange(t *testing.T) {
+	payload := EncodeModeRange(ModeRange{
+		Index:           1,
+		ID:              52,
+		AuxChannelIndex: 2,
+		Range: StepRange{
+			StartStep: 16,
+			EndStep:   32,
+		},
+	})
+	want := []byte{1, 52, 2, 16, 32}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
+func TestEncodeModeRangeWithExtras(t *testing.T) {
+	logic := uint8(1)
+	linkedTo := uint8(53)
+	payload := EncodeModeRange(ModeRange{
+		Index:           1,
+		ID:              52,
+		AuxChannelIndex: 2,
+		Range: StepRange{
+			StartStep: 16,
+			EndStep:   32,
+		},
+		ModeLogic: &logic,
+		LinkedTo:  &linkedTo,
+	})
+	want := []byte{1, 52, 2, 16, 32, 1, 53}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

@@ -449,6 +449,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 	case msp.MSPModeRangesExtra:
 		payload := []byte{3, 0, 0, 0, 52, 1, 53, 0, 0, 0}
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetModeRange:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 5 && len(frame.Payload) != 7))
 	case msp.MSPAdjustmentRanges:
 		payload := []byte{0, 0, 0, 16, 12, 0}
 		payload = appendU16(payload, 1500)

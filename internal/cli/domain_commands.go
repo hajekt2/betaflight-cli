@@ -140,8 +140,80 @@ func (a *app) modesCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set)
+	cmd.AddCommand(set, a.modeSetRangeCommand())
 	return cmd
+}
+
+func (a *app) modeSetRangeCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-range INDEX MODE_ID AUX_CHANNEL START_STEP END_STEP [LOGIC LINKED_TO]",
+		Short: "Set one AUX mode range over MSP",
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) != 5 && len(args) != 7 {
+				return fmt.Errorf("accepts 5 or 7 arg(s), received %d", len(args))
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			modeID, err := parseUint8Arg("mode_id", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			aux, err := parseUint8Arg("aux_channel", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			start, err := parseUint8Arg("start_step", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			end, err := parseUint8Arg("end_step", args[4])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			row := bfcommands.ModeRange{
+				Index:           int(index),
+				ID:              modeID,
+				AuxChannelIndex: aux,
+				Range: bfcommands.StepRange{
+					StartStep: start,
+					EndStep:   end,
+				},
+			}
+			if len(args) == 7 {
+				logic, err := parseUint8Arg("logic", args[5])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				linkedTo, err := parseUint8Arg("linked_to", args[6])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				row.ModeLogic = &logic
+				row.LinkedTo = &linkedTo
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "mode range changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetModeRange(cmd.Context(), client, row)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"mode_range": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "mode_range",
+					Command: "MSP_SET_MODE_RANGE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) resourcesCommand() *cobra.Command {

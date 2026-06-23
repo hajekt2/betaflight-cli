@@ -88,6 +88,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.portsCommand())
 	root.AddCommand(a.doctorCommand())
 	root.AddCommand(a.infoCommand())
+	root.AddCommand(a.firmwareCommand())
 	root.AddCommand(a.textCommand())
 	root.AddCommand(a.statusCommand())
 	root.AddCommand(a.systemCommand())
@@ -397,6 +398,25 @@ func (a *app) infoCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) firmwareCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "firmware", Short: "Inspect firmware, target, and metadata support"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read firmware identity, target metadata, and support policy",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				firmware, warnings := bfcommands.ReadFirmwareStatus(cmd.Context(), client)
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"firmware": firmware,
+				})
+				addStringWarnings(&env, warnings)
+				return env
+			})
+		},
+	})
+	return cmd
 }
 
 func (a *app) textCommand() *cobra.Command {

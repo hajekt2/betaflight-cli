@@ -41,6 +41,7 @@ Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of sc
 betaflight-cli ports list
 betaflight-cli doctor
 betaflight-cli info --port /dev/tty.usbmodem01
+betaflight-cli firmware status --port /dev/tty.usbmodem01
 betaflight-cli text status --port /dev/tty.usbmodem01
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01
@@ -110,6 +111,7 @@ If multiple Betaflight-compatible devices answer the handshake, the command shou
 Configurator parity should be exposed as focused command families rather than one giant command.
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
 `info` reads firmware, board, MCU, device UID, build, build option, configuration state, gyro sample rate, and legacy craft-name identity fields over MSP.
+`firmware status` reads firmware identity, target metadata, build metadata, support-policy status, and compiled settings metadata details over MSP.
 The current CLI includes first domain commands for features, serial ports, AUX modes, resources, and profile selectors.
 These commands read from parsed `dump all` output and use Betaflight CLI text lines for plan/apply writes.
 `features status` reads the active feature mask over MSP and returns decoded feature names with a bit catalog for agent reasoning.

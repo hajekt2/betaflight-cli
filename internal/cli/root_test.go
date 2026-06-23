@@ -307,6 +307,41 @@ func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	}
 }
 
+func TestFirmwareStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"firmware", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	firmware := data["firmware"].(map[string]any)
+	if firmware["variant"] != "BTFL" || firmware["version"] != "2025.12.1" || firmware["msp_api"] != "1.48" {
+		t.Fatalf("firmware identity = %+v", firmware)
+	}
+	support := firmware["support"].(map[string]any)
+	if support["supported"] != true || support["policy"] != "official Betaflight 2025.12.x and newer" {
+		t.Fatalf("support = %+v", support)
+	}
+	target := firmware["target"].(map[string]any)
+	if target["target_name"] != "STM32F405" || target["board_name"] != "FAKEF405" {
+		t.Fatalf("target = %+v", target)
+	}
+	metadata := firmware["metadata"].(map[string]any)
+	if metadata["settings_source_firmware"] != "2025.12.0" || metadata["settings_count"].(float64) < 100 {
+		t.Fatalf("metadata = %+v", metadata)
+	}
+	capabilities := firmware["capabilities"].(map[string]any)
+	if capabilities["sample_rate_hz"] != float64(8000) {
+		t.Fatalf("capabilities = %+v", capabilities)
+	}
+	identity := firmware["identity"].(map[string]any)
+	if identity["configurator_uid"] != "123456789abcdef42" || identity["configuration_state_name"] != "CONFIGURED" {
+		t.Fatalf("identity = %+v", identity)
+	}
+}
+
 func TestTextStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"text", "status"}, nil)
 	if err != nil {

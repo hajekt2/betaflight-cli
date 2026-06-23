@@ -28,7 +28,7 @@ func (a *app) vtxTableCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.vtxTableSetJSONCommand(), a.vtxTableSetBandCommand(), a.vtxTableSetPowerCommand())
+	cmd.AddCommand(set, a.vtxTableSetJSONCommand(), a.vtxTableSetBandCommand(), a.vtxTableSetBandJSONCommand(), a.vtxTableSetPowerCommand(), a.vtxTableSetPowerJSONCommand())
 	return cmd
 }
 
@@ -158,6 +158,71 @@ func (a *app) vtxTableSetBandCommand() *cobra.Command {
 	}
 }
 
+func (a *app) vtxTableSetBandJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-band-json FILE",
+		Short: "Set one VTX table band from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseVTXTableBandJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "VTX table band changes can affect RF channel mappings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVTXTableBand(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtxtable_band": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "vtxtable_band", Command: "MSP_SET_VTXTABLE_BAND", Detail: "VTX table band changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func parseVTXTableBandJSON(data []byte) (bfcommands.VTXTableBandSetConfig, error) {
+	var wrapped struct {
+		VTXTableBand *bfcommands.VTXTableBandSetConfig `json:"vtxtable_band"`
+		Band         *bfcommands.VTXTableBandSetConfig `json:"band"`
+		Config       *bfcommands.VTXTableBandSetConfig `json:"config"`
+		VTXTable     *struct {
+			Band *bfcommands.VTXTableBandSetConfig `json:"band"`
+		} `json:"vtxtable"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.VTXTableBandSetConfig{}, err
+	}
+	var config bfcommands.VTXTableBandSetConfig
+	switch {
+	case wrapped.VTXTableBand != nil:
+		config = *wrapped.VTXTableBand
+	case wrapped.Band != nil:
+		config = *wrapped.Band
+	case wrapped.Config != nil:
+		config = *wrapped.Config
+	case wrapped.VTXTable != nil && wrapped.VTXTable.Band != nil:
+		config = *wrapped.VTXTable.Band
+	default:
+		if err := json.Unmarshal(data, &config); err != nil {
+			return bfcommands.VTXTableBandSetConfig{}, err
+		}
+	}
+	config.Name = strings.ToUpper(config.Name)
+	config.Letter = strings.ToUpper(config.Letter)
+	if err := bfcommands.ValidateVTXTableBand(config); err != nil {
+		return bfcommands.VTXTableBandSetConfig{}, err
+	}
+	return config, nil
+}
+
 func (a *app) vtxTableSetPowerCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-power LEVEL VALUE LABEL",
@@ -191,6 +256,70 @@ func (a *app) vtxTableSetPowerCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) vtxTableSetPowerJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-power-json FILE",
+		Short: "Set one VTX table power level from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseVTXTablePowerJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "VTX table power changes can affect RF output; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVTXTablePower(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtxtable_power": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "vtxtable_power", Command: "MSP_SET_VTXTABLE_POWERLEVEL", Detail: "VTX table power level changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func parseVTXTablePowerJSON(data []byte) (bfcommands.VTXTablePowerSetConfig, error) {
+	var wrapped struct {
+		VTXTablePower *bfcommands.VTXTablePowerSetConfig `json:"vtxtable_power"`
+		Power         *bfcommands.VTXTablePowerSetConfig `json:"power"`
+		Config        *bfcommands.VTXTablePowerSetConfig `json:"config"`
+		VTXTable      *struct {
+			Power *bfcommands.VTXTablePowerSetConfig `json:"power"`
+		} `json:"vtxtable"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.VTXTablePowerSetConfig{}, err
+	}
+	var config bfcommands.VTXTablePowerSetConfig
+	switch {
+	case wrapped.VTXTablePower != nil:
+		config = *wrapped.VTXTablePower
+	case wrapped.Power != nil:
+		config = *wrapped.Power
+	case wrapped.Config != nil:
+		config = *wrapped.Config
+	case wrapped.VTXTable != nil && wrapped.VTXTable.Power != nil:
+		config = *wrapped.VTXTable.Power
+	default:
+		if err := json.Unmarshal(data, &config); err != nil {
+			return bfcommands.VTXTablePowerSetConfig{}, err
+		}
+	}
+	config.Label = strings.ToUpper(config.Label)
+	if err := bfcommands.ValidateVTXTablePower(config); err != nil {
+		return bfcommands.VTXTablePowerSetConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) ledsCommand() *cobra.Command {

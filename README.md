@@ -202,6 +202,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 Betaflight 2025.12 declares `MSP_OSD_VIDEO_CONFIG` and `MSP_SET_OSD_VIDEO_CONFIG` constants, but the firmware source does not expose handler cases for them, so this tool uses the confirmed `MSP_SET_OSD_CONFIG` general-settings path.
 `vtxtable set-json` accepts band and power rows as JSON, writes each row through `MSP_SET_VTXTABLE_BAND` or `MSP_SET_VTXTABLE_POWERLEVEL`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `vtxtable set-band` and `vtxtable set-power` write one VTX table band or power row through typed MSP commands, require `--yes`, and report that a separate `save` is still required to persist the change.
+`vtxtable set-band-json` and `vtxtable set-power-json` accept direct row objects or objects with `vtxtable_band`/`band`/`config`/`vtxtable.band` and `vtxtable_power`/`power`/`config`/`vtxtable.power`, require `--yes`, and return the same output roots as their positional forms.
 `features set-mask` writes the complete feature mask through `MSP_SET_FEATURE_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `serial status` reads serial port identifiers, function masks, decoded function names, and baudrate indexes over MSP.
 `serial apply-config-json` writes a complete serial port table through `MSP_SET_CF_SERIAL_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

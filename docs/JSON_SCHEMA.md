@@ -191,8 +191,9 @@ Successful OSD video-system writes include an `osd_video_system` side effect.
 Successful OSD config writes include `osd_position`, `osd_stat`, or `osd_timer` side effects.
 `vtxtable set-json` returns a `vtxtable` object with applied band rows, applied power rows, row counts, MSP command names, acknowledgement flag, and `save_required`.
 Successful full VTX table writes include a `vtxtable` side effect.
-`vtxtable set-band` returns a `vtxtable_band` object with the requested band row, MSP command name/code, acknowledgement flag, and `save_required`.
-`vtxtable set-power` returns a `vtxtable_power` object with the requested power row, MSP command name/code, acknowledgement flag, and `save_required`.
+`vtxtable set-band` and `vtxtable set-band-json` return a `vtxtable_band` object with the requested band row, MSP command name/code, acknowledgement flag, and `save_required`.
+`vtxtable set-power` and `vtxtable set-power-json` return a `vtxtable_power` object with the requested power row, MSP command name/code, acknowledgement flag, and `save_required`.
+`vtxtable set-band-json` and `vtxtable set-power-json` accept direct row objects or objects with `vtxtable_band`/`band`/`config`/`vtxtable.band` and `vtxtable_power`/`power`/`config`/`vtxtable.power`.
 Successful VTX table writes include `vtxtable_band` or `vtxtable_power` side effects.
 
 `features status` returns a `features` object decoded from `MSP_FEATURE_CONFIG`.

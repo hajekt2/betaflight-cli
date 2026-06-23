@@ -322,6 +322,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if featureMask["operation"] != "write" || featureMask["confirmation"] != "--yes" || featureMask["requires_connection"] != true || featureMask["output_root"] != "feature_mask" || featureMask["runnable"] != true {
 		t.Fatalf("feature mask capability = %+v", featureMask)
 	}
+	featureSetJSON := byCommand["betaflight-cli features set-json"]
+	if featureSetJSON["operation"] != "plan_or_write" || featureSetJSON["confirmation"] != "--yes with --apply" || featureSetJSON["requires_connection"] != true || featureSetJSON["output_root"] != "change_plan" || featureSetJSON["input"] == "" || featureSetJSON["runnable"] != true {
+		t.Fatalf("feature set json capability = %+v", featureSetJSON)
+	}
 	beeperEnable := byCommand["betaflight-cli beeper enable"]
 	if beeperEnable["operation"] != "plan_or_write" || beeperEnable["requires_connection"] != true || beeperEnable["confirmation"] != "--yes with --apply or --save" || beeperEnable["runnable"] != true {
 		t.Fatalf("beeper enable capability = %+v", beeperEnable)
@@ -985,6 +989,10 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	settings := byDomain["settings"]
 	if settings["status"] != "implemented" || len(settings["read_commands"].([]any)) == 0 || len(settings["write_commands"].([]any)) == 0 {
 		t.Fatalf("settings domain = %+v", settings)
+	}
+	beeperTransponder := byDomain["beeper-transponder"]
+	if beeperTransponder["status"] != "implemented" || !containsAnyString(beeperTransponder["output_roots"].([]any), "change_plan") {
+		t.Fatalf("beeper-transponder domain = %+v", beeperTransponder)
 	}
 	gaps := coverage["next_gaps"].([]any)
 	for _, item := range gaps {
@@ -9524,6 +9532,15 @@ func writeTempBlackboxLog(t *testing.T) string {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 	return path
+}
+
+func containsAnyString(values []any, want string) bool {
+	for _, value := range values {
+		if text, ok := value.(string); ok && text == want {
+			return true
+		}
+	}
+	return false
 }
 
 func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.Envelope, error) {

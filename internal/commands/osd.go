@@ -89,6 +89,20 @@ type OSDWarnings struct {
 	Text              string `json:"text"`
 }
 
+type OSDCanvasSetConfig struct {
+	Columns uint8 `json:"columns"`
+	Rows    uint8 `json:"rows"`
+}
+
+type OSDCanvasSetResult struct {
+	Config         OSDCanvasSetConfig `json:"config"`
+	MSPCode        uint16             `json:"msp_code"`
+	MSPName        string             `json:"msp_name"`
+	Acknowledged   bool               `json:"acknowledged"`
+	SaveRequired   bool               `json:"save_required"`
+	RebootPossible bool               `json:"reboot_possible"`
+}
+
 func ReadOSDStatus(ctx context.Context, client *connection.Client) (*OSDStatus, []string, error) {
 	status := &OSDStatus{}
 	warnings := []string{}
@@ -112,6 +126,24 @@ func ReadOSDStatus(ctx context.Context, client *connection.Client) (*OSDStatus, 
 		warnings = append(warnings, err.Error())
 	}
 	return status, warnings, nil
+}
+
+func SetOSDCanvas(ctx context.Context, client *connection.Client, config OSDCanvasSetConfig) (*OSDCanvasSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetOSDCanvas, EncodeOSDCanvas(config)); err != nil {
+		return nil, fmt.Errorf("osd canvas request failed: %w", err)
+	}
+	return &OSDCanvasSetResult{
+		Config:         config,
+		MSPCode:        msp.MSPSetOSDCanvas,
+		MSPName:        "MSP_SET_OSD_CANVAS",
+		Acknowledged:   true,
+		SaveRequired:   true,
+		RebootPossible: true,
+	}, nil
+}
+
+func EncodeOSDCanvas(config OSDCanvasSetConfig) []byte {
+	return []byte{config.Columns, config.Rows}
 }
 
 func DecodeOSDConfig(payload []byte) (*OSDConfig, error) {

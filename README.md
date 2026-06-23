@@ -188,6 +188,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `storage erase` sends `MSP_DATAFLASH_ERASE`, requires `--yes`, captures read-only before and after storage snapshots, emits a `dataflash_erase` side effect, and returns an audit summary with freed bytes.
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `vtx set-config` writes VTX band, channel, power, pit mode, low-power-disarm mode, and pit-mode frequency through `MSP_SET_VTX_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`osd set-canvas` writes OSD canvas columns and rows through `MSP_SET_OSD_CANVAS`, requires `--yes`, and reports that firmware may save and reboot when switching an HD target to MSP displayport.
 `vtxtable set-band` and `vtxtable set-power` write one VTX table band or power row through typed MSP commands, require `--yes`, and report that a separate `save` is still required to persist the change.
 `features set-mask` writes the complete feature mask through `MSP_SET_FEATURE_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `serial status` reads serial port identifiers, function masks, decoded function names, and baudrate indexes over MSP.

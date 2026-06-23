@@ -74,6 +74,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
+		cmd.AddCommand(a.osdSetCanvasCommand())
 	}
 	if domain.use == "pid" {
 		cmd.AddCommand(a.pidStatusCommand())
@@ -658,6 +659,41 @@ func (a *app) osdStatusCommand() *cobra.Command {
 					"osd":      osd,
 					"warnings": warnings,
 				})
+			})
+		},
+	}
+}
+
+func (a *app) osdSetCanvasCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-canvas COLUMNS ROWS",
+		Short: "Set OSD canvas dimensions over MSP",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			columns, err := parseUint8Arg("columns", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			rows, err := parseUint8Arg("rows", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD canvas changes can trigger EEPROM write and reboot on HD targets; pass --yes"))
+			}
+			config := bfcommands.OSDCanvasSetConfig{Columns: columns, Rows: rows}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDCanvas(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_canvas": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "osd_canvas",
+					Command: "MSP_SET_OSD_CANVAS",
+					Detail:  "canvas changed; firmware may save and reboot when switching to HD MSP displayport",
+				})
+				return env
 			})
 		},
 	}

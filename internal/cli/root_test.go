@@ -479,6 +479,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if vtxConfig["operation"] != "write" || vtxConfig["confirmation"] != "--yes" || vtxConfig["requires_connection"] != true || vtxConfig["output_root"] != "vtx_config" || vtxConfig["runnable"] != true {
 		t.Fatalf("vtx config capability = %+v", vtxConfig)
 	}
+	osdCanvas := byCommand["betaflight-cli osd set-canvas"]
+	if osdCanvas["operation"] != "write" || osdCanvas["confirmation"] != "--yes" || osdCanvas["requires_connection"] != true || osdCanvas["output_root"] != "osd_canvas" || osdCanvas["runnable"] != true {
+		t.Fatalf("osd canvas capability = %+v", osdCanvas)
+	}
 	vtxTableBand := byCommand["betaflight-cli vtxtable set-band"]
 	if vtxTableBand["operation"] != "write" || vtxTableBand["confirmation"] != "--yes" || vtxTableBand["requires_connection"] != true || vtxTableBand["output_root"] != "vtxtable_band" || vtxTableBand["runnable"] != true {
 		t.Fatalf("vtxtable band capability = %+v", vtxTableBand)
@@ -3418,6 +3422,51 @@ func TestOSDStatusWithFakeFC(t *testing.T) {
 	warnings := osd["warnings"].(map[string]any)
 	if warnings["text"] != "LOW BATTERY" {
 		t.Fatalf("warnings = %+v", warnings)
+	}
+}
+
+func TestOSDSetCanvasWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-canvas", "53", "20", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_canvas"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["columns"] != float64(53) || config["rows"] != float64(20) || result["save_required"] != true || result["reboot_possible"] != true {
+		t.Fatalf("osd_canvas = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_OSD_CANVAS" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestOSDSetCanvasRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-canvas", "53", "20"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetCanvasValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "set-canvas", "300", "20", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

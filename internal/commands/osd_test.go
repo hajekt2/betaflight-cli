@@ -53,6 +53,13 @@ func TestDecodeOSDCanvas(t *testing.T) {
 	}
 }
 
+func TestSetOSDCanvasPayload(t *testing.T) {
+	payload := EncodeOSDCanvas(OSDCanvasSetConfig{Columns: 53, Rows: 20})
+	if string(payload) != string([]byte{53, 20}) {
+		t.Fatalf("payload = %v", payload)
+	}
+}
+
 func TestDecodeOSDWarnings(t *testing.T) {
 	warnings, err := DecodeOSDWarnings([]byte{2, 11, 'L', 'O', 'W', ' ', 'B', 'A', 'T', 'T', 'E', 'R', 'Y'})
 	if err != nil {

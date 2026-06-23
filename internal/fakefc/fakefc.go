@@ -776,6 +776,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPOSDCanvas:
 		f.out.Write(response(frame.Code, []byte{53, 20}, false))
+	case msp.MSPSetOSDCanvas:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 2))
 	case msp.MSP2GetOSDWarnings:
 		payload := []byte{2}
 		payload = appendPString(payload, "LOW BATTERY")

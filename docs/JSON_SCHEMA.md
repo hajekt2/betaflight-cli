@@ -175,6 +175,8 @@ When `--reboot-first` is set, a reboot command is sent first and the response in
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
 `vtx set-config` returns a `vtx_config` object with the requested VTX fields, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful VTX config writes include a `vtx_config` side effect.
+`osd set-canvas` returns an `osd_canvas` object with requested columns/rows, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
+Successful OSD canvas writes include an `osd_canvas` side effect.
 `vtxtable set-band` returns a `vtxtable_band` object with the requested band row, MSP command name/code, acknowledgement flag, and `save_required`.
 `vtxtable set-power` returns a `vtxtable_power` object with the requested power row, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful VTX table writes include `vtxtable_band` or `vtxtable_power` side effects.

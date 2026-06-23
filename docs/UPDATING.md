@@ -63,6 +63,18 @@ go generate ./pkg/msp
 go test ./...
 ```
 
+If you prefer a single command and your environment has `opensrc` on PATH, run:
+
+```sh
+make update-metadata
+```
+
+You can also point to a local checkout:
+
+```sh
+make update-metadata BETAFLIGHT_SRC=/path/to/betaflight/betaflight
+```
+
 `go generate ./pkg/msp` writes both generated files:
 
 - `pkg/msp/codes_generated.go`

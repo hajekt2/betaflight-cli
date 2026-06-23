@@ -292,10 +292,22 @@ Generated files should include the upstream Betaflight tag or commit they came f
 The update process is documented in [docs/UPDATING.md](docs/UPDATING.md).
 Generated metadata for supported Betaflight versions should be compiled into the static binary.
 Optional external metadata updates can be added later, but runtime network access or a mutable cache must not be required for normal operation.
-For the current generated registry refresh:
+For the current generated registry refresh, run:
 
 ```sh
 export BETAFLIGHT_VERSION=2025.12.0
 export BETAFLIGHT_SRC="$(opensrc path betaflight/betaflight@${BETAFLIGHT_VERSION})"
 go generate ./pkg/msp
+```
+
+You can also run it through make:
+
+```sh
+make update-metadata
+```
+
+When you need local overrides you can pass an explicit source path:
+
+```sh
+make update-metadata BETAFLIGHT_SRC=/path/to/betaflight
 ```

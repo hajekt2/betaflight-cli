@@ -20,13 +20,14 @@ type ConfigurationSnapshot struct {
 }
 
 type ConfigurationDocument struct {
-	SourceCommand   string            `json:"source_command"`
-	LineCount       int               `json:"line_count"`
-	SectionCounts   map[string]int    `json:"section_counts"`
-	UnknownCount    int               `json:"unknown_count"`
-	KnownSettings   int               `json:"known_settings"`
-	UnknownSettings int               `json:"unknown_settings"`
-	Document        bfconfig.Document `json:"document"`
+	SourceCommand   string             `json:"source_command"`
+	LineCount       int                `json:"line_count"`
+	SectionCounts   map[string]int     `json:"section_counts"`
+	Inventory       bfconfig.Inventory `json:"inventory"`
+	UnknownCount    int                `json:"unknown_count"`
+	KnownSettings   int                `json:"known_settings"`
+	UnknownSettings int                `json:"unknown_settings"`
+	Document        bfconfig.Document  `json:"document"`
 }
 
 type ConfigurationSnapshotSummary struct {
@@ -126,6 +127,7 @@ func buildConfigurationDocument(sourceCommand string, lines []string, doc bfconf
 		SourceCommand:   sourceCommand,
 		LineCount:       len(nonEmptyLines(lines)),
 		SectionCounts:   countSections(doc.Sections),
+		Inventory:       bfconfig.BuildInventory(doc),
 		UnknownCount:    len(doc.Unknown),
 		KnownSettings:   knownSettings,
 		UnknownSettings: unknownSettings,

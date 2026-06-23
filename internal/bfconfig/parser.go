@@ -1,6 +1,7 @@
 package bfconfig
 
 import (
+	"sort"
 	"strconv"
 	"strings"
 
@@ -39,6 +40,41 @@ type Document struct {
 	Save      []Command           `json:"save"`
 	Comments  []string            `json:"comments"`
 	Unknown   []string            `json:"unknown"`
+}
+
+type Inventory struct {
+	Settings          int            `json:"settings"`
+	KnownSettings     int            `json:"known_settings"`
+	UnknownSettings   int            `json:"unknown_settings"`
+	FeaturesEnabled   []string       `json:"features_enabled,omitempty"`
+	FeaturesDisabled  []string       `json:"features_disabled,omitempty"`
+	SerialPorts       int            `json:"serial_ports"`
+	AuxModes          int            `json:"aux_modes"`
+	Resources         int            `json:"resources"`
+	Timers            int            `json:"timers"`
+	DMA               int            `json:"dma"`
+	Profiles          int            `json:"profiles"`
+	VTXTableRows      int            `json:"vtx_table_rows"`
+	OSDRows           int            `json:"osd_rows"`
+	LEDRows           int            `json:"led_rows"`
+	ServoRows         int            `json:"servo_rows"`
+	ServoMixRows      int            `json:"servo_mix_rows"`
+	AdjustmentRanges  int            `json:"adjustment_ranges"`
+	RXRanges          int            `json:"rx_ranges"`
+	RXFailsafeRows    int            `json:"rx_failsafe_rows"`
+	BeeperRows        int            `json:"beeper_rows"`
+	BeaconRows        int            `json:"beacon_rows"`
+	BoardMetadataRows int            `json:"board_metadata_rows"`
+	MixerRows         int            `json:"mixer_rows"`
+	MotorMixRows      int            `json:"motor_mix_rows"`
+	RCMapRows         int            `json:"rc_map_rows"`
+	BatchCommands     int            `json:"batch_commands"`
+	DefaultsCommands  int            `json:"defaults_commands"`
+	SaveCommands      int            `json:"save_commands"`
+	CommentRows       int            `json:"comment_rows"`
+	UnknownRows       int            `json:"unknown_rows"`
+	NonEmptySections  []string       `json:"non_empty_sections"`
+	SectionCounts     map[string]int `json:"section_counts"`
 }
 
 type Command struct {
@@ -266,6 +302,63 @@ func Parse(lines []string, registry settings.Registry) Document {
 	}
 	doc.VTX = parseVTXTableSummary(doc.VTXTable, doc.Sections["vtx_table"])
 	return doc
+}
+
+func BuildInventory(doc Document) Inventory {
+	inventory := Inventory{
+		Settings:          len(doc.Settings),
+		SerialPorts:       len(doc.Serial),
+		AuxModes:          len(doc.Aux),
+		Resources:         len(doc.Resources),
+		Timers:            len(doc.Timers),
+		DMA:               len(doc.DMA),
+		Profiles:          len(doc.Profiles),
+		VTXTableRows:      len(doc.VTXTable),
+		OSDRows:           len(doc.OSD),
+		LEDRows:           len(doc.LEDs),
+		ServoRows:         len(doc.Servos),
+		ServoMixRows:      len(doc.SMix),
+		AdjustmentRanges:  len(doc.AdjRanges),
+		RXRanges:          len(doc.RXRanges),
+		RXFailsafeRows:    len(doc.RXFail),
+		BeeperRows:        len(doc.Beeper),
+		BeaconRows:        len(doc.Beacon),
+		BoardMetadataRows: len(doc.Board),
+		MixerRows:         len(doc.Mixer),
+		MotorMixRows:      len(doc.MMix),
+		RCMapRows:         len(doc.RCMap),
+		BatchCommands:     len(doc.Batch),
+		DefaultsCommands:  len(doc.Defaults),
+		SaveCommands:      len(doc.Save),
+		CommentRows:       len(doc.Comments),
+		UnknownRows:       len(doc.Unknown),
+		SectionCounts:     map[string]int{},
+	}
+	for _, setting := range doc.Settings {
+		if setting.Known {
+			inventory.KnownSettings++
+		} else {
+			inventory.UnknownSettings++
+		}
+	}
+	for _, feature := range doc.Features {
+		if feature.Enabled {
+			inventory.FeaturesEnabled = append(inventory.FeaturesEnabled, feature.Name)
+		} else {
+			inventory.FeaturesDisabled = append(inventory.FeaturesDisabled, feature.Name)
+		}
+	}
+	for section, lines := range doc.Sections {
+		count := len(lines)
+		inventory.SectionCounts[section] = count
+		if count > 0 {
+			inventory.NonEmptySections = append(inventory.NonEmptySections, section)
+		}
+	}
+	sort.Strings(inventory.FeaturesEnabled)
+	sort.Strings(inventory.FeaturesDisabled)
+	sort.Strings(inventory.NonEmptySections)
+	return inventory
 }
 
 func classify(doc *Document, line string, fields []string, registry settings.Registry) {

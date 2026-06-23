@@ -19,6 +19,9 @@ func TestBuildConfigurationSnapshotSummaryAndGuidance(t *testing.T) {
 	fullDoc := bfconfig.Parse(lines, settings.DefaultRegistry)
 	diff := buildConfigurationDocument("diff all", lines, fullDoc)
 	full := buildConfigurationDocument("dump all", lines, fullDoc)
+	if diff.Inventory.Settings != 2 || diff.Inventory.UnknownSettings != 1 || diff.Inventory.UnknownRows != 1 {
+		t.Fatalf("inventory = %+v", diff.Inventory)
+	}
 	summary := buildConfigurationSnapshotSummary(full, diff)
 	if summary.DiffLineCount != 6 || !summary.DiffHasSaveCommand || summary.DiffUnknownCount != 1 || summary.DiffUnknownSettings != 1 {
 		t.Fatalf("summary = %+v", summary)

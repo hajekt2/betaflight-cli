@@ -148,4 +148,23 @@ func TestParseDocument(t *testing.T) {
 	if len(doc.Sections["settings"]) != 3 || len(doc.Sections["unknown"]) != 1 || len(doc.Sections["board"]) != 4 {
 		t.Fatalf("sections = %+v", doc.Sections)
 	}
+	inventory := BuildInventory(doc)
+	if inventory.Settings != 3 || inventory.KnownSettings != 2 || inventory.UnknownSettings != 1 {
+		t.Fatalf("inventory settings = %+v", inventory)
+	}
+	if len(inventory.FeaturesEnabled) != 1 || inventory.FeaturesEnabled[0] != "GPS" {
+		t.Fatalf("inventory enabled features = %+v", inventory.FeaturesEnabled)
+	}
+	if len(inventory.FeaturesDisabled) != 1 || inventory.FeaturesDisabled[0] != "AIRMODE" {
+		t.Fatalf("inventory disabled features = %+v", inventory.FeaturesDisabled)
+	}
+	if inventory.SerialPorts != 1 || inventory.AuxModes != 1 || inventory.VTXTableRows != 6 || inventory.UnknownRows != 1 {
+		t.Fatalf("inventory counts = %+v", inventory)
+	}
+	if inventory.SectionCounts["settings"] != 3 || inventory.SectionCounts["board"] != 4 || inventory.SectionCounts["unknown"] != 1 {
+		t.Fatalf("inventory sections = %+v", inventory.SectionCounts)
+	}
+	if len(inventory.NonEmptySections) == 0 || inventory.NonEmptySections[0] != "adjranges" {
+		t.Fatalf("inventory non-empty sections = %+v", inventory.NonEmptySections)
+	}
 }

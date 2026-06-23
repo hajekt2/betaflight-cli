@@ -254,6 +254,10 @@ func TestConfigurationValidateDoesNotConnect(t *testing.T) {
 	}
 	data := env.Data.(map[string]any)
 	validation := data["configuration_validation"].(map[string]any)
+	inventory := validation["inventory"].(map[string]any)
+	if inventory["settings"] != float64(1) || inventory["features_enabled"].([]any)[0] != "GPS" {
+		t.Fatalf("inventory = %+v", inventory)
+	}
 	result := validation["validation"].(map[string]any)
 	if result["valid"] != true || result["review_required"] != false {
 		t.Fatalf("validation = %+v", result)
@@ -397,6 +401,10 @@ func TestConfigurationExportFullIncludesConfiguration(t *testing.T) {
 	configuration := data["configuration"].(map[string]any)
 	if len(configuration["settings"].([]any)) < 8 {
 		t.Fatalf("configuration = %+v", configuration)
+	}
+	inventory := data["inventory"].(map[string]any)
+	if inventory["settings"].(float64) < 8 || inventory["serial_ports"].(float64) == 0 {
+		t.Fatalf("inventory = %+v", inventory)
 	}
 }
 

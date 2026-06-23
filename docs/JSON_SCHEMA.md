@@ -86,6 +86,8 @@ The raw CLI text remains authoritative.
 The parsed configuration is a best-effort agent view over the same lines.
 It includes settings, features, serial commands, AUX ranges, resources, selected profiles, VTX table commands, OSD commands, comments, unknown lines, and compatibility section buckets.
 Known settings include metadata hints from the compiled Betaflight setting registry.
+Configuration exports, validation results, snapshots, and comparisons also include an `inventory` object next to each parsed document.
+The inventory is a stable scan-friendly summary with setting counts, unknown counts, enabled and disabled features, populated section names, and row counts for common CLI families.
 
 ## Batch Plans
 
@@ -178,21 +180,21 @@ Flight mode records include `byte_index` and `bit_index` so modes above bit 31 r
 The object includes a compact summary for configured state, reboot-required state, arming blockers, active flight modes, active PID/rate/battery profiles, config storage usage, and write guidance that reminds agents to plan before apply and save explicitly.
 
 `configuration snapshot` returns a `configuration_snapshot` object built from read-only `dump all` and `diff all` CLI output.
-The object includes parsed full and diff documents, section counts, unknown line and unknown setting counts, save-command detection, and restore/batch review guidance.
+The object includes parsed full and diff documents, inventories, section counts, unknown line and unknown setting counts, save-command detection, and restore/batch review guidance.
 Parsed documents classify Betaflight import metadata and common CLI families such as `batch`, `defaults`, `save`, `board`, `timers`, `dma`, `mixer`, `mmix`, `map`, `beeper`, `beacon`, and `rxfail` separately from genuinely unknown syntax.
 The `timers` and `dma` arrays include decoded assignment fields plus the original raw line for restore fidelity.
 The `mixer`, `mmix`, and `map` arrays include decoded mixer names, custom motor mix coefficients, RC order, and the original raw line.
 
 `configuration validate` returns a `configuration_validation` object built from local Betaflight CLI text without opening a serial connection.
-The object includes the parsed document, section counts, unknown line and unknown setting counts, restore-import skipped lines, the normalized change plan, and a `validation` object with `valid`, `review_required`, and structured errors.
+The object includes the parsed document, inventory, section counts, unknown line and unknown setting counts, restore-import skipped lines, the normalized change plan, and a `validation` object with `valid`, `review_required`, and structured errors.
 Input may be raw CLI text or JSON containing `lines` or `raw` at the top level or under `data`.
 
 `configuration compare` returns a `configuration_compare` object built from local Betaflight CLI text and the current read-only `dump all` output.
-The object includes parsed reference and current documents, wrapper-insensitive line differences, machine-readable setting differences, summary counts, and recommended review actions.
+The object includes parsed reference and current documents, inventories, wrapper-insensitive line differences, machine-readable setting differences, summary counts, and recommended review actions.
 Input may be raw CLI text or JSON containing `lines` or `raw` at the top level or under `data`.
 
 `configuration export` reads current configuration through `dump all` or `diff all` based on `--source`.
-Default JSON output matches backup-style fields with raw CLI text, parsed sections, redaction metadata, and `raw_authoritative`.
+Default JSON output matches backup-style fields with raw CLI text, parsed sections, inventory, redaction metadata, and `raw_authoritative`.
 With `--raw-cli`, command data is plain CLI text for direct `.cli` artifact creation.
 
 `tasks status` returns a `tasks` object parsed from the Betaflight `tasks` CLI command.

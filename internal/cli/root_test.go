@@ -5928,6 +5928,9 @@ func TestMotorsTestPlanDoesNotConnect(t *testing.T) {
 	if checks[0].(map[string]any)["passed"] != true || checks[1].(map[string]any)["passed"] != false {
 		t.Fatalf("checks = %+v", checks)
 	}
+	if checks[2].(map[string]any)["name"] != "dry_run_only" || checks[2].(map[string]any)["passed"] != true {
+		t.Fatalf("plan mode check = %+v", checks[2])
+	}
 }
 
 func TestMotorsTestPlanAllMotors(t *testing.T) {
@@ -6026,6 +6029,10 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 	audit := plan["audit"].(map[string]any)
 	if audit["safety_passed"] != true || audit["preflight_captured"] != true || audit["post_stop_captured"] != true || audit["stop_succeeded"] != true {
 		t.Fatalf("audit = %+v", audit)
+	}
+	checks := plan["safety_checks"].([]any)
+	if checks[2].(map[string]any)["name"] != "bounded_apply" || checks[2].(map[string]any)["passed"] != true {
+		t.Fatalf("apply mode check = %+v", checks[2])
 	}
 	if audit["requested_duration_ms"] != float64(1) || audit["elapsed_duration_ms"].(float64) < 0 {
 		t.Fatalf("audit timing = %+v", audit)

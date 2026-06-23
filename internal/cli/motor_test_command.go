@@ -102,7 +102,7 @@ func (a *app) motorTestCommand(use, short string, apply bool) *cobra.Command {
 		Use:   use,
 		Short: short,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			plan, err := buildMotorTestPlan(motor, all, motorCount, value, duration, propsOff, batteryAware)
+			plan, err := buildMotorTestPlan(motor, all, motorCount, value, duration, propsOff, batteryAware, apply)
 			if err != nil {
 				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
 			}
@@ -321,7 +321,7 @@ func buildMotorTestAudit(plan motorTestPlan, elapsedMS int64, stopErr error, war
 	}
 }
 
-func buildMotorTestPlan(motor int, all bool, motorCount int, value int, duration time.Duration, propsOff, batteryAware bool) (motorTestPlan, error) {
+func buildMotorTestPlan(motor int, all bool, motorCount int, value int, duration time.Duration, propsOff, batteryAware bool, apply bool) (motorTestPlan, error) {
 	switch {
 	case all && motorCount <= 0:
 		return motorTestPlan{}, fmt.Errorf("--motor-count must be > 0 when --all is set")
@@ -362,6 +362,13 @@ func buildMotorTestPlan(motor int, all bool, motorCount int, value int, duration
 		recommended = append(recommended, "verify craft motor order and numbering before enabling all-motor tests")
 	}
 
+	modeCheck := safetyCheck{Name: "dry_run_only", Passed: true, Required: true, Detail: "this command only creates a plan and never sends motor output"}
+	applyMessage := "test-plan is offline only; use test-apply with all confirmations to run the bounded motor output command"
+	if apply {
+		modeCheck = safetyCheck{Name: "bounded_apply", Passed: true, Required: true, Detail: "this command sends bounded motor output and then attempts a stop command"}
+		applyMessage = "test-apply sends motor output after all confirmations, then attempts the generated stop command"
+	}
+
 	return motorTestPlan{
 		Kind:                  "motor_test",
 		Applied:               false,
@@ -380,9 +387,9 @@ func buildMotorTestPlan(motor int, all bool, motorCount int, value int, duration
 		SafetyChecks: []safetyCheck{
 			{Name: "props_off", Passed: propsOff, Required: true, Detail: "propellers must be removed before any future motor output apply command"},
 			{Name: "battery_awareness", Passed: batteryAware, Required: true, Detail: "operator must review power source, bench restraint, and ESC arming state"},
-			{Name: "dry_run_only", Passed: true, Required: true, Detail: "this command only creates a plan and never sends motor output"},
+			modeCheck,
 		},
 		RecommendedPreflight: recommended,
-		ApplyMessage:         "test-plan is offline only; use test-apply with all confirmations to run the bounded motor output command",
+		ApplyMessage:         applyMessage,
 	}, nil
 }

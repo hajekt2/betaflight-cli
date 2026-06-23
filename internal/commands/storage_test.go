@@ -40,3 +40,26 @@ func TestDecodeSDCardSummaryRejectsShortPayload(t *testing.T) {
 		t.Fatal("DecodeSDCardSummary() error = nil, want short payload error")
 	}
 }
+
+func TestDecodeDataflashReadChunk(t *testing.T) {
+	payload := appendU32Test(nil, 128)
+	payload = appendU16Test(payload, 4)
+	payload = append(payload, 0)
+	payload = append(payload, []byte("BLOG")...)
+	chunk, err := DecodeDataflashReadChunk(payload)
+	if err != nil {
+		t.Fatalf("DecodeDataflashReadChunk() error = %v", err)
+	}
+	if chunk.Address != 128 || chunk.DataLength != 4 || chunk.CompressionType != 0 || string(chunk.Data) != "BLOG" {
+		t.Fatalf("chunk = %+v", chunk)
+	}
+}
+
+func TestDecodeDataflashReadChunkRejectsCompression(t *testing.T) {
+	payload := appendU32Test(nil, 0)
+	payload = appendU16Test(payload, 1)
+	payload = append(payload, 1, 0)
+	if _, err := DecodeDataflashReadChunk(payload); err == nil {
+		t.Fatal("DecodeDataflashReadChunk() error = nil, want compression error")
+	}
+}

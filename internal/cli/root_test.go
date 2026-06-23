@@ -1015,6 +1015,49 @@ func TestStorageStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestStorageExportWithFakeFC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "flash.bbl")
+	env, err := runTestCommand(t, []string{"storage", "export", path, "--size", "64"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	export := data["dataflash_export"].(map[string]any)
+	if export["completed"] != true || export["exported_bytes"] != float64(64) || export["path"] != path {
+		t.Fatalf("export = %+v", export)
+	}
+	if len(export["chunks"].([]any)) == 0 {
+		t.Fatalf("chunks = %+v", export["chunks"])
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if len(content) != 64 || !strings.HasPrefix(string(content), "BLACKBOX\n") {
+		t.Fatalf("content = %q", string(content))
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "file_write" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestStorageExportRequiresForceToOverwrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "flash.bbl")
+	if err := os.WriteFile(path, []byte("existing"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	env, err := runTestCommand(t, []string{"storage", "export", path, "--size", "8"}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want existing-file failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "file_exists" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestStorageEraseRequiresConfirmationBeforeConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"storage", "erase"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

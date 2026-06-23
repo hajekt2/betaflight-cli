@@ -21,6 +21,7 @@ type FC struct {
 	Unsupported        map[uint16]bool
 	SaveCloses         bool
 	DataflashUsedBytes uint32
+	DataflashData      []byte
 }
 
 func New() *FC {
@@ -143,6 +144,7 @@ func New() *FC {
 		},
 		Unsupported:        map[uint16]bool{},
 		DataflashUsedBytes: 262144,
+		DataflashData:      bytes.Repeat([]byte("BLACKBOX\n"), 32768),
 	}
 }
 
@@ -381,6 +383,32 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU32(payload, 16)
 		payload = appendU32(payload, 1048576)
 		payload = appendU32(payload, f.DataflashUsedBytes)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPDataflashRead:
+		if len(frame.Payload) < 7 {
+			f.out.Write(response(frame.Code, nil, true))
+			return
+		}
+		address := binary.LittleEndian.Uint32(frame.Payload[:4])
+		blockSize := binary.LittleEndian.Uint16(frame.Payload[4:6])
+		payload := appendU32(nil, address)
+		if address >= uint32(len(f.DataflashData)) || address >= f.DataflashUsedBytes {
+			payload = appendU16(payload, 0)
+			payload = append(payload, 0)
+			f.out.Write(response(frame.Code, payload, false))
+			return
+		}
+		end := address + uint32(blockSize)
+		if end > f.DataflashUsedBytes {
+			end = f.DataflashUsedBytes
+		}
+		if end > uint32(len(f.DataflashData)) {
+			end = uint32(len(f.DataflashData))
+		}
+		data := f.DataflashData[address:end]
+		payload = appendU16(payload, uint16(len(data)))
+		payload = append(payload, 0)
+		payload = append(payload, data...)
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPDataflashErase:
 		f.DataflashUsedBytes = 0

@@ -147,6 +147,7 @@ The object includes support status, device index and name, rate fields, optional
 
 `storage status` returns a `storage` object decoded from `MSP_DATAFLASH_SUMMARY` and `MSP_SDCARD_SUMMARY`.
 The object includes Dataflash support and readiness flags, sector count, total/used/free byte counts, SD card support, state ID/name, last filesystem error, and free/total kilobytes.
+`storage export FILE` returns a `dataflash_export` object with the output path, offset, requested size, exported byte count, chunk metadata, completion state, truncation state, and the storage summary used to bound the export.
 `storage erase` returns a `storage_erase` object with dangerous confirmation requirements, read-only before and after snapshots, a `dataflash_erase` side effect, and an `audit` record that includes freed bytes.
 
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.

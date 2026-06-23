@@ -1,6 +1,9 @@
 package commands
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestDecodeMotorConfigAndOutputs(t *testing.T) {
 	payload := appendU16Test(nil, 0)
@@ -53,6 +56,10 @@ func TestDecodeMotor3DAndOutputOrder(t *testing.T) {
 	}
 	if config.DeadbandLow != 1406 || config.DeadbandHigh != 1514 || config.Neutral != 1460 {
 		t.Fatalf("config = %+v", config)
+	}
+	payload := EncodeMotor3DConfig(Motor3DConfig{DeadbandLow: 1406, DeadbandHigh: 1514, Neutral: 1460})
+	if !bytes.Equal(payload, []byte{0x7e, 0x05, 0xea, 0x05, 0xb4, 0x05}) {
+		t.Fatalf("payload = %v", payload)
 	}
 	order, err := DecodeMotorOutputOrder([]byte{4, 0, 1, 2, 3})
 	if err != nil {

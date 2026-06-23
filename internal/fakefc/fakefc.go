@@ -636,6 +636,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 1514)
 		payload = appendU16(payload, 1460)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetMotor3dConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 6))
 	case msp.MSPMixerConfig:
 		f.out.Write(response(frame.Code, []byte{3, 1}, false))
 	case msp.MSP2MotorOutputReordering:

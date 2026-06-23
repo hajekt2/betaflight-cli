@@ -45,6 +45,14 @@ type Motor3DConfig struct {
 	Neutral      uint16 `json:"neutral"`
 }
 
+type Motor3DConfigSetResult struct {
+	Config       Motor3DConfig `json:"config"`
+	MSPCode      uint16        `json:"msp_code"`
+	MSPName      string        `json:"msp_name"`
+	Acknowledged bool          `json:"acknowledged"`
+	SaveRequired bool          `json:"save_required"`
+}
+
 type ServoStatus struct {
 	Outputs        []uint16             `json:"outputs,omitempty"`
 	Configurations []ServoConfiguration `json:"configurations,omitempty"`
@@ -131,6 +139,30 @@ func ReadServoStatus(ctx context.Context, client *connection.Client) (*ServoStat
 		warnings = append(warnings, err.Error())
 	}
 	return status, warnings, nil
+}
+
+func SetMotor3DConfig(ctx context.Context, client *connection.Client, config Motor3DConfig) (*Motor3DConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetMotor3dConfig, EncodeMotor3DConfig(config)); err != nil {
+		return nil, fmt.Errorf("motor 3d config request failed: %w", err)
+	}
+	return &Motor3DConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetMotor3dConfig,
+		MSPName:      "MSP_SET_MOTOR_3D_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeMotor3DConfig(config Motor3DConfig) []byte {
+	payload := appendU16Payload(nil, config.DeadbandLow)
+	payload = appendU16Payload(payload, config.DeadbandHigh)
+	payload = appendU16Payload(payload, config.Neutral)
+	return payload
+}
+
+func appendU16Payload(dst []byte, value uint16) []byte {
+	return append(dst, byte(value), byte(value>>8))
 }
 
 func DecodeMotorConfig(payload []byte) (*MotorConfig, error) {

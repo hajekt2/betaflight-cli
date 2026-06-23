@@ -567,9 +567,49 @@ func (a *app) motorsCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(a.motor3DConfigCommand())
 	cmd.AddCommand(a.motorTestPlanCommand())
 	cmd.AddCommand(a.motorTestApplyCommand())
 	return cmd
+}
+
+func (a *app) motor3DConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-3d-config DEADBAND_LOW DEADBAND_HIGH NEUTRAL",
+		Short: "Set 3D motor deadband and neutral values through MSP_SET_MOTOR_3D_CONFIG",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			low, err := parseUint16Arg("deadband_low", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			high, err := parseUint16Arg("deadband_high", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			neutral, err := parseUint16Arg("neutral", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "3D motor configuration changes motor settings; pass --yes"))
+			}
+			config := bfcommands.Motor3DConfig{DeadbandLow: low, DeadbandHigh: high, Neutral: neutral}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetMotor3DConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"motor_3d_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "motor_3d_config",
+					Command: "MSP_SET_MOTOR_3D_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) versionCommand() *cobra.Command {

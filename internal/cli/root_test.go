@@ -359,6 +359,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if gpsConfig["operation"] != "write" || gpsConfig["confirmation"] != "--yes" || gpsConfig["requires_connection"] != true || gpsConfig["output_root"] != "gps_config" || gpsConfig["runnable"] != true {
 		t.Fatalf("gps config capability = %+v", gpsConfig)
 	}
+	motor3DConfig := byCommand["betaflight-cli motors set-3d-config"]
+	if motor3DConfig["operation"] != "write" || motor3DConfig["confirmation"] != "--yes" || motor3DConfig["requires_connection"] != true || motor3DConfig["output_root"] != "motor_3d_config" || motor3DConfig["runnable"] != true {
+		t.Fatalf("motor 3d config capability = %+v", motor3DConfig)
+	}
 	ledValues := byCommand["betaflight-cli leds set-values"]
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
 		t.Fatalf("led values capability = %+v", ledValues)
@@ -3391,6 +3395,54 @@ func TestMotorsStatusWithFakeFC(t *testing.T) {
 	first := telemetry[0].(map[string]any)
 	if first["rpm"] != float64(12500) || first["voltage_v"] != 16.8 {
 		t.Fatalf("telemetry = %+v", telemetry)
+	}
+}
+
+func TestMotorsSet3DConfigRejectsInvalidValueBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"motors", "set-3d-config", "1406", "70000", "1460", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestMotorsSet3DConfigRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"motors", "set-3d-config", "1406", "1514", "1460"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestMotorsSet3DConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"motors", "set-3d-config", "1406", "1514", "1460", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["motor_3d_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["deadband_low"] != float64(1406) || config["deadband_high"] != float64(1514) || config["neutral"] != float64(1460) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_MOTOR_3D_CONFIG" || result["save_required"] != true {
+		t.Fatalf("motor 3d config result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "motor_3d_config" || env.SideEffects[0].Command != "MSP_SET_MOTOR_3D_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

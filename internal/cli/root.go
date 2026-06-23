@@ -1276,11 +1276,10 @@ func (a *app) mspCommand() *cobra.Command {
 		Short: "Send a raw MSP request and return raw payload hex",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			code64, err := strconv.ParseUint(args[0], 0, 16)
+			code, meta, err := parseMSPCode(args[0])
 			if err != nil {
 				return err
 			}
-			code := uint16(code64)
 			payload, err := hex.DecodeString(strings.TrimPrefix(payloadHex, "0x"))
 			if err != nil {
 				return err
@@ -1298,10 +1297,15 @@ func (a *app) mspCommand() *cobra.Command {
 					return a.failure(commandPath(cmd), &target, err)
 				}
 				env := output.Success(commandPath(cmd), &target, map[string]any{
-					"code":        frame.Code,
-					"version":     frame.Version,
-					"payload_hex": hex.EncodeToString(frame.Payload),
-					"length":      len(frame.Payload),
+					"code":             frame.Code,
+					"code_name":        meta.Name,
+					"protocol":         frame.Version,
+					"version":          frame.Version,
+					"direction_hint":   string(meta.Direction),
+					"command_source":   meta.Source,
+					"command_line":     meta.Line,
+					"payload_hex":      hex.EncodeToString(frame.Payload),
+					"length":           len(frame.Payload),
 				})
 				if op != connection.ReadOnly {
 					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "raw_msp", Detail: "raw MSP write-like command sent"})
@@ -1312,6 +1316,37 @@ func (a *app) mspCommand() *cobra.Command {
 	})
 	cmd.PersistentFlags().StringVar(&payloadHex, "payload-hex", "", "hex payload bytes")
 	return cmd
+}
+
+func parseMSPCode(raw string) (uint16, msp.CommandMeta, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return 0, msp.CommandMeta{}, errors.New("MSP code is required")
+	}
+	if command, ok := msp.LookupCommandByName(trimmed); ok {
+		return command.Code, command, nil
+	}
+
+	upper := strings.ToUpper(trimmed)
+	if command, ok := msp.LookupCommandByName(upper); ok {
+		return command.Code, command, nil
+	}
+	if !strings.HasPrefix(upper, "MSP_") {
+		if command, ok := msp.LookupCommandByName("MSP_" + upper); ok {
+			return command.Code, command, nil
+		}
+	}
+
+	code64, err := strconv.ParseUint(trimmed, 0, 16)
+	if err != nil {
+		return 0, msp.CommandMeta{}, fmt.Errorf("invalid MSP code %q", trimmed)
+	}
+	code := uint16(code64)
+	command, ok := msp.LookupCommand(code)
+	if ok {
+		return code, command, nil
+	}
+	return code, msp.CommandMeta{Name: fmt.Sprintf("MSP_%d", code)}, nil
 }
 
 func (a *app) runBackupCommand(cmd *cobra.Command, cliLine string, redact bool, rawCLI bool) error {

@@ -15,6 +15,7 @@ import (
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/fakefc"
 	"github.com/hajekt2/betaflight-cli/internal/output"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
 func TestClassifyCLI(t *testing.T) {
@@ -1417,6 +1418,62 @@ func TestStorageEraseUsesDangerousOperation(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "dataflash_erase" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestMSPRequestByNameReturnsMetadata(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_NAME"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["code"].(float64) != float64(msp.MSPName) {
+		t.Fatalf("code = %+v", data["code"])
+	}
+	if data["code_name"] != "MSP_NAME" {
+		t.Fatalf("code_name = %+v", data["code_name"])
+	}
+	if data["payload_hex"].(string) != "42657461466c69676874" {
+		t.Fatalf("payload_hex = %+v", data["payload_hex"])
+	}
+	if data["command_source"].(string) != "src/main/msp/msp_protocol.h" {
+		t.Fatalf("command_source = %+v", data["command_source"])
+	}
+	if data["direction_hint"] != "read" {
+		t.Fatalf("direction_hint = %+v", data["direction_hint"])
+	}
+}
+
+func TestMSPRequestNumericFallbackUsesCodeName(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "0xFFFF"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["code"].(float64) != 65535 {
+		t.Fatalf("code = %+v", data["code"])
+	}
+	if data["code_name"] != "MSP_65535" {
+		t.Fatalf("code_name = %+v", data["code_name"])
+	}
+	if _, ok := data["command_source"].(string); !ok || data["command_source"] != "" {
+		t.Fatalf("command_source = %+v", data["command_source"])
+	}
+}
+
+func TestMSPRequestRequiresYesForWriteLikeCommands(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_SET_NAME", "--payload-hex", "466f6f"}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

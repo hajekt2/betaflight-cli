@@ -1,5 +1,7 @@
 package msp
 
+import "strings"
+
 //go:generate go run ../../internal/generate/cmd/bfmeta -betaflight-src ${BETAFLIGHT_SRC} -source-version=${BETAFLIGHT_VERSION} -out-msp codes_generated.go -out-settings ../../internal/settings/metadata_generated.go
 
 type CommandDirection string
@@ -31,6 +33,16 @@ func RegisterCommands(commands []CommandMeta) {
 func LookupCommand(code uint16) (CommandMeta, bool) {
 	command, ok := commandRegistry[code]
 	return command, ok
+}
+
+func LookupCommandByName(name string) (CommandMeta, bool) {
+	for code, command := range commandRegistry {
+		if strings.EqualFold(command.Name, name) {
+			command.Code = code
+			return command, true
+		}
+	}
+	return CommandMeta{}, false
 }
 
 func IsLikelyWriteCode(code uint16) bool {

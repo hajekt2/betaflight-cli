@@ -45,3 +45,21 @@ func TestDecodeAdjustmentRangesRejectsPartialRow(t *testing.T) {
 		t.Fatal("DecodeAdjustmentRanges() error = nil, want partial row error")
 	}
 }
+
+func TestEncodeAdjustmentRange(t *testing.T) {
+	payload := EncodeAdjustmentRange(AdjustmentRange{
+		Index:                 1,
+		SlotIndex:             0,
+		AuxChannelIndex:       2,
+		RangeStartStep:        4,
+		RangeEndStep:          8,
+		AdjustmentFunction:    33,
+		AuxSwitchChannelIndex: 3,
+		AdjustmentCenter:      1600,
+		AdjustmentScale:       50,
+	})
+	want := []byte{1, 0, 2, 4, 8, 33, 3, 0x40, 0x06, 0x32, 0}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

@@ -333,8 +333,81 @@ func (a *app) adjustmentsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set)
+	cmd.AddCommand(set, a.adjustmentSetRangeCommand())
 	return cmd
+}
+
+func (a *app) adjustmentSetRangeCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-range INDEX SLOT AUX_CHANNEL START_STEP END_STEP FUNCTION SELECT_CHANNEL CENTER SCALE",
+		Short: "Set one adjustment range over MSP",
+		Args:  cobra.ExactArgs(9),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			slot, err := parseUint8Arg("slot", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			aux, err := parseUint8Arg("aux_channel", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			start, err := parseUint8Arg("start_step", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			end, err := parseUint8Arg("end_step", args[4])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			function, err := parseUint8Arg("function", args[5])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			selectChannel, err := parseUint8Arg("select_channel", args[6])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			center, err := parseUint16Arg("center", args[7])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			scale, err := parseUint16Arg("scale", args[8])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "adjustment range changes configuration; pass --yes"))
+			}
+			row := bfcommands.AdjustmentRange{
+				Index:                 int(index),
+				SlotIndex:             slot,
+				AuxChannelIndex:       aux,
+				RangeStartStep:        start,
+				RangeEndStep:          end,
+				AdjustmentFunction:    function,
+				AuxSwitchChannelIndex: selectChannel,
+				AdjustmentCenter:      center,
+				AdjustmentScale:       scale,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetAdjustmentRange(cmd.Context(), client, row)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"adjustment_range": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "adjustment_range",
+					Command: "MSP_SET_ADJUSTMENT_RANGE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) rxRangeCommand() *cobra.Command {

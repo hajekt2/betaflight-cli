@@ -328,6 +328,8 @@ Successful servo writes include `servo_config` or `servo_mix_rule` side effects.
 
 `adjustments status` returns an `adjustments` object decoded from `MSP_ADJUSTMENT_RANGES`.
 The object includes adjustment range rows, AUX channel names, range microsecond values, adjustment function names, center and scale values, active markers, and native `adjrange` CLI commands.
+`adjustments set-range` returns an `adjustment_range` object with the written row, decoded microsecond equivalents, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful adjustment range writes include an `adjustment_range` side effect.
 
 ## Error Codes
 

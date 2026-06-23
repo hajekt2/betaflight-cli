@@ -399,6 +399,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if servoMixRule["operation"] != "write" || servoMixRule["confirmation"] != "--yes" || servoMixRule["requires_connection"] != true || servoMixRule["output_root"] != "servo_mix_rule" || servoMixRule["runnable"] != true {
 		t.Fatalf("servo mix rule capability = %+v", servoMixRule)
 	}
+	adjustmentRange := byCommand["betaflight-cli adjustments set-range"]
+	if adjustmentRange["operation"] != "write" || adjustmentRange["confirmation"] != "--yes" || adjustmentRange["requires_connection"] != true || adjustmentRange["output_root"] != "adjustment_range" || adjustmentRange["runnable"] != true {
+		t.Fatalf("adjustment range capability = %+v", adjustmentRange)
+	}
 	voltageMeter := byCommand["betaflight-cli battery set-voltage-meter"]
 	if voltageMeter["operation"] != "write" || voltageMeter["confirmation"] != "--yes" || voltageMeter["requires_connection"] != true || voltageMeter["output_root"] != "voltage_meter_config" || voltageMeter["runnable"] != true {
 		t.Fatalf("voltage meter capability = %+v", voltageMeter)
@@ -4885,6 +4889,51 @@ func TestAdjustmentsStatusWithFakeFC(t *testing.T) {
 	second := ranges[1].(map[string]any)
 	if second["adjustment_function_name"] != "BATTERY_PROFILE" || second["range_start_us"] != float64(1000) || second["cli_command"] != "adjrange 1 0 1 1000 1100 33 2 1600 50" {
 		t.Fatalf("second range = %+v", second)
+	}
+}
+
+func TestAdjustmentsSetRangeWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"adjustments", "set-range", "1", "0", "2", "4", "8", "33", "3", "1600", "50", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["adjustment_range"].(map[string]any)
+	row := result["range"].(map[string]any)
+	if row["index"] != float64(1) || row["range_start_us"] != float64(1000) || row["adjustment_function_name"] != "BATTERY_PROFILE" || result["save_required"] != true {
+		t.Fatalf("adjustment_range = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_ADJUSTMENT_RANGE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestAdjustmentsSetRangeRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"adjustments", "set-range", "1", "0", "2", "4", "8", "33", "3", "1600", "50"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestAdjustmentsSetRangeValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"adjustments", "set-range", "1", "0", "2", "4", "8", "33", "3", "99999", "50", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

@@ -224,6 +224,7 @@ It never connects to hardware.
 `servos set-config` writes one servo configuration row through `MSP_SET_SERVO_CONFIGURATION`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos set-mix-rule` writes one servo mixer rule through `MSP_SET_SERVO_MIX_RULE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.
+`adjustments set-range` writes one adjustment range through `MSP_SET_ADJUSTMENT_RANGE` using step values, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `blackbox inspect FILE` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, decode-validated frame samples with common Betaflight predictors and field encodings applied, best-effort event summaries, and stream summaries for decoded fields.
 `blackbox inspect --log-index N` inspects one detected onboard Blackbox log directly from the flight controller without writing a local file first.
 Firmware flashing is now supported as an external-tool workflow (`firmware flash`) with explicit planning and confirmation, and still requires `--execute --yes` for any external flashing action.

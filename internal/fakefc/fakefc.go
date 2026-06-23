@@ -457,6 +457,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 1600)
 		payload = appendU16(payload, 50)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetAdjustmentRange:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 11))
 	case msp.MSPRXConfig:
 		payload := []byte{2}
 		payload = appendU16(payload, 2000)

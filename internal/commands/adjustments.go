@@ -74,6 +74,14 @@ type AdjustmentRange struct {
 	CLICommand             string `json:"cli_command"`
 }
 
+type AdjustmentRangeSetResult struct {
+	Range        AdjustmentRange `json:"range"`
+	MSPCode      uint16          `json:"msp_code"`
+	MSPName      string          `json:"msp_name"`
+	Acknowledged bool            `json:"acknowledged"`
+	SaveRequired bool            `json:"save_required"`
+}
+
 func ReadAdjustmentStatus(ctx context.Context, client *connection.Client) (*AdjustmentStatus, error) {
 	frame, err := client.Request(ctx, msp.MSPAdjustmentRanges, nil)
 	if err != nil {
@@ -84,6 +92,35 @@ func ReadAdjustmentStatus(ctx context.Context, client *connection.Client) (*Adju
 		return nil, err
 	}
 	return &AdjustmentStatus{Source: "MSP_ADJUSTMENT_RANGES", Ranges: ranges}, nil
+}
+
+func SetAdjustmentRange(ctx context.Context, client *connection.Client, row AdjustmentRange) (*AdjustmentRangeSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetAdjustmentRange, EncodeAdjustmentRange(row)); err != nil {
+		return nil, fmt.Errorf("adjustment range request failed: %w", err)
+	}
+	normalized := adjustmentRange(row.Index, row.SlotIndex, row.AuxChannelIndex, row.RangeStartStep, row.RangeEndStep, row.AdjustmentFunction, row.AuxSwitchChannelIndex, row.AdjustmentCenter, row.AdjustmentScale)
+	return &AdjustmentRangeSetResult{
+		Range:        normalized,
+		MSPCode:      msp.MSPSetAdjustmentRange,
+		MSPName:      "MSP_SET_ADJUSTMENT_RANGE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeAdjustmentRange(row AdjustmentRange) []byte {
+	payload := []byte{
+		byte(row.Index),
+		row.SlotIndex,
+		row.AuxChannelIndex,
+		row.RangeStartStep,
+		row.RangeEndStep,
+		row.AdjustmentFunction,
+		row.AuxSwitchChannelIndex,
+	}
+	payload = appendU16Payload(payload, row.AdjustmentCenter)
+	payload = appendU16Payload(payload, row.AdjustmentScale)
+	return payload
 }
 
 func DecodeAdjustmentRanges(payload []byte) ([]AdjustmentRange, error) {

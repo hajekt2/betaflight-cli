@@ -202,6 +202,9 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	gaps := coverage["next_gaps"].([]any)
 	for _, item := range gaps {
 		gap := item.(map[string]any)
+		if gap["domain"] == "blackbox-decoding" {
+			t.Fatalf("unexpected blackbox-decoding gap remains: %+v", gap)
+		}
 		if gap["domain"] == "motor-testing" {
 			t.Fatalf("unexpected motor-testing gap remains: %+v", gap)
 		}

@@ -335,16 +335,10 @@ func missingCommands(commandSet map[string]bool, commands []string) []string {
 }
 
 func coverageGaps(domains []coverageDomain) []coverageGap {
-		gaps := []coverageGap{
-		{
-			Domain:     "blackbox-decoding",
-			Reason:     "Offline Blackbox inspection currently decodes simple variable-byte samples, not full Blackbox frame streams.",
-			NextSteps:  []string{"implement binary frame decoding", "add typed gyro, motor, RC, PID, and event streams", "add JSON summaries suitable for agents"},
-			SafetyNote: "Offline only.",
-		},
+	gaps := []coverageGap{
 		{
 			Domain:     "firmware-flashing",
-			Reason:     "Reboot-to-bootloader flows exist, but firmware flashing is not implemented.",
+			Reason:     "Reboot-to-bootloader flows exist, but firmware flashing is intentionally out of scope for this release.",
 			NextSteps:  []string{"decide whether flashing belongs in this CLI", "if accepted, add target validation and image provenance checks", "require explicit dangerous confirmation"},
 			SafetyNote: "Firmware flashing can brick hardware when misused.",
 		},

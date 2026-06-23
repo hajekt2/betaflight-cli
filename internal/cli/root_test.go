@@ -1564,6 +1564,23 @@ func TestSettingsApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestSettingsApplyRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"settings", "set", "gyro_lpf1_static_hz", "0", "--apply"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after settings apply confirmation failure")
+	}
+}
+
 func TestSettingsListMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"settings", "metadata", "dshot_bidir"}, nil)
 	if err != nil {

@@ -1472,6 +1472,9 @@ func (a *app) settingsCommand() *cobra.Command {
 				}
 				return a.render(env)
 			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "apply requires --yes"))
+			}
 			if save && !a.opts.yes {
 				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--save requires --yes because it persists and usually reboots the flight controller"))
 			}

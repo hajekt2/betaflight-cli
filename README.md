@@ -116,6 +116,7 @@ The important contract is that every non-interactive command can emit stable JSO
 Raw CLI text should require `--format text` or interactive mode.
 JSON output should use a versioned response envelope from the first release.
 The envelope schema is documented in [docs/JSON_SCHEMA.md](docs/JSON_SCHEMA.md).
+`betaflight-cli schema` returns a machine-readable contract payload describing the active envelope fields and known command families.
 When JSON output has `ok: false`, the process should exit non-zero.
 When `--port` is omitted, read-only commands may auto-detect and connect to the most likely Betaflight serial port.
 Write and dangerous commands should require either an explicit `--port` or an explicit `--auto-port` flag.

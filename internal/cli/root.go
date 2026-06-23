@@ -112,6 +112,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.transponderCommand())
 	root.AddCommand(a.mixerCommand())
 	root.AddCommand(a.motorsCommand())
+	root.AddCommand(a.schemaCommand())
 	root.AddCommand(a.settingsCommand())
 	root.AddCommand(a.featuresCommand())
 	root.AddCommand(a.serialCommand())
@@ -138,6 +139,93 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.rebootCommand())
 	root.AddCommand(a.mspCommand())
 	return root
+}
+
+func (a *app) schemaCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "schema",
+		Short: "Show the stable JSON contract metadata for AI integrations",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			capabilities := collectCapabilityCommands(cmd.Root())
+			commandCount := len(capabilities)
+			envelopeFields := map[string]any{
+				"schema_version": map[string]any{
+					"type":        "string",
+					"description": "envelope schema version",
+				},
+				"ok": map[string]any{
+					"type":        "boolean",
+					"description": "command success status",
+				},
+				"command": map[string]any{
+					"type":        "string",
+					"description": "canonical command that produced this envelope",
+				},
+				"target": map[string]any{
+					"type":        "object",
+					"description": "connected target metadata when a serial transport was involved",
+				},
+				"data": map[string]any{
+					"type":        "object",
+					"description": "command-specific payload",
+				},
+				"warnings": map[string]any{
+					"type":        "array",
+					"description": "non-blocking warnings",
+				},
+				"errors": map[string]any{
+					"type":        "array",
+					"description": "structured errors when ok is false",
+				},
+				"side_effects": map[string]any{
+					"type":        "array",
+					"description": "externally visible effects such as writes, reboots, or network calls",
+				},
+			}
+			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+				"command": "schema",
+				"schema_version": map[string]any{
+					"envelope":        output.SchemaVersion,
+					"inversion_level":  "command-output-schema-first",
+					"description":     "stable JSON envelope contract currently used for all machine-facing output",
+					"supported_minors": []string{"stable"},
+				},
+				"envelope": envelopeFields,
+				"command_contracts": map[string]any{
+					"total_commands": commandCount,
+					"requires_connection_default": "when command touches transport",
+					"operations": []string{
+						"read_only",
+						"plan_or_write",
+						"write",
+						"dangerous",
+						"offline",
+						"offline_or_read_only_probe",
+						"offline_dangerous_plan",
+					},
+				},
+				"output_roots": []string{
+					"status",
+					"configuration",
+					"telemetry",
+					"debug",
+					"system",
+					"tasks",
+					"environment",
+					"blackbox",
+					"storage",
+					"settings",
+					"change_plan",
+					"firmware_flash",
+					"firmware",
+					"target",
+					"cli",
+					"msp",
+				},
+				"command_count": commandCount,
+			}))
+		},
+	}
 }
 
 func (a *app) blackboxCommand() *cobra.Command {

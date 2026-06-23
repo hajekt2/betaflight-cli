@@ -298,6 +298,35 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestSchemaCommandDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"schema"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatalf("schema command should be offline and never connect")
+	}
+	data := env.Data.(map[string]any)
+	if data["command"] != "schema" {
+		t.Fatalf("command = %v", data["command"])
+	}
+	schemaVersion := data["schema_version"].(map[string]any)
+	if schemaVersion["envelope"] != output.SchemaVersion {
+		t.Fatalf("schema_version = %+v", schemaVersion)
+	}
+	contract := data["command_contracts"].(map[string]any)
+	if contract["total_commands"] == nil {
+		t.Fatalf("command_contracts = %+v", contract)
+	}
+}
+
 func TestFirmwareFlashPlanModeWorksOffline(t *testing.T) {
 	tmp := t.TempDir()
 	image := filepath.Join(tmp, "firmware.bin")

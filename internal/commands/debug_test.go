@@ -38,3 +38,14 @@ func TestDecodeAccelerometerTrimRejectsShortPayload(t *testing.T) {
 		t.Fatal("DecodeAccelerometerTrim() error = nil, want short payload error")
 	}
 }
+
+func TestEncodeAccelerometerTrim(t *testing.T) {
+	payload := EncodeAccelerometerTrim(AccelerometerTrim{Pitch: -12, Roll: 34})
+	trim, err := DecodeAccelerometerTrim(payload)
+	if err != nil {
+		t.Fatalf("DecodeAccelerometerTrim(EncodeAccelerometerTrim()) error = %v", err)
+	}
+	if trim.Pitch != -12 || trim.Roll != 34 {
+		t.Fatalf("trim = %+v", trim)
+	}
+}

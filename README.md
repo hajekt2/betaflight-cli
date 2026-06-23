@@ -53,6 +53,7 @@ betaflight-cli configuration compare --file backup.txt --port /dev/tty.usbmodem0
 betaflight-cli configuration export --source full --raw-cli --format text --port /dev/tty.usbmodem01 > backup.cli
 betaflight-cli text status --port /dev/tty.usbmodem01
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
+betaflight-cli debug set-accelerometer-trim -12 34 --port /dev/tty.usbmodem01 --yes
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01
 betaflight-cli backup create --redact --port /dev/tty.usbmodem01
 betaflight-cli backup create --raw-cli --format text --port /dev/tty.usbmodem01 > backup.cli
@@ -149,6 +150,7 @@ It preserves extended flight-mode bytes so new Betaflight modes beyond the legac
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `debug status` reads live debug channels and accelerometer trims over MSP.
+`debug set-accelerometer-trim` writes accelerometer pitch/roll trim through `MSP_SET_ACC_TRIM` and requires `--yes`.
 `environment status` reads altitude, vario, rangefinder altitude, and legacy analog telemetry over MSP.
 `rtc status` reads the flight controller real-time clock over MSP and returns a normalized UTC timestamp when firmware supplies one.
 `rtc set` writes the flight controller real-time clock using `MSP_SET_RTC` with either `--timestamp` or `--now`, and requires `--yes`.

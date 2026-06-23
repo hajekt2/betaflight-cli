@@ -19,6 +19,13 @@ type AccelerometerTrim struct {
 	Roll  int16 `json:"roll"`
 }
 
+type AccelerometerTrimSetResult struct {
+	Trim         AccelerometerTrim `json:"trim"`
+	MSPCode      uint16            `json:"msp_code"`
+	MSPName      string            `json:"msp_name"`
+	Acknowledged bool              `json:"acknowledged"`
+}
+
 func ReadDebugStatus(ctx context.Context, client *connection.Client) (*DebugStatus, []string, error) {
 	status := &DebugStatus{Sources: map[string]string{}}
 	warnings := []string{}
@@ -84,4 +91,23 @@ func DecodeAccelerometerTrim(payload []byte) (*AccelerometerTrim, error) {
 		return nil, fmt.Errorf("MSP_ACC_TRIM returned %d trailing byte(s)", r.Remaining())
 	}
 	return &AccelerometerTrim{Pitch: pitch, Roll: roll}, nil
+}
+
+func SetAccelerometerTrim(ctx context.Context, client *connection.Client, trim AccelerometerTrim) (*AccelerometerTrimSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetAccTrim, EncodeAccelerometerTrim(trim)); err != nil {
+		return nil, fmt.Errorf("accelerometer trim request failed: %w", err)
+	}
+	return &AccelerometerTrimSetResult{
+		Trim:         trim,
+		MSPCode:      msp.MSPSetAccTrim,
+		MSPName:      "MSP_SET_ACC_TRIM",
+		Acknowledged: true,
+	}, nil
+}
+
+func EncodeAccelerometerTrim(trim AccelerometerTrim) []byte {
+	payload := make([]byte, 0, 4)
+	payload = append(payload, byte(trim.Pitch), byte(uint16(trim.Pitch)>>8))
+	payload = append(payload, byte(trim.Roll), byte(uint16(trim.Roll)>>8))
+	return payload
 }

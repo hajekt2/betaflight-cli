@@ -1237,6 +1237,38 @@ func (a *app) debugCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "set-accelerometer-trim PITCH ROLL",
+		Short: "Set accelerometer trim over MSP",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pitch, err := parseInt16Arg("PITCH", args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			roll, err := parseInt16Arg("ROLL", args[1])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "accelerometer trim changes calibration state; pass --yes"))
+			}
+			trim := bfcommands.AccelerometerTrim{Pitch: pitch, Roll: roll}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetAccelerometerTrim(cmd.Context(), client, trim)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"accelerometer_trim": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "accelerometer_trim",
+					Command: result.MSPName,
+					Detail:  "accelerometer trim updated",
+				})
+				return env
+			})
+		},
+	})
 	return cmd
 }
 

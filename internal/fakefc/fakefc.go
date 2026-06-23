@@ -528,6 +528,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload := appendS16(nil, -12)
 		payload = appendS16(payload, 34)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetAccTrim:
+		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPRawImu:
 		payload := appendS16(nil, 2048)
 		payload = appendS16(payload, -1024)

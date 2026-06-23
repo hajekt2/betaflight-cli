@@ -517,6 +517,14 @@ func requireInts(values []string) error {
 	return nil
 }
 
+func parseInt16Arg(name, value string) (int16, error) {
+	parsed, err := strconv.ParseInt(value, 10, 16)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a signed 16-bit integer", name)
+	}
+	return int16(parsed), nil
+}
+
 func validationFailure(a *app, cmd *cobra.Command, err error) error {
 	return validationFailureMessage(a, cmd, err.Error())
 }

@@ -331,6 +331,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rtcSet["operation"] != "write" || rtcSet["confirmation"] != "--yes" || rtcSet["requires_connection"] != true || rtcSet["output_root"] != "rtc" || rtcSet["runnable"] != true {
 		t.Fatalf("rtc set capability = %+v", rtcSet)
 	}
+	accTrim := byCommand["betaflight-cli debug set-accelerometer-trim"]
+	if accTrim["operation"] != "write" || accTrim["confirmation"] != "--yes" || accTrim["requires_connection"] != true || accTrim["output_root"] != "accelerometer_trim" || accTrim["runnable"] != true {
+		t.Fatalf("accelerometer trim capability = %+v", accTrim)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -731,6 +735,59 @@ func TestDebugStatusWithFakeFC(t *testing.T) {
 	trim := debug["accelerometer_trim"].(map[string]any)
 	if trim["pitch"] != float64(-12) || trim["roll"] != float64(34) {
 		t.Fatalf("trim = %+v", trim)
+	}
+}
+
+func TestDebugSetAccelerometerTrimRequiresValidInt16(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim", "40000", "0", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after trim validation failure")
+	}
+}
+
+func TestDebugSetAccelerometerTrimRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim", "-12", "34"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after trim confirmation failure")
+	}
+}
+
+func TestDebugSetAccelerometerTrimWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim", "-12", "34", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["accelerometer_trim"].(map[string]any)
+	trim := result["trim"].(map[string]any)
+	if trim["pitch"] != float64(-12) || trim["roll"] != float64(34) || result["msp_name"] != "MSP_SET_ACC_TRIM" {
+		t.Fatalf("accelerometer trim = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "accelerometer_trim" || env.SideEffects[0].Command != "MSP_SET_ACC_TRIM" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

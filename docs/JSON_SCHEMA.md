@@ -240,6 +240,8 @@ The object includes raw lines, resource assignments, timer alternate-function as
 
 `debug status` returns a `debug` object decoded from `MSP_DEBUG` and `MSP_ACC_TRIM`.
 The object includes signed debug channel values, signed accelerometer pitch/roll trims, source metadata, and per-message warnings when one optional request is unavailable.
+`debug set-accelerometer-trim` returns an `accelerometer_trim` object with the requested trim, MSP command name/code, and acknowledgement flag.
+Successful trim writes include an `accelerometer_trim` side effect.
 
 `environment status` returns an `environment` object decoded from `MSP_ALTITUDE`, `MSP_SONAR_ALTITUDE`, and `MSP_ANALOG`.
 The object includes estimated altitude in centimeters/meters, vario, rangefinder altitude, legacy voltage, drawn mAh, RSSI, amperage, battery voltage, source metadata, and per-message warnings.

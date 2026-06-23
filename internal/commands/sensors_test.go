@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
@@ -81,6 +82,10 @@ func TestDecodeSensorAlignmentAndCompass(t *testing.T) {
 	}
 	if compass.DeclinationDeciDegrees != 123 || compass.DeclinationDegrees != 12.3 {
 		t.Fatalf("compass = %+v", compass)
+	}
+	payload := EncodeCompassConfig(-123)
+	if !bytes.Equal(payload, []byte{0x85, 0xff}) {
+		t.Fatalf("payload = %v", payload)
 	}
 }
 

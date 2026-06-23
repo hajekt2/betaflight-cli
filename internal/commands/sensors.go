@@ -61,6 +61,14 @@ type CompassConfig struct {
 	DeclinationDegrees     float64 `json:"declination_degrees"`
 }
 
+type CompassConfigSetResult struct {
+	Config       CompassConfig `json:"config"`
+	MSPCode      uint16        `json:"msp_code"`
+	MSPName      string        `json:"msp_name"`
+	Acknowledged bool          `json:"acknowledged"`
+	SaveRequired bool          `json:"save_required"`
+}
+
 type SensorCalibrationKind string
 
 const (
@@ -135,6 +143,24 @@ func CalibrateSensor(ctx context.Context, client *connection.Client, kind Sensor
 		MSPName:      name,
 		Acknowledged: true,
 	}, nil
+}
+
+func SetCompassConfig(ctx context.Context, client *connection.Client, declinationDeciDegrees int16) (*CompassConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetCompassConfig, EncodeCompassConfig(declinationDeciDegrees)); err != nil {
+		return nil, fmt.Errorf("compass config request failed: %w", err)
+	}
+	return &CompassConfigSetResult{
+		Config:       compassConfigFromDeclination(declinationDeciDegrees),
+		MSPCode:      msp.MSPSetCompassConfig,
+		MSPName:      "MSP_SET_COMPASS_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeCompassConfig(declinationDeciDegrees int16) []byte {
+	v := uint16(declinationDeciDegrees)
+	return []byte{byte(v), byte(v >> 8)}
 }
 
 func sensorCalibrationCommand(kind SensorCalibrationKind) (uint16, string, error) {
@@ -269,10 +295,15 @@ func DecodeCompassConfig(payload []byte) (*CompassConfig, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &CompassConfig{
+	config := compassConfigFromDeclination(declination)
+	return &config, nil
+}
+
+func compassConfigFromDeclination(declination int16) CompassConfig {
+	return CompassConfig{
 		DeclinationDeciDegrees: declination,
 		DeclinationDegrees:     float64(declination) / 10,
-	}, nil
+	}
 }
 
 func readActiveSensorHardware(ctx context.Context, client *connection.Client) ([]SensorHardware, error) {

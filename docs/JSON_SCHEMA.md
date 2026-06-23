@@ -280,6 +280,8 @@ Successful board alignment writes include a `board_alignment` side effect.
 
 `sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP2_GYRO_SENSOR_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.
 The object includes configured hardware IDs, active hardware IDs, active gyro hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
+`sensors set-compass-declination` returns a `compass_config` object with declination in deci-degrees and degrees, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful compass config writes include a `compass_config` side effect.
 `sensors calibrate-accelerometer` and `sensors calibrate-magnetometer` return a `sensor_calibration` object with the calibration kind, MSP command name/code, and acknowledgement flag.
 Successful calibration commands also include a `sensor_calibration` side effect.
 

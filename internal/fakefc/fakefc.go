@@ -564,6 +564,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 	case msp.MSPCompassConfig:
 		payload := appendS16(nil, 123)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetCompassConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 2))
 	case msp.MSPBeeperConfig:
 		payload := appendU32(nil, 0x00000012)
 		payload = append(payload, 3)

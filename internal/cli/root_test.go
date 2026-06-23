@@ -335,6 +335,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if accTrim["operation"] != "write" || accTrim["confirmation"] != "--yes" || accTrim["requires_connection"] != true || accTrim["output_root"] != "accelerometer_trim" || accTrim["runnable"] != true {
 		t.Fatalf("accelerometer trim capability = %+v", accTrim)
 	}
+	compassConfig := byCommand["betaflight-cli sensors set-compass-declination"]
+	if compassConfig["operation"] != "write" || compassConfig["confirmation"] != "--yes" || compassConfig["requires_connection"] != true || compassConfig["output_root"] != "compass_config" || compassConfig["runnable"] != true {
+		t.Fatalf("compass config capability = %+v", compassConfig)
+	}
 	profileCopy := byCommand["betaflight-cli profiles copy"]
 	if profileCopy["operation"] != "write" || profileCopy["confirmation"] != "--yes" || profileCopy["requires_connection"] != true || profileCopy["output_root"] != "profile_copy" || profileCopy["runnable"] != true {
 		t.Fatalf("profile copy capability = %+v", profileCopy)
@@ -3124,6 +3128,54 @@ func TestSensorsCalibrationWithFakeFC(t *testing.T) {
 		t.Fatalf("calibration = %+v", calibration)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_calibration" || env.SideEffects[0].Command != "MSP_MAG_CALIBRATION" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSensorsSetCompassDeclinationRejectsInvalidValueBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-compass-declination", "40000", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSensorsSetCompassDeclinationRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-compass-declination", "123"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSensorsSetCompassDeclinationWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-compass-declination", "-123", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["compass_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["declination_deci_degrees"] != float64(-123) || config["declination_degrees"] != -12.3 {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_COMPASS_CONFIG" || result["save_required"] != true {
+		t.Fatalf("compass config result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "compass_config" || env.SideEffects[0].Command != "MSP_SET_COMPASS_CONFIG" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

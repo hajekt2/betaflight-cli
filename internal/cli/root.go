@@ -370,7 +370,38 @@ func (a *app) sensorsCommand() *cobra.Command {
 	})
 	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-accelerometer", "Calibrate the accelerometer over MSP", bfcommands.SensorCalibrationAccelerometer))
 	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-magnetometer", "Calibrate the magnetometer over MSP", bfcommands.SensorCalibrationMagnetometer))
+	cmd.AddCommand(a.sensorCompassDeclinationCommand())
 	return cmd
+}
+
+func (a *app) sensorCompassDeclinationCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-compass-declination DECI_DEGREES",
+		Short: "Set compass declination through MSP_SET_COMPASS_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			declination, err := parseInt16Arg("deci_degrees", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "compass declination changes sensor configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetCompassConfig(cmd.Context(), client, declination)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"compass_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "compass_config",
+					Command: "MSP_SET_COMPASS_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) sensorCalibrationCommand(use, short string, kind bfcommands.SensorCalibrationKind) *cobra.Command {

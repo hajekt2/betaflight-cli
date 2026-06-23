@@ -25,7 +25,10 @@ func TestParseDocument(t *testing.T) {
 		"aux 0 0 0 1700 2100 0 0",
 		"resource MOTOR 1 A00",
 		"timer B00 AF2",
+		"timer B01 NONE",
 		"dma ADC 1 0",
+		"dma SPI_TX 1 NONE",
+		"dma pin B00 0",
 		"mixer QUADX",
 		"mmix reset",
 		"map AETR1234",
@@ -78,8 +81,11 @@ func TestParseDocument(t *testing.T) {
 	if len(doc.Resources) != 1 || doc.Resources[0].Kind != "MOTOR" || doc.Resources[0].Target != "A00" {
 		t.Fatalf("resources = %+v", doc.Resources)
 	}
-	if len(doc.Timers) != 1 || len(doc.DMA) != 1 {
+	if len(doc.Timers) != 2 || doc.Timers[0].Pin != "B00" || doc.Timers[0].AlternateFunction != "AF2" || doc.Timers[0].Raw != "timer B00 AF2" || doc.Timers[1].Pin != "B01" || !doc.Timers[1].None {
 		t.Fatalf("timers/dma = %+v/%+v", doc.Timers, doc.DMA)
+	}
+	if len(doc.DMA) != 3 || doc.DMA[0].Scope != "ADC" || doc.DMA[0].Device != "1" || doc.DMA[0].Index != "" || doc.DMA[0].Option != "0" || doc.DMA[0].Raw != "dma ADC 1 0" || doc.DMA[1].Scope != "SPI_TX" || doc.DMA[1].Index != "" || !doc.DMA[1].None || doc.DMA[2].Scope != "pin" || doc.DMA[2].Device != "B00" || doc.DMA[2].Index != "" || doc.DMA[2].Option != "0" {
+		t.Fatalf("dma = %+v", doc.DMA)
 	}
 	if len(doc.Mixer) != 1 || len(doc.MMix) != 1 || len(doc.RCMap) != 1 {
 		t.Fatalf("mixer/mmix/map = %+v/%+v/%+v", doc.Mixer, doc.MMix, doc.RCMap)

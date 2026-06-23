@@ -179,6 +179,7 @@ The object includes a compact summary for configured state, reboot-required stat
 `configuration snapshot` returns a `configuration_snapshot` object built from read-only `dump all` and `diff all` CLI output.
 The object includes parsed full and diff documents, section counts, unknown line and unknown setting counts, save-command detection, and restore/batch review guidance.
 Parsed documents classify Betaflight import metadata and common CLI families such as `batch`, `defaults`, `save`, `board`, `timers`, `dma`, `mixer`, `mmix`, `map`, `beeper`, `beacon`, and `rxfail` separately from genuinely unknown syntax.
+The `timers` and `dma` arrays include decoded assignment fields plus the original raw line for restore fidelity.
 
 `tasks status` returns a `tasks` object parsed from the Betaflight `tasks` CLI command.
 The object includes raw lines, parsed task rows, optional check-function stats, optional total load, parser warnings, and a `task_stats_reset` side effect because Betaflight resets max task execution statistics after printing them.

@@ -16,8 +16,8 @@ type Document struct {
 	Serial    []Serial            `json:"serial"`
 	Aux       []AuxRange          `json:"aux"`
 	Resources []Resource          `json:"resources"`
-	Timers    []Command           `json:"timers"`
-	DMA       []Command           `json:"dma"`
+	Timers    []TimerAssignment   `json:"timers"`
+	DMA       []DMAAssignment     `json:"dma"`
 	Profiles  []Profile           `json:"profiles"`
 	VTXTable  []Command           `json:"vtx_table"`
 	VTX       *VTXTableSummary    `json:"vtx,omitempty"`
@@ -111,6 +111,27 @@ type Resource struct {
 	Kind   string `json:"kind"`
 	Index  string `json:"index,omitempty"`
 	Target string `json:"target,omitempty"`
+	Line   string `json:"line"`
+}
+
+type TimerAssignment struct {
+	Pin               string `json:"pin,omitempty"`
+	AlternateFunction string `json:"alternate_function,omitempty"`
+	Function          string `json:"function,omitempty"`
+	Free              bool   `json:"free"`
+	None              bool   `json:"none"`
+	Raw               string `json:"raw"`
+	Line              string `json:"line"`
+}
+
+type DMAAssignment struct {
+	Scope  string `json:"scope,omitempty"`
+	Device string `json:"device,omitempty"`
+	Index  string `json:"index,omitempty"`
+	Option string `json:"option,omitempty"`
+	Free   bool   `json:"free"`
+	None   bool   `json:"none"`
+	Raw    string `json:"raw"`
 	Line   string `json:"line"`
 }
 
@@ -262,10 +283,10 @@ func classify(doc *Document, line string, fields []string, registry settings.Reg
 		doc.Resources = append(doc.Resources, parseResource(line, fields))
 	case fields[0] == "timer":
 		doc.Sections["timers"] = append(doc.Sections["timers"], line)
-		doc.Timers = append(doc.Timers, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+		doc.Timers = append(doc.Timers, parseTimerAssignment(line, fields))
 	case fields[0] == "dma":
 		doc.Sections["dma"] = append(doc.Sections["dma"], line)
-		doc.DMA = append(doc.DMA, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+		doc.DMA = append(doc.DMA, parseDMAAssignment(line, fields))
 	case fields[0] == "vtxtable":
 		doc.Sections["vtx_table"] = append(doc.Sections["vtx_table"], line)
 		doc.VTXTable = append(doc.VTXTable, Command{Kind: fields[0], Line: line, Args: fields[1:]})
@@ -408,6 +429,39 @@ func parseResource(line string, fields []string) Resource {
 		resource.Target = fields[3]
 	}
 	return resource
+}
+
+func parseTimerAssignment(line string, fields []string) TimerAssignment {
+	assignment := TimerAssignment{Raw: line, Line: line}
+	if len(fields) > 1 {
+		assignment.Pin = fields[1]
+	}
+	if len(fields) > 2 {
+		assignment.AlternateFunction = fields[2]
+		assignment.Function = fields[2]
+		assignment.Free = strings.EqualFold(fields[2], "FREE")
+		assignment.None = strings.EqualFold(fields[2], "NONE")
+	}
+	return assignment
+}
+
+func parseDMAAssignment(line string, fields []string) DMAAssignment {
+	assignment := DMAAssignment{Raw: line, Line: line}
+	if len(fields) > 1 {
+		assignment.Scope = fields[1]
+	}
+	if len(fields) > 2 {
+		assignment.Device = fields[2]
+	}
+	if len(fields) >= 5 {
+		assignment.Index = fields[3]
+	}
+	if len(fields) > 1 {
+		assignment.Option = fields[len(fields)-1]
+		assignment.Free = strings.EqualFold(assignment.Option, "FREE")
+		assignment.None = strings.EqualFold(assignment.Option, "NONE")
+	}
+	return assignment
 }
 
 func parseIndexedCommand(line string, fields []string) IndexedCommand {

@@ -832,7 +832,7 @@ func (a *app) beeperCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(disable, &disableFlags)
-	cmd.AddCommand(disable, a.beeperSetConfigCommand())
+	cmd.AddCommand(disable, a.beeperSetConfigCommand(), a.beeperSetConfigJSONCommand())
 	return cmd
 }
 
@@ -877,6 +877,64 @@ func (a *app) beeperSetConfigCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) beeperSetConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set beeper and DShot beacon masks from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseBeeperConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "beeper configuration changes beeper settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetBeeperConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"beeper_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "beeper_config",
+					Command: "MSP_SET_BEEPER_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseBeeperConfigJSON(data []byte) (bfcommands.BeeperConfig, error) {
+	var wrapped struct {
+		BeeperConfig *bfcommands.BeeperConfig `json:"beeper_config"`
+		Beeper       *bfcommands.BeeperConfig `json:"beeper"`
+		Config       *bfcommands.BeeperConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.BeeperConfig{}, err
+	}
+	switch {
+	case wrapped.BeeperConfig != nil:
+		return *wrapped.BeeperConfig, nil
+	case wrapped.Beeper != nil:
+		return *wrapped.Beeper, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.BeeperConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.BeeperConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) transponderCommand() *cobra.Command {

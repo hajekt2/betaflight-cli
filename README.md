@@ -251,6 +251,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `sensors calibrate-accelerometer` and `sensors calibrate-magnetometer` send typed MSP calibration requests, require `--yes`, and report the calibration side effect.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
 `beeper set-config` writes beeper and DShot beacon disable masks through `MSP_SET_BEEPER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`beeper set-config-json` writes beeper and DShot beacon disable masks through `MSP_SET_BEEPER_CONFIG`, accepts either a beeper config object or an object with `beeper_config`, `beeper`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `transponder config` reads IR transponder provider requirements, active provider, code bytes, hex data, and native CLI commands over MSP.
 `transponder set-config` writes the active transponder provider and data bytes through `MSP_SET_TRANSPONDER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.

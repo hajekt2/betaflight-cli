@@ -327,6 +327,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if beeperConfig["operation"] != "write" || beeperConfig["confirmation"] != "--yes" || beeperConfig["requires_connection"] != true || beeperConfig["output_root"] != "beeper_config" || beeperConfig["runnable"] != true {
 		t.Fatalf("beeper config capability = %+v", beeperConfig)
 	}
+	beeperConfigJSON := byCommand["betaflight-cli beeper set-config-json"]
+	if beeperConfigJSON["operation"] != "write" || beeperConfigJSON["confirmation"] != "--yes" || beeperConfigJSON["requires_connection"] != true || beeperConfigJSON["output_root"] != "beeper_config" || beeperConfigJSON["input"] == "" || beeperConfigJSON["runnable"] != true {
+		t.Fatalf("beeper config json capability = %+v", beeperConfigJSON)
+	}
 	cliInteractive := byCommand["betaflight-cli cli interactive"]
 	if cliInteractive["operation"] != "dangerous" || cliInteractive["confirmation"] != "--yes" || cliInteractive["requires_connection"] != true || cliInteractive["runnable"] != true {
 		t.Fatalf("cli interactive capability = %+v", cliInteractive)
@@ -4480,8 +4484,42 @@ func TestBeeperSetConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestBeeperSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"beeper":{"disabled_mask":18,"dshot_beacon_tone":3,"dshot_beacon_disabled_mask":514}}`
+	env, err := runTestCommandWithInput(t, []string{"beeper", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["beeper_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["disabled_mask"] != float64(0x12) || config["dshot_beacon_disabled_mask"] != float64(0x202) || result["save_required"] != true {
+		t.Fatalf("beeper_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "beeper_config" || env.SideEffects[0].Command != "MSP_SET_BEEPER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestBeeperSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"beeper", "set-config", "0x12", "3", "0x202"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestBeeperSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"beeper_config":{"disabled_mask":18,"dshot_beacon_tone":3,"dshot_beacon_disabled_mask":514}}`
+	env, err := runTestCommandWithInput(t, []string{"beeper", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})

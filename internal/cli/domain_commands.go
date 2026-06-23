@@ -218,8 +218,122 @@ func (a *app) serialCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.serialApplyConfigJSONCommand())
+	cmd.AddCommand(set, a.serialSetJSONCommand(), a.serialApplyConfigJSONCommand())
 	return cmd
+}
+
+func (a *app) serialSetJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Plan or set one serial CLI row from JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			line, err := parseSerialSetJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.planOrApplyCLI(cmd, []string{line}, "serial", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseSerialSetJSON(data []byte) (string, error) {
+	type serialSetInput struct {
+		Port               json.RawMessage `json:"port"`
+		Identifier         *int            `json:"identifier"`
+		ID                 *int            `json:"id"`
+		IdentifierName     string          `json:"identifier_name"`
+		PortName           string          `json:"port_name"`
+		FunctionMask       *int            `json:"function_mask"`
+		MSPBaud            *int            `json:"msp_baud"`
+		MSPBaudRateIndex   *int            `json:"msp_baudrate_index"`
+		GPSBaud            *int            `json:"gps_baud"`
+		GPSBaudRateIndex   *int            `json:"gps_baudrate_index"`
+		TelemetryBaud      *int            `json:"telemetry_baud"`
+		TelemetryBaudIndex *int            `json:"telemetry_baudrate_index"`
+		BlackboxBaud       *int            `json:"blackbox_baud"`
+		BlackboxBaudIndex  *int            `json:"blackbox_baudrate_index"`
+	}
+	var wrapped struct {
+		Serial *serialSetInput `json:"serial"`
+		Port   *serialSetInput `json:"port"`
+		Row    *serialSetInput `json:"row"`
+		Set    *serialSetInput `json:"set"`
+		serialSetInput
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return "", err
+	}
+	input := wrapped.serialSetInput
+	for _, candidate := range []*serialSetInput{wrapped.Serial, wrapped.Port, wrapped.Row, wrapped.Set} {
+		if candidate != nil {
+			input = *candidate
+			break
+		}
+	}
+	port, err := serialPortToken(input.Port, input.Identifier, input.ID, input.IdentifierName, input.PortName)
+	if err != nil {
+		return "", err
+	}
+	values := []struct {
+		name  string
+		value *int
+	}{
+		{"function_mask", input.FunctionMask},
+		{"msp_baud", firstIntPtr(input.MSPBaud, input.MSPBaudRateIndex)},
+		{"gps_baud", firstIntPtr(input.GPSBaud, input.GPSBaudRateIndex)},
+		{"telemetry_baud", firstIntPtr(input.TelemetryBaud, input.TelemetryBaudIndex)},
+		{"blackbox_baud", firstIntPtr(input.BlackboxBaud, input.BlackboxBaudIndex)},
+	}
+	parts := make([]string, 0, len(values))
+	for _, item := range values {
+		if item.value == nil {
+			return "", fmt.Errorf("%s is required", item.name)
+		}
+		if *item.value < 0 {
+			return "", fmt.Errorf("%s must be non-negative", item.name)
+		}
+		parts = append(parts, strconv.Itoa(*item.value))
+	}
+	return "serial " + port + " " + strings.Join(parts, " "), nil
+}
+
+func serialPortToken(portRaw json.RawMessage, identifier *int, id *int, identifierName string, portName string) (string, error) {
+	if len(portRaw) != 0 && string(portRaw) != "null" {
+		var text string
+		if err := json.Unmarshal(portRaw, &text); err == nil {
+			if strings.TrimSpace(text) == "" {
+				return "", fmt.Errorf("port must not be empty")
+			}
+			return strings.TrimSpace(text), nil
+		}
+		var value int
+		if err := json.Unmarshal(portRaw, &value); err != nil {
+			return "", fmt.Errorf("port must be a string or non-negative integer")
+		}
+		if value < 0 {
+			return "", fmt.Errorf("port must be non-negative")
+		}
+		return strconv.Itoa(value), nil
+	}
+	if value := firstIntPtr(identifier, id); value != nil {
+		if *value < 0 {
+			return "", fmt.Errorf("identifier must be non-negative")
+		}
+		return strconv.Itoa(*value), nil
+	}
+	text := firstString(identifierName, portName)
+	if strings.TrimSpace(text) == "" {
+		return "", fmt.Errorf("port is required")
+	}
+	return strings.TrimSpace(text), nil
 }
 
 func (a *app) serialApplyConfigJSONCommand() *cobra.Command {

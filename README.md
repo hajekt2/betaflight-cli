@@ -213,6 +213,7 @@ Betaflight 2025.12 declares `MSP_OSD_VIDEO_CONFIG` and `MSP_SET_OSD_VIDEO_CONFIG
 `vtxtable set-band-json` and `vtxtable set-power-json` accept direct row objects or objects with `vtxtable_band`/`band`/`config`/`vtxtable.band` and `vtxtable_power`/`power`/`config`/`vtxtable.power`, require `--yes`, and return the same output roots as their positional forms.
 `features set-mask` writes the complete feature mask through `MSP_SET_FEATURE_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `serial status` reads serial port identifiers, function masks, decoded function names, and baudrate indexes over MSP.
+`serial set-json` accepts one native serial row with `port`/`identifier`/`id`, `function_mask`, and MSP/GPS/telemetry/Blackbox baud fields, returns a native CLI `change_plan`, and can apply the resulting `serial ...` row with `--apply --yes`.
 `serial apply-config-json` writes a complete serial port table through `MSP_SET_CF_SERIAL_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.

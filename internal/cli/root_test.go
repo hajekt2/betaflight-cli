@@ -534,6 +534,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if serialConfig["operation"] != "write" || serialConfig["confirmation"] != "--yes" || serialConfig["requires_connection"] != true || serialConfig["output_root"] != "serial_config" || serialConfig["runnable"] != true {
 		t.Fatalf("serial config capability = %+v", serialConfig)
 	}
+	serialSetJSON := byCommand["betaflight-cli serial set-json"]
+	if serialSetJSON["operation"] != "plan_or_write" || serialSetJSON["confirmation"] != "--yes with --apply or --save" || serialSetJSON["requires_connection"] != true || serialSetJSON["output_root"] != "change_plan" || serialSetJSON["input"] == "" || serialSetJSON["runnable"] != true {
+		t.Fatalf("serial set json capability = %+v", serialSetJSON)
+	}
 	modeRange := byCommand["betaflight-cli modes set-range"]
 	if modeRange["operation"] != "write" || modeRange["confirmation"] != "--yes" || modeRange["requires_connection"] != true || modeRange["output_root"] != "mode_range" || modeRange["runnable"] != true {
 		t.Fatalf("mode range capability = %+v", modeRange)
@@ -6460,6 +6464,61 @@ func TestSerialSetPlan(t *testing.T) {
 	lines := data["cli_lines"].([]any)
 	if lines[0] != "serial UART1 64 115200 57600 0 115200" || data["applied"] != false {
 		t.Fatalf("plan = %+v", data)
+	}
+}
+
+func TestSerialSetJSONPlanDoesNotConnect(t *testing.T) {
+	input := `{"serial":{"port":"UART1","function_mask":64,"msp_baud":115200,"gps_baud":57600,"telemetry_baud":0,"blackbox_baud":115200}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"serial", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if lines[0] != "serial UART1 64 115200 57600 0 115200" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only serial set-json command")
+	}
+}
+
+func TestSerialSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"identifier":51,"function_mask":64,"msp_baudrate_index":5,"gps_baudrate_index":4,"telemetry_baudrate_index":-1,"blackbox_baudrate_index":0}`
+	env, err := runTestCommandWithInput(t, []string{"serial", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid serial JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSerialSetJSONApplyWithFakeFC(t *testing.T) {
+	input := `{"row":{"identifier":51,"function_mask":64,"msp_baudrate_index":5,"gps_baudrate_index":4,"telemetry_baudrate_index":0,"blackbox_baudrate_index":5}}`
+	env, err := runTestCommandWithInput(t, []string{"serial", "set-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["kind"] != "serial" || data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "serial 51 64 5 4 0 5" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

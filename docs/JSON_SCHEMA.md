@@ -207,6 +207,8 @@ Successful feature mask writes include a `feature_mask` side effect.
 
 `serial status` returns a `serial` object decoded from `MSP2_COMMON_SERIAL_CONFIG` with legacy `MSP_CF_SERIAL_CONFIG` fallback.
 The object includes port identifiers, decoded port names, function masks, decoded functions, baudrate indexes, and decoded baudrate names.
+`serial set-json` accepts one native serial row with `port`/`identifier`/`id`, `function_mask`, and MSP/GPS/telemetry/Blackbox baud fields, either directly or under `serial`, `port`, `row`, or `set`.
+It returns a `change_plan` with the exact native `serial PORT FUNCTION_MASK MSP_BAUD GPS_BAUD TELEMETRY_BAUD BLACKBOX_BAUD` CLI line, and applying it requires `--apply --yes`.
 `serial apply-config-json` returns a `serial_config` object with the applied full-table port rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful serial config writes include a `serial_config` side effect.
 

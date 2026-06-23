@@ -10,6 +10,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"runtime"
 	"strings"
 	"time"
 
@@ -523,7 +524,7 @@ func (a *app) versionCommand() *cobra.Command {
 				"commit":         a.build.Commit,
 				"date":           a.build.Date,
 				"schema_version": output.SchemaVersion,
-				"go_target":      "latest stable",
+				"go_target":      runtime.Version(),
 			})
 			return a.render(env)
 		},

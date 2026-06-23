@@ -22,6 +22,8 @@ type Status struct {
 	I2CErrors           uint16   `json:"i2c_errors"`
 	ActiveSensors       uint16   `json:"active_sensors"`
 	ModeFlags           uint32   `json:"mode_flags"`
+	ModeFlagsBytes      []int    `json:"mode_flags_bytes,omitempty"`
+	ModeFlagByteCount   *uint8   `json:"mode_flag_byte_count,omitempty"`
 	Profile             uint8    `json:"profile"`
 	CPULoad             *uint16  `json:"cpu_load,omitempty"`
 	ProfileCount        *uint8   `json:"profile_count,omitempty"`
@@ -117,7 +119,13 @@ func decodeStatus(payload []byte, extended bool) (*Status, error) {
 		I2CErrors:     i2c,
 		ActiveSensors: sensors,
 		ModeFlags:     mode,
-		Profile:       profile,
+		ModeFlagsBytes: []int{
+			int(byte(mode)),
+			int(byte(mode >> 8)),
+			int(byte(mode >> 16)),
+			int(byte(mode >> 24)),
+		},
+		Profile: profile,
 	}
 	if !extended {
 		return status, nil
@@ -133,7 +141,12 @@ func decodeStatus(payload []byte, extended bool) (*Status, error) {
 		status.RateProfile = &rate
 	}
 	if byteCount, err := r.U8(); err == nil && r.Remaining() >= int(byteCount) {
-		_, _ = r.Bytes(int(byteCount))
+		status.ModeFlagByteCount = &byteCount
+		if extra, err := r.Bytes(int(byteCount)); err == nil {
+			for _, value := range extra {
+				status.ModeFlagsBytes = append(status.ModeFlagsBytes, int(value))
+			}
+		}
 	}
 	if count, err := r.U8(); err == nil {
 		status.ArmingDisableCount = &count

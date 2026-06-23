@@ -117,6 +117,7 @@ It also includes CLI-row table commands for VTX tables, LED strips, servos, adju
 It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.
 `status` reads compact runtime status from `MSP_STATUS_EX`, including active sensor names, active flight mode names, arming-disable state, and reboot-required state.
+It preserves extended flight-mode bytes so new Betaflight modes beyond the legacy 32-bit mask can still be represented.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `debug status` reads live debug channels and accelerometer trims over MSP.

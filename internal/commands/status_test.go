@@ -32,3 +32,25 @@ func TestDecodeFlightModeStateReportsUnknownMask(t *testing.T) {
 		t.Fatalf("unknown mask = %d", state.UnknownMask)
 	}
 }
+
+func TestDecodeFlightModeStateUsesExtendedFlagBytes(t *testing.T) {
+	status := &Status{
+		Source:         "MSP_STATUS_EX",
+		ModeFlags:      0,
+		ModeFlagsBytes: make([]int, 5),
+	}
+	status.ModeFlagsBytes[4] = 1
+	modes := make([]ModeDefinition, 33)
+	for i := range modes {
+		modes[i] = ModeDefinition{ID: uint8(i), Name: "MODE"}
+	}
+	modes[32].Name = "EXTENDED"
+	state := DecodeFlightModeState(status, modes)
+	if len(state.ActiveNames) != 1 || state.ActiveNames[0] != "EXTENDED" {
+		t.Fatalf("active names = %+v", state.ActiveNames)
+	}
+	active := state.ActiveModes[0]
+	if active.Bit != 32 || active.ByteIndex != 4 || active.BitIndex != 0 || active.Mask != 0 {
+		t.Fatalf("active extended mode = %+v", active)
+	}
+}

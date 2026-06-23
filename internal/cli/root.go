@@ -1677,45 +1677,6 @@ func platformHint() string {
 	return "USB serial only. On macOS prefer /dev/cu.* ports; on Linux check dialout/uucp permissions; on Windows use COM ports."
 }
 
-type cliClass int
-
-const (
-	cliReadOnly cliClass = iota
-	cliWrite
-	cliDangerous
-)
-
-func classifyCLI(command string) cliClass {
-	fields := strings.Fields(strings.ToLower(strings.TrimSpace(command)))
-	if len(fields) == 0 {
-		return cliReadOnly
-	}
-	first := fields[0]
-	switch first {
-	case "save", "defaults", "motor", "motors", "dshotprog", "bl", "dfu", "msc", "exit", "reboot", "erase", "beeper":
-		return cliDangerous
-	case "diff", "dump", "get", "version", "status", "help", "tasks":
-		return cliReadOnly
-	case "resource":
-		if len(fields) == 1 || fields[1] == "show" || fields[1] == "list" {
-			return cliReadOnly
-		}
-		return cliWrite
-	case "set", "feature", "serial", "aux", "profile", "rateprofile", "battery_profile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail":
-		return cliWrite
-	default:
-		return cliWrite
-	}
-}
-
-func isConfigurationRead(command string) bool {
-	fields := strings.Fields(strings.ToLower(strings.TrimSpace(command)))
-	if len(fields) == 0 {
-		return false
-	}
-	return fields[0] == "dump" || fields[0] == "diff"
-}
-
 func parseCLISections(lines []string) map[string][]string {
 	return bfconfig.Parse(lines, settings.DefaultRegistry).Sections
 }

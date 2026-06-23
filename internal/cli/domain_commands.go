@@ -383,19 +383,6 @@ func (a *app) validateChangePlan(cmd *cobra.Command, plan batch.Plan, opts planV
 	return output.Envelope{}, true
 }
 
-func isBatchAllowed(line string) bool {
-	fields := strings.Fields(strings.ToLower(strings.TrimSpace(line)))
-	if len(fields) == 0 {
-		return false
-	}
-	switch fields[0] {
-	case "set", "feature", "serial", "aux", "resource", "timer", "dma", "profile", "rateprofile", "battery_profile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail", "beeper", "beacon", "mixer", "mmix", "map":
-		return true
-	default:
-		return false
-	}
-}
-
 func validateSetLine(line string) error {
 	trimmed := strings.TrimSpace(line)
 	if !strings.HasPrefix(strings.ToLower(trimmed), "set ") {

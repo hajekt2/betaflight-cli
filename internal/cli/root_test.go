@@ -26,6 +26,10 @@ func TestClassifyCLI(t *testing.T) {
 		{"diff all", cliReadOnly},
 		{"dump all", cliReadOnly},
 		{"get gyro_lpf1_static_hz", cliReadOnly},
+		{"resource", cliReadOnly},
+		{"resource show", cliReadOnly},
+		{"resource list", cliReadOnly},
+		{"resource serialrx 1 A06", cliWrite},
 		{"set gyro_lpf1_static_hz = 0", cliWrite},
 		{"save", cliDangerous},
 		{"defaults", cliDangerous},
@@ -34,6 +38,23 @@ func TestClassifyCLI(t *testing.T) {
 	for _, tt := range tests {
 		if got := classifyCLI(tt.command); got != tt.want {
 			t.Fatalf("classifyCLI(%q) = %v, want %v", tt.command, got, tt.want)
+		}
+	}
+}
+
+func TestIsBatchAllowed(t *testing.T) {
+	tests := map[string]bool{
+		"set foo = 1":        true,
+		"serial 0 1 1":       true,
+		"resource serialrx 1": true,
+		"save":               false,
+		"diff all":           false,
+		"reboot":             false,
+		"feature GPS":        true,
+	}
+	for line, want := range tests {
+		if got := isBatchAllowed(line); got != want {
+			t.Fatalf("isBatchAllowed(%q) = %v, want %v", line, got, want)
 		}
 	}
 }

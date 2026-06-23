@@ -25,6 +25,13 @@ type Document struct {
 	SMix      []Command           `json:"smix"`
 	AdjRanges []AdjustmentRange   `json:"adjranges"`
 	RXRanges  []RXRange           `json:"rxranges"`
+	RXFail    []RXFail            `json:"rxfail"`
+	Beeper    []Command           `json:"beeper"`
+	Beacon    []Command           `json:"beacon"`
+	Board     []Command           `json:"board"`
+	Batch     []Command           `json:"batch"`
+	Defaults  []Command           `json:"defaults"`
+	Save      []Command           `json:"save"`
 	Comments  []string            `json:"comments"`
 	Unknown   []string            `json:"unknown"`
 }
@@ -145,6 +152,14 @@ type RXRange struct {
 	Line    string `json:"line"`
 }
 
+type RXFail struct {
+	Channel *int     `json:"channel,omitempty"`
+	Mode    string   `json:"mode,omitempty"`
+	Value   *int     `json:"value,omitempty"`
+	Args    []string `json:"args,omitempty"`
+	Line    string   `json:"line"`
+}
+
 func Parse(lines []string, registry settings.Registry) Document {
 	doc := Document{
 		Sections: map[string][]string{
@@ -161,6 +176,13 @@ func Parse(lines []string, registry settings.Registry) Document {
 			"smix":      {},
 			"adjranges": {},
 			"rxranges":  {},
+			"rxfail":    {},
+			"beeper":    {},
+			"beacon":    {},
+			"board":     {},
+			"batch":     {},
+			"defaults":  {},
+			"save":      {},
 			"unknown":   {},
 		},
 	}
@@ -246,6 +268,27 @@ func classify(doc *Document, line string, fields []string, registry settings.Reg
 	case fields[0] == "rxrange":
 		doc.Sections["rxranges"] = append(doc.Sections["rxranges"], line)
 		doc.RXRanges = append(doc.RXRanges, parseRXRange(line, fields))
+	case fields[0] == "rxfail":
+		doc.Sections["rxfail"] = append(doc.Sections["rxfail"], line)
+		doc.RXFail = append(doc.RXFail, parseRXFail(line, fields))
+	case fields[0] == "beeper":
+		doc.Sections["beeper"] = append(doc.Sections["beeper"], line)
+		doc.Beeper = append(doc.Beeper, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "beacon":
+		doc.Sections["beacon"] = append(doc.Sections["beacon"], line)
+		doc.Beacon = append(doc.Beacon, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "board_name" || fields[0] == "manufacturer_id" || fields[0] == "mcu_id" || fields[0] == "signature":
+		doc.Sections["board"] = append(doc.Sections["board"], line)
+		doc.Board = append(doc.Board, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "batch":
+		doc.Sections["batch"] = append(doc.Sections["batch"], line)
+		doc.Batch = append(doc.Batch, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "defaults":
+		doc.Sections["defaults"] = append(doc.Sections["defaults"], line)
+		doc.Defaults = append(doc.Defaults, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "save":
+		doc.Sections["save"] = append(doc.Sections["save"], line)
+		doc.Save = append(doc.Save, Command{Kind: fields[0], Line: line, Args: fields[1:]})
 	case strings.HasPrefix(line, "osd_") || strings.HasPrefix(line, "set osd_"):
 		doc.Sections["osd"] = append(doc.Sections["osd"], line)
 		doc.OSD = append(doc.OSD, Command{Kind: fields[0], Line: line, Args: fields[1:]})
@@ -387,6 +430,20 @@ func parseRXRange(line string, fields []string) RXRange {
 	out.Channel = values[0]
 	out.Min = values[1]
 	out.Max = values[2]
+	return out
+}
+
+func parseRXFail(line string, fields []string) RXFail {
+	out := RXFail{Line: line}
+	values := parseIntFields(fields[1:], 3)
+	out.Channel = values[0]
+	if len(fields) > 2 {
+		out.Mode = fields[2]
+	}
+	out.Value = values[2]
+	if len(fields) > 1 {
+		out.Args = fields[1:]
+	}
 	return out
 }
 

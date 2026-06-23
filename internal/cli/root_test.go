@@ -224,8 +224,12 @@ func TestConfigurationSnapshotWithFakeFC(t *testing.T) {
 		t.Fatalf("guidance = %+v", guidance)
 	}
 	diff := snapshot["diff"].(map[string]any)
-	if diff["source_command"] != "diff all" || diff["unknown_count"].(float64) == 0 {
+	if diff["source_command"] != "diff all" || diff["unknown_count"].(float64) != 0 {
 		t.Fatalf("diff = %+v", diff)
+	}
+	sectionCounts := diff["section_counts"].(map[string]any)
+	if sectionCounts["batch"].(float64) != 1 || sectionCounts["board"].(float64) != 2 || sectionCounts["defaults"].(float64) != 1 || sectionCounts["save"].(float64) != 1 {
+		t.Fatalf("section counts = %+v", sectionCounts)
 	}
 	full := snapshot["full"].(map[string]any)
 	if full["source_command"] != "dump all" || full["line_count"].(float64) == 0 {

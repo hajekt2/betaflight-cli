@@ -20,7 +20,7 @@ func TestBuildConfigurationSnapshotSummaryAndGuidance(t *testing.T) {
 	diff := buildConfigurationDocument("diff all", lines, fullDoc)
 	full := buildConfigurationDocument("dump all", lines, fullDoc)
 	summary := buildConfigurationSnapshotSummary(full, diff)
-	if summary.DiffLineCount != 6 || !summary.DiffHasSaveCommand || summary.DiffUnknownCount != 2 || summary.DiffUnknownSettings != 1 {
+	if summary.DiffLineCount != 6 || !summary.DiffHasSaveCommand || summary.DiffUnknownCount != 1 || summary.DiffUnknownSettings != 1 {
 		t.Fatalf("summary = %+v", summary)
 	}
 	if !summary.ReviewRequired {

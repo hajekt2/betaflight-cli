@@ -10,10 +10,17 @@ func TestParseDocument(t *testing.T) {
 	doc := Parse([]string{
 		"# version",
 		"batch start",
+		"defaults nosave",
+		"board_name JHEF405PRO",
+		"manufacturer_id JHEF",
+		"mcu_id 004c00223130500620353248",
+		"signature",
 		"profile 1",
 		"rateprofile 2",
 		"feature GPS",
 		"feature -AIRMODE",
+		"beeper -BAT_LOW",
+		"beacon RX_SET",
 		"serial UART1 64 115200 57600 0 115200",
 		"aux 0 0 0 1700 2100 0 0",
 		"resource MOTOR 1 A00",
@@ -28,9 +35,11 @@ func TestParseDocument(t *testing.T) {
 		"smix reverse 0 2 r",
 		"adjrange 0 0 0 900 1300 12 0 0 0",
 		"rxrange 0 1000 2000",
+		"rxfail 5 s 1800",
 		"set gyro_lpf1_static_hz = 0",
 		"set imaginary_setting = value",
 		"set osd_units = METRIC",
+		"save",
 		"unknown stuff",
 	}, settings.DefaultRegistry)
 
@@ -94,13 +103,25 @@ func TestParseDocument(t *testing.T) {
 	if len(doc.RXRanges) != 1 || doc.RXRanges[0].Max == nil || *doc.RXRanges[0].Max != 2000 {
 		t.Fatalf("rxranges = %+v", doc.RXRanges)
 	}
+	if len(doc.RXFail) != 1 || doc.RXFail[0].Channel == nil || *doc.RXFail[0].Channel != 5 || doc.RXFail[0].Mode != "s" || doc.RXFail[0].Value == nil || *doc.RXFail[0].Value != 1800 {
+		t.Fatalf("rxfail = %+v", doc.RXFail)
+	}
+	if len(doc.Beeper) != 1 || len(doc.Beacon) != 1 {
+		t.Fatalf("beeper/beacon = %+v/%+v", doc.Beeper, doc.Beacon)
+	}
+	if len(doc.Board) != 4 {
+		t.Fatalf("board = %+v", doc.Board)
+	}
+	if len(doc.Batch) != 1 || len(doc.Defaults) != 1 || len(doc.Save) != 1 {
+		t.Fatalf("batch/defaults/save = %+v/%+v/%+v", doc.Batch, doc.Defaults, doc.Save)
+	}
 	if len(doc.OSD) != 1 {
 		t.Fatalf("osd = %+v", doc.OSD)
 	}
-	if len(doc.Unknown) != 2 {
+	if len(doc.Unknown) != 1 {
 		t.Fatalf("unknown = %+v", doc.Unknown)
 	}
-	if len(doc.Sections["settings"]) != 3 || len(doc.Sections["unknown"]) != 2 {
+	if len(doc.Sections["settings"]) != 3 || len(doc.Sections["unknown"]) != 1 || len(doc.Sections["board"]) != 4 {
 		t.Fatalf("sections = %+v", doc.Sections)
 	}
 }

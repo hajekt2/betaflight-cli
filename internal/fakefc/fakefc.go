@@ -282,6 +282,17 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 6, 23, 12, 34, 56)
 		payload = appendU16(payload, 789)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPReboot:
+		if len(frame.Payload) == 0 {
+			f.out.Write(response(frame.Code, []byte{0}, false))
+			return
+		}
+		mode := frame.Payload[0]
+		payload := []byte{mode}
+		if mode == 2 || mode == 3 {
+			payload = append(payload, 1)
+		}
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBatteryState:
 		payload := []byte{4}
 		payload = appendU16(payload, 1300)

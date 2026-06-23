@@ -130,6 +130,7 @@ Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `restore plan` and `presets plan` convert local Betaflight CLI text into audited change plans without connecting.
 They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosave` lines are included only with `--include-defaults`.
 `restore apply --include-defaults` and `presets apply --include-defaults` require `--yes` because defaults reset configuration before applying later lines.
+`reboot firmware`, `reboot bootloader`, `reboot bootloader-flash`, `reboot msc`, and `reboot msc-utc` send reviewed `MSP_REBOOT` requests and always require `--yes`.
 `blackbox config` reads current Blackbox configuration over MSP and returns decoded device, sample rate, and enabled or disabled field selections.
 `storage status` reads Dataflash and SD card summaries over MSP and returns capacity, usage, readiness, and state fields.
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.

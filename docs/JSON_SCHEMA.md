@@ -108,6 +108,10 @@ Restore and local preset commands emit the same change-plan fields plus `skipped
 `skipped_lines` records ignored import wrappers such as comments, `batch start`, `batch end`, `save`, and skipped `defaults nosave`.
 When `include_defaults` is true, exact `defaults nosave` lines are included in `cli_lines`; applying such a plan requires global `--yes`.
 
+`reboot` commands return a `reboot` object with the requested or acknowledged `mode`, `mode_name`, `msp_code`, `acknowledged`, and optional `msc_ready` fields.
+Successful reboot commands include a `side_effects` item because the Flight Controller may reboot, disconnect, or change USB mode.
+All reboot commands require global `--yes` and use the dangerous operation class.
+
 `blackbox inspect` returns an `inspection` object.
 The object includes file sizes, header metadata, ordered header names, parsed field definitions, warnings, `frame_marker_counts_approx`, and `frame_summary_approx`.
 `frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.

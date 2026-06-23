@@ -105,6 +105,9 @@ Configurator sends `MSP_SET_RTC` on connect and marks `MSP_RTC` as not used, but
 `MSP_STATUS_EX` returns CPU load as an integer percent constrained to 0 through 100.
 Its configuration-state byte currently uses bit 0 for reboot-required state and reserves other bits for future firmware expansion.
 
+`MSP_REBOOT` accepts reboot modes used by Configurator: firmware, ROM bootloader, USB mass storage, UTC USB mass storage, and flash bootloader.
+The response echoes the accepted reboot mode and may include MSC readiness for USB mass-storage mode.
+
 `MSP_SONAR_ALTITUDE` returns the latest rangefinder altitude in centimeters.
 
 `MSP_ANALOG` returns legacy voltage, drawn mAh, RSSI, amperage in 0.01A units, and battery voltage in 0.01V units.

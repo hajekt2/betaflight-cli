@@ -135,7 +135,12 @@ func decodeStringSlice(fn func([]byte) []string) mspPayloadDecoder {
 
 func decodeByteSlice(fn func([]byte) []uint8) mspPayloadDecoder {
 	return func(payload []byte) (any, error) {
-		return fn(payload), nil
+		raw := fn(payload)
+		out := make([]any, len(raw))
+		for i, value := range raw {
+			out[i] = float64(value)
+		}
+		return out, nil
 	}
 }
 
@@ -173,7 +178,11 @@ func decodeMSPPIDPayload(payload []byte) (any, error) {
 }
 
 func decodeRawBytes(payload []byte) (any, error) {
-	return append([]byte(nil), payload...)
+	out := make([]any, len(payload))
+	for i, raw := range payload {
+		out[i] = float64(raw)
+	}
+	return out, nil
 }
 
 func decodeRawAccTrim(payload []byte) (any, error) {

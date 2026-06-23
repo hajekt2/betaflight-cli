@@ -1839,6 +1839,27 @@ func TestMSPRequestWithDecodeForSensorConfig(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForRXMapUsesNumberArray(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_RX_MAP", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	if decoded, ok := data["decoded"].([]any); ok {
+		if len(decoded) != 4 || decoded[0] != float64(0) || decoded[1] != float64(1) {
+			t.Fatalf("decoded = %+v", decoded)
+		}
+	} else {
+		t.Fatalf("decoded type = %T, value = %+v", data["decoded"], data["decoded"])
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

@@ -645,6 +645,14 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 61))
 	case msp.MSPSimplifiedTuning:
 		f.out.Write(response(frame.Code, fakeSimplifiedTuningPayload(), false))
+	case msp.MSPCalculateSimplifiedPID:
+		f.out.Write(response(frame.Code, fakeSimplifiedPIDCalculationPayload(), len(frame.Payload) != 17))
+	case msp.MSPCalculateSimplifiedDterm:
+		f.out.Write(response(frame.Code, fakeSimplifiedDtermPayload(), len(frame.Payload) != 18))
+	case msp.MSPCalculateSimplifiedGyro:
+		f.out.Write(response(frame.Code, fakeSimplifiedGyroPayload(), len(frame.Payload) != 18))
+	case msp.MSPValidateSimplifiedTuning:
+		f.out.Write(response(frame.Code, []byte{1, 1, 0}, false))
 	case msp.MSPSetSimplifiedTuning:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 53))
 	case msp.MSPAdvancedConfig:
@@ -967,6 +975,38 @@ func fakeSimplifiedTuningPayload() []byte {
 	payload = appendU16(payload, 250)
 	payload = appendU16(payload, 75)
 	payload = appendU16(payload, 300)
+	payload = appendU32(payload, 0)
+	payload = appendU32(payload, 0)
+	return payload
+}
+
+func fakeSimplifiedPIDCalculationPayload() []byte {
+	payload := []byte{50, 85, 35, 45}
+	payload = appendU16(payload, 120)
+	payload = append(payload, 52, 87, 37, 47)
+	payload = appendU16(payload, 125)
+	payload = append(payload, 48, 80, 0, 0)
+	payload = appendU16(payload, 110)
+	return payload
+}
+
+func fakeSimplifiedDtermPayload() []byte {
+	payload := []byte{1, 100}
+	payload = appendU16(payload, 105)
+	payload = appendU16(payload, 155)
+	payload = appendU16(payload, 75)
+	payload = appendU16(payload, 175)
+	payload = appendU32(payload, 0)
+	payload = appendU32(payload, 0)
+	return payload
+}
+
+func fakeSimplifiedGyroPayload() []byte {
+	payload := []byte{1, 100}
+	payload = appendU16(payload, 155)
+	payload = appendU16(payload, 255)
+	payload = appendU16(payload, 80)
+	payload = appendU16(payload, 305)
 	payload = appendU32(payload, 0)
 	payload = appendU32(payload, 0)
 	return payload

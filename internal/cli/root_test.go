@@ -415,6 +415,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if pidAdvanced["operation"] != "write" || pidAdvanced["confirmation"] != "--yes" || pidAdvanced["requires_connection"] != true || pidAdvanced["output_root"] != "pid_advanced" || pidAdvanced["runnable"] != true {
 		t.Fatalf("pid advanced capability = %+v", pidAdvanced)
 	}
+	simplifiedPreview := byCommand["betaflight-cli pid preview-simplified-json"]
+	if simplifiedPreview["operation"] != "read_only" || simplifiedPreview["confirmation"] != "none" || simplifiedPreview["requires_connection"] != true || simplifiedPreview["output_root"] != "simplified_tuning_preview" || simplifiedPreview["runnable"] != true {
+		t.Fatalf("simplified preview capability = %+v", simplifiedPreview)
+	}
+	simplifiedValidation := byCommand["betaflight-cli pid validate-simplified"]
+	if simplifiedValidation["operation"] != "read_only" || simplifiedValidation["confirmation"] != "none" || simplifiedValidation["requires_connection"] != true || simplifiedValidation["output_root"] != "simplified_tuning_validation" || simplifiedValidation["runnable"] != true {
+		t.Fatalf("simplified validation capability = %+v", simplifiedValidation)
+	}
 	simplifiedTuning := byCommand["betaflight-cli pid set-simplified-json"]
 	if simplifiedTuning["operation"] != "write" || simplifiedTuning["confirmation"] != "--yes" || simplifiedTuning["requires_connection"] != true || simplifiedTuning["output_root"] != "simplified_tuning" || simplifiedTuning["runnable"] != true {
 		t.Fatalf("simplified tuning capability = %+v", simplifiedTuning)
@@ -5956,6 +5964,49 @@ func TestPIDSetSimplifiedJSONValidationBeforeConnect(t *testing.T) {
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
 		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestPIDPreviewSimplifiedJSONWithFakeFC(t *testing.T) {
+	input := `{"simplified_tuning":{"pids":{"mode":2,"master_multiplier":100,"roll_pitch_ratio":100,"i_gain":100,"d_gain":100,"pi_gain":100,"d_max_gain":100,"feedforward_gain":100,"pitch_pi_gain":100},"dterm":{"enabled":true,"multiplier":100,"lpf1_static_hz":100,"lpf2_static_hz":150,"lpf1_dynamic_min_hz":70,"lpf1_dynamic_max_hz":170},"gyro":{"enabled":true,"multiplier":100,"lpf1_static_hz":150,"lpf2_static_hz":250,"lpf1_dynamic_min_hz":75,"lpf1_dynamic_max_hz":300}}}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "preview-simplified-json", "-"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	preview := data["simplified_tuning_preview"].(map[string]any)
+	gains := preview["pid_gains"].([]any)
+	roll := gains[0].(map[string]any)
+	if preview["read_only"] != true || roll["axis"] != "roll" || roll["d_max"] != float64(45) {
+		t.Fatalf("preview = %+v", preview)
+	}
+	dterm := preview["dterm"].(map[string]any)
+	if dterm["lpf1_dynamic_max_hz"] != float64(175) {
+		t.Fatalf("dterm = %+v", dterm)
+	}
+	if len(env.SideEffects) != 0 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestPIDValidateSimplifiedWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"pid", "validate-simplified"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	validation := data["simplified_tuning_validation"].(map[string]any)
+	if validation["pids_match"] != true || validation["gyro_match"] != true || validation["dterm_match"] != false || validation["read_only"] != true {
+		t.Fatalf("validation = %+v", validation)
+	}
+	if len(env.SideEffects) != 0 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

@@ -201,6 +201,9 @@ The object includes active PID gain triplets, PID names, controller identity, th
 Successful PID gain writes include a `pid_gains` side effect.
 `pid set-advanced-json` returns a `pid_advanced` object with the requested PID advanced profile fields, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful PID advanced writes include a `pid_advanced` side effect.
+`pid preview-simplified-json` returns a `simplified_tuning_preview` object with the proposed input, calculated PIDF values, calculated D-term filter fields, calculated gyro filter fields, MSP command names, and `read_only`.
+The preview command has no side effects.
+`pid validate-simplified` returns a `simplified_tuning_validation` object with `pids_match`, `gyro_match`, `dterm_match`, MSP command name, and `read_only`.
 `pid set-simplified-json` returns a `simplified_tuning` object with requested simplified PID, D-term filter, and gyro filter tuning, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful simplified tuning writes include a `simplified_tuning` side effect.
 

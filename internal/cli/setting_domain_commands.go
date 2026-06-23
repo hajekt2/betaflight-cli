@@ -83,6 +83,8 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "pid" {
 		cmd.AddCommand(a.pidStatusCommand())
+		cmd.AddCommand(a.pidPreviewSimplifiedJSONCommand())
+		cmd.AddCommand(a.pidValidateSimplifiedCommand())
 		cmd.AddCommand(a.pidSetGainsJSONCommand())
 		cmd.AddCommand(a.pidSetAdvancedJSONCommand())
 		cmd.AddCommand(a.pidSetSimplifiedJSONCommand())
@@ -991,6 +993,47 @@ func (a *app) pidSetSimplifiedJSONCommand() *cobra.Command {
 					Detail:  "simplified tuning changed but not saved",
 				})
 				return env
+			})
+		},
+	}
+}
+
+func (a *app) pidPreviewSimplifiedJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "preview-simplified-json FILE",
+		Short: "Preview simplified tuning calculations without changing configuration",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			tuning, err := parseSimplifiedTuningJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.PreviewSimplifiedTuning(cmd.Context(), client, tuning)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{"simplified_tuning_preview": result})
+			})
+		},
+	}
+}
+
+func (a *app) pidValidateSimplifiedCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "validate-simplified",
+		Short: "Validate current simplified tuning against applied tuning values",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.ValidateSimplifiedTuningState(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{"simplified_tuning_validation": result})
 			})
 		},
 	}

@@ -145,6 +145,30 @@ func TestValidateSimplifiedTuning(t *testing.T) {
 	}
 }
 
+func TestDecodeSimplifiedCalculatedPIDs(t *testing.T) {
+	payload := []byte{50, 85, 35, 45}
+	payload = appendU16Test(payload, 120)
+	payload = append(payload, 52, 87, 37, 47)
+	payload = appendU16Test(payload, 125)
+	gains, err := DecodeSimplifiedCalculatedPIDs(payload)
+	if err != nil {
+		t.Fatalf("DecodeSimplifiedCalculatedPIDs() error = %v", err)
+	}
+	if len(gains) != 2 || gains[0].Axis != "roll" || gains[0].DMax != 45 || gains[1].F != 125 {
+		t.Fatalf("gains = %+v", gains)
+	}
+}
+
+func TestDecodeSimplifiedTuningValidation(t *testing.T) {
+	validation, err := DecodeSimplifiedTuningValidation([]byte{1, 0, 1, 99})
+	if err != nil {
+		t.Fatalf("DecodeSimplifiedTuningValidation() error = %v", err)
+	}
+	if !validation.PIDsMatch || validation.GyroMatch || !validation.DtermMatch || validation.TrailingBytesIgnored != 1 {
+		t.Fatalf("validation = %+v", validation)
+	}
+}
+
 func simplifiedTuningTestPayload() []byte {
 	payload := []byte{2, 100, 100, 100, 100, 100, 100, 100, 100}
 	payload = appendU32Test(payload, 0)

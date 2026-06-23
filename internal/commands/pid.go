@@ -112,6 +112,33 @@ type SimplifiedTuningSetResult struct {
 	SaveRequired bool             `json:"save_required"`
 }
 
+type SimplifiedTuningPreview struct {
+	Input      SimplifiedTuning       `json:"input"`
+	PIDGains   []SimplifiedCalculatedPID `json:"pid_gains"`
+	Dterm      SimplifiedFilter       `json:"dterm"`
+	Gyro       SimplifiedFilter       `json:"gyro"`
+	MSPNames   []string               `json:"msp_names"`
+	ReadOnly   bool                   `json:"read_only"`
+}
+
+type SimplifiedCalculatedPID struct {
+	Axis string `json:"axis"`
+	P    uint8  `json:"p"`
+	I    uint8  `json:"i"`
+	D    uint8  `json:"d"`
+	DMax uint8  `json:"d_max"`
+	F    uint16 `json:"f"`
+}
+
+type SimplifiedTuningValidation struct {
+	PIDsMatch  bool `json:"pids_match"`
+	GyroMatch  bool `json:"gyro_match"`
+	DtermMatch bool `json:"dterm_match"`
+	MSPName    string `json:"msp_name"`
+	ReadOnly   bool   `json:"read_only"`
+	TrailingBytesIgnored int `json:"trailing_bytes_ignored,omitempty"`
+}
+
 type RateProfile struct {
 	Axes                 []RateAxis `json:"axes"`
 	Throttle             Throttle   `json:"throttle"`
@@ -325,6 +352,56 @@ func SetSimplifiedTuning(ctx context.Context, client *connection.Client, tuning 
 	}, nil
 }
 
+func PreviewSimplifiedTuning(ctx context.Context, client *connection.Client, tuning SimplifiedTuning) (*SimplifiedTuningPreview, error) {
+	if err := ValidateSimplifiedTuning(tuning); err != nil {
+		return nil, err
+	}
+	pidFrame, err := client.Request(ctx, msp.MSPCalculateSimplifiedPID, EncodeSimplifiedPIDs(tuning.PIDs))
+	if err != nil {
+		return nil, fmt.Errorf("simplified PID calculation request failed: %w", err)
+	}
+	pidGains, err := DecodeSimplifiedCalculatedPIDs(pidFrame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("simplified PID calculation decode failed: %w", err)
+	}
+	dtermFrame, err := client.Request(ctx, msp.MSPCalculateSimplifiedDterm, EncodeSimplifiedFilter(tuning.Dterm))
+	if err != nil {
+		return nil, fmt.Errorf("simplified D-term calculation request failed: %w", err)
+	}
+	dterm, err := DecodeSimplifiedFilterPayload(dtermFrame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("simplified D-term calculation decode failed: %w", err)
+	}
+	gyroFrame, err := client.Request(ctx, msp.MSPCalculateSimplifiedGyro, EncodeSimplifiedFilter(tuning.Gyro))
+	if err != nil {
+		return nil, fmt.Errorf("simplified gyro calculation request failed: %w", err)
+	}
+	gyro, err := DecodeSimplifiedFilterPayload(gyroFrame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("simplified gyro calculation decode failed: %w", err)
+	}
+	return &SimplifiedTuningPreview{
+		Input:    tuning,
+		PIDGains: pidGains,
+		Dterm:    *dterm,
+		Gyro:     *gyro,
+		MSPNames: []string{"MSP_CALCULATE_SIMPLIFIED_PID", "MSP_CALCULATE_SIMPLIFIED_DTERM", "MSP_CALCULATE_SIMPLIFIED_GYRO"},
+		ReadOnly: true,
+	}, nil
+}
+
+func ValidateSimplifiedTuningState(ctx context.Context, client *connection.Client) (*SimplifiedTuningValidation, error) {
+	frame, err := client.Request(ctx, msp.MSPValidateSimplifiedTuning, nil)
+	if err != nil {
+		return nil, fmt.Errorf("simplified tuning validation request failed: %w", err)
+	}
+	validation, err := DecodeSimplifiedTuningValidation(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("simplified tuning validation decode failed: %w", err)
+	}
+	return validation, nil
+}
+
 func ValidatePIDAdvanced(advanced PIDAdvanced) error {
 	if advanced.FeedforwardAveraging > 3 {
 		return fmt.Errorf("feedforward_averaging must be 0-3")
@@ -483,22 +560,30 @@ func EncodePIDAdvanced(advanced PIDAdvanced) []byte {
 }
 
 func EncodeSimplifiedTuning(tuning SimplifiedTuning) []byte {
-	payload := []byte{
-		tuning.PIDs.Mode,
-		tuning.PIDs.MasterMultiplier,
-		tuning.PIDs.RollPitchRatio,
-		tuning.PIDs.IGain,
-		tuning.PIDs.DGain,
-		tuning.PIDs.PIGain,
-		tuning.PIDs.DMaxGain,
-		tuning.PIDs.FeedforwardGain,
-		tuning.PIDs.PitchPIGain,
-	}
-	payload = appendU32Payload(payload, tuning.PIDs.Reserved1)
-	payload = appendU32Payload(payload, tuning.PIDs.Reserved2)
-	payload = appendSimplifiedFilter(payload, tuning.Dterm)
-	payload = appendSimplifiedFilter(payload, tuning.Gyro)
+	payload := EncodeSimplifiedPIDs(tuning.PIDs)
+	payload = append(payload, EncodeSimplifiedFilter(tuning.Dterm)...)
+	payload = append(payload, EncodeSimplifiedFilter(tuning.Gyro)...)
 	return payload
+}
+
+func EncodeSimplifiedPIDs(pids SimplifiedPIDs) []byte {
+	payload := []byte{
+		pids.Mode,
+		pids.MasterMultiplier,
+		pids.RollPitchRatio,
+		pids.IGain,
+		pids.DGain,
+		pids.PIGain,
+		pids.DMaxGain,
+		pids.FeedforwardGain,
+		pids.PitchPIGain,
+	}
+	payload = appendU32Payload(payload, pids.Reserved1)
+	return appendU32Payload(payload, pids.Reserved2)
+}
+
+func EncodeSimplifiedFilter(filter SimplifiedFilter) []byte {
+	return appendSimplifiedFilter(nil, filter)
 }
 
 func appendSimplifiedFilter(payload []byte, filter SimplifiedFilter) []byte {
@@ -509,6 +594,44 @@ func appendSimplifiedFilter(payload []byte, filter SimplifiedFilter) []byte {
 	payload = appendU16Payload(payload, filter.LPF1DynamicMaxHz)
 	payload = appendU32Payload(payload, filter.Reserved1)
 	return appendU32Payload(payload, filter.Reserved2)
+}
+
+func DecodeSimplifiedCalculatedPIDs(payload []byte) ([]SimplifiedCalculatedPID, error) {
+	const axisPayloadLength = 6
+	if len(payload)%axisPayloadLength != 0 {
+		return nil, fmt.Errorf("payload length %d is not a multiple of simplified PIDF result size %d", len(payload), axisPayloadLength)
+	}
+	r := msp.NewPayloadReader(payload)
+	out := make([]SimplifiedCalculatedPID, 0, len(payload)/axisPayloadLength)
+	axes := []string{"roll", "pitch", "yaw"}
+	for i := 0; r.Remaining() > 0; i++ {
+		p, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		ii, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		d, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		dmax, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		f, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		axis := fmt.Sprintf("axis_%d", i)
+		if i < len(axes) {
+			axis = axes[i]
+		}
+		out = append(out, SimplifiedCalculatedPID{Axis: axis, P: p, I: ii, D: d, DMax: dmax, F: f})
+	}
+	return out, nil
 }
 
 func DecodePIDGains(payload []byte, names []string) ([]PIDGain, error) {
@@ -681,6 +804,45 @@ func readSimplifiedFilter(r *msp.PayloadReader, name string) (SimplifiedFilter, 
 		LPF1DynamicMaxHz: dynMax,
 		Reserved1:        reserved1,
 		Reserved2:        reserved2,
+	}, nil
+}
+
+func DecodeSimplifiedFilterPayload(payload []byte) (*SimplifiedFilter, error) {
+	if len(payload) < 18 {
+		return nil, fmt.Errorf("payload length %d is shorter than simplified filter size 18", len(payload))
+	}
+	r := msp.NewPayloadReader(payload)
+	filter, err := readSimplifiedFilter(r, "calculated")
+	if err != nil {
+		return nil, err
+	}
+	return &filter, nil
+}
+
+func DecodeSimplifiedTuningValidation(payload []byte) (*SimplifiedTuningValidation, error) {
+	if len(payload) < 3 {
+		return nil, fmt.Errorf("payload length %d is shorter than MSP_VALIDATE_SIMPLIFIED_TUNING size 3", len(payload))
+	}
+	r := msp.NewPayloadReader(payload)
+	pids, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	gyro, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	dterm, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	return &SimplifiedTuningValidation{
+		PIDsMatch: pids != 0,
+		GyroMatch: gyro != 0,
+		DtermMatch: dterm != 0,
+		MSPName: "MSP_VALIDATE_SIMPLIFIED_TUNING",
+		ReadOnly: true,
+		TrailingBytesIgnored: r.Remaining(),
 	}, nil
 }
 

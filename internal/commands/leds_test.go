@@ -70,6 +70,26 @@ func TestEncodeLEDConfigValues(t *testing.T) {
 	}
 }
 
+func TestEncodeLEDColors(t *testing.T) {
+	got := EncodeLEDColors([]LEDColor{
+		{Index: 0, Hue: 0, Sat: 0, Val: 255},
+		{Index: 1, Hue: 120, Sat: 255, Val: 255},
+	})
+	want := []byte{0, 0, 0, 255, 120, 0, 255, 255}
+	if string(got) != string(want) {
+		t.Fatalf("EncodeLEDColors() = %v, want %v", got, want)
+	}
+}
+
+func TestValidateLEDColors(t *testing.T) {
+	if err := ValidateLEDColors([]LEDColor{{Hue: 360, Sat: 0, Val: 255}}); err == nil {
+		t.Fatal("ValidateLEDColors() error = nil, want hue error")
+	}
+	if err := ValidateLEDColors(nil); err == nil {
+		t.Fatal("ValidateLEDColors() error = nil, want empty table error")
+	}
+}
+
 func testLEDConfigRaw(x, y, function uint8, overlays uint16, color, directions uint8) uint32 {
 	return uint32(y&0x0f) |
 		uint32(x&0x0f)<<4 |

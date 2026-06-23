@@ -86,6 +86,14 @@ type LEDConfigValuesSetResult struct {
 	SaveRequired bool            `json:"save_required"`
 }
 
+type LEDColorsSetResult struct {
+	Colors       []LEDColor `json:"colors"`
+	MSPCode      uint16     `json:"msp_code"`
+	MSPName      string     `json:"msp_name"`
+	Acknowledged bool       `json:"acknowledged"`
+	SaveRequired bool       `json:"save_required"`
+}
+
 func ReadLEDStatus(ctx context.Context, client *connection.Client) (*LEDStatus, []string, error) {
 	status := &LEDStatus{Sources: map[string]string{}}
 	warnings := []string{}
@@ -231,10 +239,50 @@ func SetLEDConfigValues(ctx context.Context, client *connection.Client, values L
 	}, nil
 }
 
+func SetLEDColors(ctx context.Context, client *connection.Client, colors []LEDColor) (*LEDColorsSetResult, error) {
+	if err := ValidateLEDColors(colors); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetLedColors, EncodeLEDColors(colors)); err != nil {
+		return nil, fmt.Errorf("led colors request failed: %w", err)
+	}
+	return &LEDColorsSetResult{
+		Colors:       colors,
+		MSPCode:      msp.MSPSetLedColors,
+		MSPName:      "MSP_SET_LED_COLORS",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateLEDColors(colors []LEDColor) error {
+	if len(colors) == 0 {
+		return fmt.Errorf("led colors must contain at least one row")
+	}
+	for i, color := range colors {
+		if color.Hue > 359 {
+			return fmt.Errorf("colors[%d].hue must be <= 359", i)
+		}
+		if color.Index != 0 && color.Index != i {
+			return fmt.Errorf("colors[%d].index must match row position %d", i, i)
+		}
+	}
+	return nil
+}
+
 func EncodeLEDConfigValues(values LEDConfigValues) []byte {
 	payload := []byte{values.Brightness}
 	payload = append(payload, byte(values.RainbowDelta), byte(values.RainbowDelta>>8))
 	payload = append(payload, byte(values.RainbowFreq), byte(values.RainbowFreq>>8))
+	return payload
+}
+
+func EncodeLEDColors(colors []LEDColor) []byte {
+	payload := make([]byte, 0, len(colors)*4)
+	for _, color := range colors {
+		payload = appendU16Payload(payload, color.Hue)
+		payload = append(payload, color.Sat, color.Val)
+	}
 	return payload
 }
 

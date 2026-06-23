@@ -467,6 +467,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
 		t.Fatalf("led values capability = %+v", ledValues)
 	}
+	ledColors := byCommand["betaflight-cli leds set-colors-json"]
+	if ledColors["operation"] != "write" || ledColors["confirmation"] != "--yes" || ledColors["requires_connection"] != true || ledColors["output_root"] != "led_colors" || ledColors["runnable"] != true {
+		t.Fatalf("led colors capability = %+v", ledColors)
+	}
 	servoConfig := byCommand["betaflight-cli servos set-config"]
 	if servoConfig["operation"] != "write" || servoConfig["confirmation"] != "--yes" || servoConfig["requires_connection"] != true || servoConfig["output_root"] != "servo_config" || servoConfig["runnable"] != true {
 		t.Fatalf("servo config capability = %+v", servoConfig)
@@ -5780,6 +5784,59 @@ func TestLEDSetValuesWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "led_values" || env.SideEffects[0].Command != "MSP2_SET_LED_STRIP_CONFIG_VALUES" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestLEDSetColorsJSONWithFakeFC(t *testing.T) {
+	input := `{"colors":[{"index":0,"hue":0,"sat":0,"val":255},{"index":1,"hue":120,"sat":255,"val":255}]}`
+	env, err := runTestCommandWithInput(t, []string{"leds", "set-colors-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["led_colors"].(map[string]any)
+	colors := result["colors"].([]any)
+	second := colors[1].(map[string]any)
+	if second["hue"] != float64(120) || second["sat"] != float64(255) || result["save_required"] != true {
+		t.Fatalf("led colors = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "led_colors" || env.SideEffects[0].Command != "MSP_SET_LED_COLORS" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestLEDSetColorsJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `[{"hue":0,"sat":0,"val":255}]`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"leds", "set-colors-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after LED color confirmation failure")
+	}
+}
+
+func TestLEDSetColorsJSONValidationBeforeConnect(t *testing.T) {
+	input := `[{"hue":360,"sat":0,"val":255}]`
+	env, err := runTestCommandWithInput(t, []string{"leds", "set-colors-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid LED colors")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

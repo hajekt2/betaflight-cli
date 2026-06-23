@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -153,7 +154,7 @@ func (a *app) ledsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.ledValuesCommand())
+	cmd.AddCommand(set, a.ledValuesCommand(), a.ledColorsJSONCommand())
 	return cmd
 }
 
@@ -198,6 +199,67 @@ func (a *app) ledValuesCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) ledColorsJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-colors-json FILE",
+		Short: "Set the full LED HSV color table through MSP_SET_LED_COLORS",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			colors, err := parseLEDColorsJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "LED color table changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetLEDColors(cmd.Context(), client, colors)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"led_colors": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "led_colors",
+					Command: "MSP_SET_LED_COLORS",
+					Detail:  "LED color table changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseLEDColorsJSON(data []byte) ([]bfcommands.LEDColor, error) {
+	var colors []bfcommands.LEDColor
+	if err := json.Unmarshal(data, &colors); err != nil {
+		var wrapped struct {
+			Colors []bfcommands.LEDColor `json:"colors"`
+			LEDs   *struct {
+				Colors []bfcommands.LEDColor `json:"colors"`
+			} `json:"leds"`
+		}
+		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
+			return nil, err
+		}
+		switch {
+		case wrapped.Colors != nil:
+			colors = wrapped.Colors
+		case wrapped.LEDs != nil:
+			colors = wrapped.LEDs.Colors
+		default:
+			return nil, fmt.Errorf("LED color JSON must be an array or object with colors")
+		}
+	}
+	if err := bfcommands.ValidateLEDColors(colors); err != nil {
+		return nil, err
+	}
+	return colors, nil
 }
 
 func (a *app) servosCommand() *cobra.Command {

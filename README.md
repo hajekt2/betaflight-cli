@@ -246,6 +246,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 It never connects to hardware.
 `motors test-apply` runs the same bounded single-motor plan, requires `--yes`, `--props-off`, and `--battery-aware`, records read-only runtime preflight state, sends a stop command after the requested duration, records a read-only post-stop motor snapshot, emits a `motor_output` side effect, and returns both a compact audit record and a preflight-to-post-stop summary.
 `leds status` reads LED strip rows, HSV colors, mode colors, and brightness/rainbow values over MSP.
+`leds set-colors-json` writes the full LED HSV color table through `MSP_SET_LED_COLORS`, accepts either an array of colors or an object with `colors`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `leds set-values` writes LED strip brightness, rainbow delta, and rainbow frequency through `MSP2_SET_LED_STRIP_CONFIG_VALUES`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `servos set-config` writes one servo configuration row through `MSP_SET_SERVO_CONFIGURATION`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

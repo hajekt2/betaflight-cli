@@ -19,6 +19,17 @@ func TestDecodePIDGainsRejectsPartialTriplet(t *testing.T) {
 	}
 }
 
+func TestEncodePIDGains(t *testing.T) {
+	payload := EncodePIDGains([]PIDGain{
+		{P: 45, I: 80, D: 30},
+		{P: 47, I: 84, D: 34},
+	})
+	want := []byte{45, 80, 30, 47, 84, 34}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodeRateProfile(t *testing.T) {
 	payload := []byte{7, 10, 70, 72, 65, 0, 50, 20}
 	payload = appendU16Test(payload, 0)

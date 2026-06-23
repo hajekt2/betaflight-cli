@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 	"strings"
@@ -81,6 +82,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "pid" {
 		cmd.AddCommand(a.pidStatusCommand())
+		cmd.AddCommand(a.pidSetGainsJSONCommand())
 	}
 	if domain.use == "rates" {
 		cmd.AddCommand(a.ratesStatusCommand())
@@ -819,6 +821,64 @@ func (a *app) pidStatusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) pidSetGainsJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-gains-json FILE",
+		Short: "Set complete PID gain triplets from JSON through MSP_SET_PID",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			gains, err := parsePIDGainsJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "PID gain changes affect flight tuning; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetPIDGains(cmd.Context(), client, gains)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"pid_gains": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "pid_gains",
+					Command: "MSP_SET_PID",
+					Detail:  "PID gains changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parsePIDGainsJSON(data []byte) ([]bfcommands.PIDGain, error) {
+	var gains []bfcommands.PIDGain
+	if err := json.Unmarshal(data, &gains); err != nil {
+		var wrapped struct {
+			Gains []bfcommands.PIDGain `json:"gains"`
+		}
+		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
+			return nil, err
+		}
+		gains = wrapped.Gains
+	}
+	names := bfcommands.DefaultPIDNamesForCLI()
+	if len(gains) != len(names) {
+		return nil, fmt.Errorf("pid gains must contain exactly %d rows for Betaflight 2025.12", len(names))
+	}
+	for i := range gains {
+		gains[i].Index = i
+		if gains[i].Name == "" {
+			gains[i].Name = names[i]
+		}
+	}
+	return gains, nil
 }
 
 func (a *app) ratesStatusCommand() *cobra.Command {

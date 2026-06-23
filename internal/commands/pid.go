@@ -22,6 +22,10 @@ var (
 	throttleLimitTypeNames = []string{"OFF", "SCALE", "CLIP"}
 )
 
+func DefaultPIDNamesForCLI() []string {
+	return append([]string(nil), defaultPIDNames...)
+}
+
 type PIDStatus struct {
 	Controller  *PIDController    `json:"controller,omitempty"`
 	Names       []string          `json:"names,omitempty"`
@@ -48,6 +52,14 @@ type PIDGain struct {
 	P     uint8  `json:"p"`
 	I     uint8  `json:"i"`
 	D     uint8  `json:"d"`
+}
+
+type PIDGainsSetResult struct {
+	Gains        []PIDGain `json:"gains"`
+	MSPCode      uint16    `json:"msp_code"`
+	MSPName      string    `json:"msp_name"`
+	Acknowledged bool      `json:"acknowledged"`
+	SaveRequired bool      `json:"save_required"`
 }
 
 type RateProfile struct {
@@ -202,6 +214,27 @@ func ReadRateStatus(ctx context.Context, client *connection.Client) (*RateStatus
 		warnings = append(warnings, err.Error())
 	}
 	return status, warnings, nil
+}
+
+func SetPIDGains(ctx context.Context, client *connection.Client, gains []PIDGain) (*PIDGainsSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetPID, EncodePIDGains(gains)); err != nil {
+		return nil, fmt.Errorf("pid gains request failed: %w", err)
+	}
+	return &PIDGainsSetResult{
+		Gains:        gains,
+		MSPCode:      msp.MSPSetPID,
+		MSPName:      "MSP_SET_PID",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodePIDGains(gains []PIDGain) []byte {
+	payload := make([]byte, 0, len(gains)*pidTripletLength)
+	for _, gain := range gains {
+		payload = append(payload, gain.P, gain.I, gain.D)
+	}
+	return payload
 }
 
 func DecodePIDGains(payload []byte, names []string) ([]PIDGain, error) {

@@ -610,6 +610,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 			50, 50, 75,
 			40, 0, 0,
 		}, false))
+	case msp.MSPSetPID:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 15))
 	case msp.MSPPidnames:
 		f.out.Write(response(frame.Code, []byte("ROLL;PITCH;YAW;LEVEL;MAG;"), false))
 	case msp.MSPPIDController:

@@ -395,6 +395,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if gpsRescuePIDs["operation"] != "write" || gpsRescuePIDs["confirmation"] != "--yes" || gpsRescuePIDs["requires_connection"] != true || gpsRescuePIDs["output_root"] != "gps_rescue_pids" || gpsRescuePIDs["runnable"] != true {
 		t.Fatalf("gps rescue pids capability = %+v", gpsRescuePIDs)
 	}
+	pidGains := byCommand["betaflight-cli pid set-gains-json"]
+	if pidGains["operation"] != "write" || pidGains["confirmation"] != "--yes" || pidGains["requires_connection"] != true || pidGains["output_root"] != "pid_gains" || pidGains["runnable"] != true {
+		t.Fatalf("pid gains capability = %+v", pidGains)
+	}
 	motorConfig := byCommand["betaflight-cli motors set-config"]
 	if motorConfig["operation"] != "write" || motorConfig["confirmation"] != "--yes" || motorConfig["requires_connection"] != true || motorConfig["output_root"] != "motor_config" || motorConfig["runnable"] != true {
 		t.Fatalf("motor config capability = %+v", motorConfig)
@@ -5638,6 +5642,55 @@ func TestPIDStatusWithFakeFC(t *testing.T) {
 	rateProfile := pid["rate_profile"].(map[string]any)
 	if rateProfile["rates_type_name"] != "ACTUAL" {
 		t.Fatalf("rate profile = %+v", rateProfile)
+	}
+}
+
+func TestPIDSetGainsJSONWithFakeFC(t *testing.T) {
+	input := `{"gains":[{"p":45,"i":80,"d":30},{"p":47,"i":84,"d":34},{"p":45,"i":80,"d":0},{"p":50,"i":50,"d":75},{"p":40,"i":0,"d":0}]}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-gains-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["pid_gains"].(map[string]any)
+	gains := result["gains"].([]any)
+	first := gains[0].(map[string]any)
+	if first["name"] != "ROLL" || first["p"] != float64(45) || first["i"] != float64(80) || result["save_required"] != true {
+		t.Fatalf("pid_gains = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_PID" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestPIDSetGainsJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `[{"p":45,"i":80,"d":30},{"p":47,"i":84,"d":34},{"p":45,"i":80,"d":0},{"p":50,"i":50,"d":75},{"p":40,"i":0,"d":0}]`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-gains-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestPIDSetGainsJSONValidationBeforeConnect(t *testing.T) {
+	input := `[{"p":45,"i":80,"d":30}]`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-gains-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid JSON shape")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

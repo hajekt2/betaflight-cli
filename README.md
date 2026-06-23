@@ -197,6 +197,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
 `modes set-range` writes one AUX mode range through `MSP_SET_MODE_RANGE` using step values, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`pid set-gains-json` writes the complete five-row PID gain table through `MSP_SET_PID`, accepts either a JSON array or an object with `gains`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver status` reads receiver configuration, channel map, RSSI channel, RC deadband, RX failsafe rows, and live RC channels over MSP.
 `receiver set-rxfail` writes one receiver failsafe channel through `MSP_SET_RXFAIL_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-rssi-channel` writes the RSSI channel through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

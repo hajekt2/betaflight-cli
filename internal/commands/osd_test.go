@@ -84,6 +84,39 @@ func TestEncodeOSDTimer(t *testing.T) {
 	}
 }
 
+func TestEncodeOSDVideoSystem(t *testing.T) {
+	config := &OSDConfig{
+		Units:             1,
+		SelectedProfile:   2,
+		StickOverlayMode:  1,
+		CameraFrameWidth:  24,
+		CameraFrameHeight: 18,
+		EnabledWarnings:   0x12345678,
+		Alarms: OSDAlarms{
+			RSSI:        20,
+			CapacityMAh: 1500,
+			AltitudeM:   120,
+			LinkQuality: 70,
+			RSSIDBm:     -95,
+		},
+	}
+	payload := EncodeOSDVideoSystem(config, 3)
+	want := []byte{
+		255, 3, 1, 20,
+		0xdc, 0x05,
+		0, 0,
+		120, 0,
+		0x78, 0x56,
+		0x78, 0x56, 0x34, 0x12,
+		2, 1, 24, 18,
+		70, 0,
+		0xa1, 0xff,
+	}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodeOSDWarnings(t *testing.T) {
 	warnings, err := DecodeOSDWarnings([]byte{2, 11, 'L', 'O', 'W', ' ', 'B', 'A', 'T', 'T', 'E', 'R', 'Y'})
 	if err != nil {

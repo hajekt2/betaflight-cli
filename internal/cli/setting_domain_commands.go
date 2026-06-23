@@ -77,6 +77,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
 		cmd.AddCommand(a.osdSetCanvasCommand())
+		cmd.AddCommand(a.osdSetVideoSystemCommand())
 		cmd.AddCommand(a.osdSetPositionCommand())
 		cmd.AddCommand(a.osdSetStatCommand())
 		cmd.AddCommand(a.osdSetTimerCommand())
@@ -770,6 +771,39 @@ func (a *app) osdSetCanvasCommand() *cobra.Command {
 					Type:    "osd_canvas",
 					Command: "MSP_SET_OSD_CANVAS",
 					Detail:  "canvas changed; firmware may save and reboot when switching to HD MSP displayport",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) osdSetVideoSystemCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-video-system VIDEO_SYSTEM",
+		Short: "Set OSD video system over MSP while preserving the other general OSD settings",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			videoSystem, err := parseUint8Arg("video_system", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if videoSystem > 3 {
+				return validationFailure(a, cmd, fmt.Errorf("video_system must be 0 (AUTO), 1 (PAL), 2 (NTSC), or 3 (HD)"))
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD video system changes can alter canvas and displayport behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDVideoSystem(cmd.Context(), client, videoSystem)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_video_system": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "osd_video_system",
+					Command: "MSP_SET_OSD_CONFIG",
+					Detail:  "OSD video system changed but not saved; firmware may resize canvas or change displayport mode when switching SD/HD",
 				})
 				return env
 			})

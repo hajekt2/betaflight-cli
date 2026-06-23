@@ -816,7 +816,9 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetOSDConfig:
 		ok := false
-		if len(frame.Payload) == 4 && frame.Payload[0] == 254 {
+		if len(frame.Payload) == 24 && frame.Payload[0] == 255 && frame.Payload[1] <= 3 {
+			ok = true
+		} else if len(frame.Payload) == 4 && frame.Payload[0] == 254 {
 			ok = true
 		} else if len(frame.Payload) == 4 {
 			ok = true

@@ -143,6 +143,20 @@ type OSDTimerSetResult struct {
 	SaveRequired bool              `json:"save_required"`
 }
 
+type OSDVideoSystemSetConfig struct {
+	VideoSystem     uint8  `json:"video_system"`
+	VideoSystemName string `json:"video_system_name,omitempty"`
+}
+
+type OSDVideoSystemSetResult struct {
+	Config         OSDVideoSystemSetConfig `json:"config"`
+	MSPCode        uint16                  `json:"msp_code"`
+	MSPName        string                  `json:"msp_name"`
+	Acknowledged   bool                    `json:"acknowledged"`
+	SaveRequired   bool                    `json:"save_required"`
+	RebootPossible bool                    `json:"reboot_possible"`
+}
+
 func ReadOSDStatus(ctx context.Context, client *connection.Client) (*OSDStatus, []string, error) {
 	status := &OSDStatus{}
 	warnings := []string{}
@@ -238,6 +252,44 @@ func SetOSDTimer(ctx context.Context, client *connection.Client, config OSDTimer
 func EncodeOSDTimer(config OSDTimerSetConfig) []byte {
 	payload := []byte{254, config.Index}
 	return appendU16Payload(payload, config.Value)
+}
+
+func SetOSDVideoSystem(ctx context.Context, client *connection.Client, videoSystem uint8) (*OSDVideoSystemSetResult, error) {
+	if videoSystem > 3 {
+		return nil, fmt.Errorf("video_system must be 0 (AUTO), 1 (PAL), 2 (NTSC), or 3 (HD)")
+	}
+	frame, err := client.Request(ctx, msp.MSPOSDConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("osd config unavailable before video system update: %w", err)
+	}
+	config, err := DecodeOSDConfig(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("osd config decode failed before video system update: %w", err)
+	}
+	if _, err := client.Request(ctx, msp.MSPSetOSDConfig, EncodeOSDVideoSystem(config, videoSystem)); err != nil {
+		return nil, fmt.Errorf("osd video system request failed: %w", err)
+	}
+	resultConfig := OSDVideoSystemSetConfig{VideoSystem: videoSystem, VideoSystemName: lookupVideoSystem(videoSystem)}
+	return &OSDVideoSystemSetResult{
+		Config:         resultConfig,
+		MSPCode:        msp.MSPSetOSDConfig,
+		MSPName:        "MSP_SET_OSD_CONFIG",
+		Acknowledged:   true,
+		SaveRequired:   true,
+		RebootPossible: videoSystem == 3 || config.VideoSystem == 3,
+	}, nil
+}
+
+func EncodeOSDVideoSystem(config *OSDConfig, videoSystem uint8) []byte {
+	payload := []byte{255, videoSystem, config.Units, config.Alarms.RSSI}
+	payload = appendU16Payload(payload, config.Alarms.CapacityMAh)
+	payload = appendU16Payload(payload, 0)
+	payload = appendU16Payload(payload, config.Alarms.AltitudeM)
+	payload = appendU16Payload(payload, uint16(config.EnabledWarnings))
+	payload = appendU32Payload(payload, config.EnabledWarnings)
+	payload = append(payload, config.SelectedProfile, config.StickOverlayMode, config.CameraFrameWidth, config.CameraFrameHeight)
+	payload = appendU16Payload(payload, config.Alarms.LinkQuality)
+	return appendU16Payload(payload, uint16(config.Alarms.RSSIDBm))
 }
 
 func DecodeOSDConfig(payload []byte) (*OSDConfig, error) {

@@ -190,7 +190,9 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `vtx set-config` writes VTX band, channel, power, pit mode, low-power-disarm mode, and pit-mode frequency through `MSP_SET_VTX_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `osd set-canvas` writes OSD canvas columns and rows through `MSP_SET_OSD_CANVAS`, requires `--yes`, and reports that firmware may save and reboot when switching an HD target to MSP displayport.
+`osd set-video-system` reads the current general OSD config, changes only `video_system`, writes it back through `MSP_SET_OSD_CONFIG`, requires `--yes`, and reports that firmware may resize canvas or change displayport behavior when switching SD and HD modes.
 `osd set-position`, `osd set-stat`, and `osd set-timer` write individual OSD element positions, post-flight statistic flags, and timer values through `MSP_SET_OSD_CONFIG`, require `--yes`, and report that a separate `save` is still required to persist the change.
+Betaflight 2025.12 declares `MSP_OSD_VIDEO_CONFIG` and `MSP_SET_OSD_VIDEO_CONFIG` constants, but the firmware source does not expose handler cases for them, so this tool uses the confirmed `MSP_SET_OSD_CONFIG` general-settings path.
 `vtxtable set-band` and `vtxtable set-power` write one VTX table band or power row through typed MSP commands, require `--yes`, and report that a separate `save` is still required to persist the change.
 `features set-mask` writes the complete feature mask through `MSP_SET_FEATURE_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `serial status` reads serial port identifiers, function masks, decoded function names, and baudrate indexes over MSP.

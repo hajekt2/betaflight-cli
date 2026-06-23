@@ -1756,6 +1756,29 @@ func TestMSPRequestWithDecodeForServoAndMotorOutputOrder(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForRawIMU(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_RAW_IMU", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	imuRaw := decoded["accelerometer_raw"].([]any)
+	if len(imuRaw) != 3 || imuRaw[0] != float64(2048) || imuRaw[1] != float64(-1024) {
+		t.Fatalf("accelerometer_raw = %+v", imuRaw)
+	}
+	g := decoded["accelerometer_g"].([]any)
+	if g[0] != float64(1) || g[1] != float64(-0.5) {
+		t.Fatalf("accelerometer_g = %+v", g)
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

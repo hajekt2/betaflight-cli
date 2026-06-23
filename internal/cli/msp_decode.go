@@ -80,7 +80,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPCompGPS:            decodeVia(commands.DecodeGPSHome),
 	msp.MSPGpssvinfo:          decodeVia(commands.DecodeGPSSatellites),
 	msp.MSPSensorConfig:       decodeVia(commands.DecodeActiveGyros),
-	msp.MSPRawIMU:             decodeVia(commands.DecodeRawIMU),
+	msp.MSPRawImu:             decodeVia(commands.DecodeRawIMU),
 	msp.MSPSensorAlignment:     decodeVia(commands.DecodeSensorAlignment),
 	msp.MSPCompassConfig:      decodeVia(commands.DecodeCompassConfig),
 	msp.MSPMotorConfig:        decodeVia(commands.DecodeMotorConfig),

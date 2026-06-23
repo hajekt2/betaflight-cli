@@ -23,6 +23,7 @@ type Inspection struct {
 	FieldDefinitions        map[string]FieldDefinition `json:"field_definitions"`
 	FrameMarkerCountsApprox map[string]int             `json:"frame_marker_counts_approx"`
 	FrameSummaryApprox      FrameSummary               `json:"frame_summary_approx"`
+	DecodedFrames           DecodedFrameSummary        `json:"decoded_frames"`
 	Warnings                []string                   `json:"warnings,omitempty"`
 }
 
@@ -57,6 +58,32 @@ type FrameCandidate struct {
 	BytesToNext int64  `json:"bytes_to_next,omitempty"`
 }
 
+type DecodedFrameSummary struct {
+	AttemptedCount        int                    `json:"attempted_count"`
+	DecodedCount          int                    `json:"decoded_count"`
+	FailedCount           int                    `json:"failed_count"`
+	Truncated             bool                   `json:"truncated"`
+	UnsupportedEncodings  map[string]int         `json:"unsupported_encodings,omitempty"`
+	UnsupportedFrameTypes map[string]int         `json:"unsupported_frame_types,omitempty"`
+	ByType                map[string]DecodedStat `json:"by_type"`
+	Samples               []DecodedFrame         `json:"samples,omitempty"`
+	Warnings              []string               `json:"warnings,omitempty"`
+}
+
+type DecodedStat struct {
+	Attempted int `json:"attempted"`
+	Decoded   int `json:"decoded"`
+	Failed    int `json:"failed"`
+}
+
+type DecodedFrame struct {
+	Type       string         `json:"type"`
+	Offset     int64          `json:"offset"`
+	DataOffset int64          `json:"data_offset"`
+	Values     map[string]int `json:"values,omitempty"`
+	Error      string         `json:"error,omitempty"`
+}
+
 func Inspect(r io.Reader) (Inspection, error) {
 	data, err := io.ReadAll(r)
 	if err != nil {
@@ -79,6 +106,7 @@ func Inspect(r io.Reader) (Inspection, error) {
 	out.DataBytes = int64(len(data) - headerEnd)
 	out.FrameMarkerCountsApprox = countFrameMarkers(data[headerEnd:])
 	out.FrameSummaryApprox = summarizeFrameCandidates(data[headerEnd:], int64(headerEnd), 200)
+	out.DecodedFrames = decodeFrames(data[headerEnd:], int64(headerEnd), out.FieldDefinitions, out.FrameSummaryApprox, 50)
 	out.Warnings = validationWarnings(out)
 	return out, nil
 }
@@ -246,6 +274,190 @@ func summarizeFrameCandidates(data []byte, headerBytes int64, maxIndex int) Fram
 		previousIndex = i
 	}
 	return summary
+}
+
+func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDefinition, candidates FrameSummary, maxSamples int) DecodedFrameSummary {
+	out := DecodedFrameSummary{
+		UnsupportedEncodings:  map[string]int{},
+		UnsupportedFrameTypes: map[string]int{},
+		ByType:                map[string]DecodedStat{},
+	}
+	for i, candidate := range candidates.Candidates {
+		if candidate.BytesToNext == 0 || candidate.DataOffset < 0 || candidate.DataOffset >= int64(len(data)) {
+			continue
+		}
+		if out.AttemptedCount >= maxSamples {
+			out.Truncated = true
+			break
+		}
+		nextOffset := candidate.DataOffset + candidate.BytesToNext
+		if nextOffset > int64(len(data)) {
+			nextOffset = int64(len(data))
+		}
+		payloadStart := candidate.DataOffset + 1
+		if payloadStart > nextOffset {
+			payloadStart = nextOffset
+		}
+		payload := data[payloadStart:nextOffset]
+		frameType := candidate.Type
+		def, ok := definitionForFrame(frameType, definitions)
+		if !ok {
+			out.UnsupportedFrameTypes[frameType]++
+			out.recordFailed(frameType, candidate, "missing field definition")
+			continue
+		}
+		out.AttemptedCount++
+		decoded, err := decodeFramePayload(frameType, candidate, payload, def)
+		if err != nil {
+			out.recordFailed(frameType, candidate, err.Error())
+			if strings.HasPrefix(err.Error(), "unsupported encoding ") {
+				out.UnsupportedEncodings[strings.TrimPrefix(err.Error(), "unsupported encoding ")]++
+			}
+			continue
+		}
+		out.DecodedCount++
+		stat := out.ByType[frameType]
+		stat.Attempted++
+		stat.Decoded++
+		out.ByType[frameType] = stat
+		out.Samples = append(out.Samples, decoded)
+		if i == len(candidates.Candidates)-1 && candidates.Truncated {
+			out.Truncated = true
+		}
+	}
+	out.FailedCount = out.AttemptedCount - out.DecodedCount
+	if len(out.UnsupportedEncodings) == 0 {
+		out.UnsupportedEncodings = nil
+	}
+	if len(out.UnsupportedFrameTypes) == 0 {
+		out.UnsupportedFrameTypes = nil
+	}
+	for frameType, stat := range out.ByType {
+		if stat.Failed > 0 {
+			out.Warnings = append(out.Warnings, fmt.Sprintf("failed to decode %d %s frame samples", stat.Failed, frameType))
+		}
+	}
+	sort.Strings(out.Warnings)
+	return out
+}
+
+func (out *DecodedFrameSummary) recordFailed(frameType string, candidate FrameCandidate, message string) {
+	out.FailedCount++
+	stat := out.ByType[frameType]
+	stat.Attempted++
+	stat.Failed++
+	out.ByType[frameType] = stat
+	out.Samples = append(out.Samples, DecodedFrame{
+		Type:       frameType,
+		Offset:     candidate.Offset,
+		DataOffset: candidate.DataOffset,
+		Error:      message,
+	})
+}
+
+func definitionForFrame(frameType string, definitions map[string]FieldDefinition) (FieldDefinition, bool) {
+	if def, ok := definitions[frameType]; ok {
+		if frameType == "P" && len(def.Names) == 0 {
+			if iDef, ok := definitions["I"]; ok {
+				def.Names = iDef.Names
+				def.Signed = iDef.Signed
+			}
+		}
+		return def, true
+	}
+	if frameType == "P" {
+		if def, ok := definitions["I"]; ok {
+			pDef := definitions["P"]
+			pDef.Frame = "P"
+			pDef.Names = def.Names
+			return pDef, true
+		}
+	}
+	return FieldDefinition{}, false
+}
+
+func decodeFramePayload(frameType string, candidate FrameCandidate, payload []byte, def FieldDefinition) (DecodedFrame, error) {
+	values := map[string]int{}
+	offset := 0
+	fieldCount := len(def.Encoding)
+	if len(def.Names) > 0 && len(def.Names) < fieldCount {
+		fieldCount = len(def.Names)
+	}
+	for i := 0; i < fieldCount; i++ {
+		encoding := def.Encoding[i]
+		name := fmt.Sprintf("field_%d", i)
+		if i < len(def.Names) && def.Names[i] != "" {
+			name = def.Names[i]
+		}
+		value, consumed, err := decodeFieldValue(payload[offset:], encoding, signedField(def, i))
+		if err != nil {
+			return DecodedFrame{}, err
+		}
+		offset += consumed
+		values[name] = value
+	}
+	if offset < len(payload) {
+		return DecodedFrame{}, fmt.Errorf("decoded %d of %d payload bytes", offset, len(payload))
+	}
+	return DecodedFrame{
+		Type:       frameType,
+		Offset:     candidate.Offset,
+		DataOffset: candidate.DataOffset,
+		Values:     values,
+	}, nil
+}
+
+func signedField(def FieldDefinition, index int) bool {
+	if index >= len(def.Signed) {
+		return false
+	}
+	return def.Signed[index] == "1"
+}
+
+func decodeFieldValue(data []byte, encoding string, signed bool) (int, int, error) {
+	switch encoding {
+	case "0":
+		return decodeSignedVB(data)
+	case "1":
+		value, consumed, err := decodeUnsignedVB(data)
+		if err != nil {
+			return 0, 0, err
+		}
+		if signed {
+			return zigzagDecode(value), consumed, nil
+		}
+		return int(value), consumed, nil
+	default:
+		return 0, 0, fmt.Errorf("unsupported encoding %s", encoding)
+	}
+}
+
+func decodeUnsignedVB(data []byte) (uint32, int, error) {
+	var value uint32
+	for i := 0; i < len(data) && i < 5; i++ {
+		b := data[i]
+		value |= uint32(b&0x7f) << (7 * i)
+		if b&0x80 == 0 {
+			return value, i + 1, nil
+		}
+	}
+	return 0, 0, fmt.Errorf("truncated variable-byte integer")
+}
+
+func decodeSignedVB(data []byte) (int, int, error) {
+	value, consumed, err := decodeUnsignedVB(data)
+	if err != nil {
+		return 0, 0, err
+	}
+	return zigzagDecode(value), consumed, nil
+}
+
+func zigzagDecode(value uint32) int {
+	n := int(value >> 1)
+	if value&1 == 0 {
+		return n
+	}
+	return -n - 1
 }
 
 func validationWarnings(in Inspection) []string {

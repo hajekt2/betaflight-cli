@@ -122,9 +122,10 @@ Successful reboot commands include a `side_effects` item because the Flight Cont
 All reboot commands require global `--yes` and use the dangerous operation class.
 
 `blackbox inspect` returns an `inspection` object.
-The object includes file sizes, header metadata, ordered header names, parsed field definitions, warnings, `frame_marker_counts_approx`, and `frame_summary_approx`.
+The object includes file sizes, header metadata, ordered header names, parsed field definitions, warnings, `frame_marker_counts_approx`, `frame_summary_approx`, and `decoded_frames`.
 `frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.
-The marker counts and candidate frame index are approximate until full binary frame decoding is implemented.
+`decoded_frames` is a capped best-effort sample decoder for simple variable-byte frame payloads and reports unsupported encodings or frame types instead of guessing.
+The marker counts and candidate frame index are approximate until full binary frame decoding covers every Blackbox encoding.
 
 `capabilities` returns a `capabilities` object without connecting to hardware.
 The object includes the introspected Cobra command tree, per-command runnable state, safety operation class, connection requirement, confirmation requirement, output root, input notes, and curated workflow sequences for common agent tasks.

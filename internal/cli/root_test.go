@@ -941,6 +941,10 @@ func TestBlackboxInspectDoesNotConnect(t *testing.T) {
 	if inspection["product"] == "" || inspection["firmware_revision"] == "" {
 		t.Fatalf("inspection = %+v", inspection)
 	}
+	decoded := inspection["decoded_frames"].(map[string]any)
+	if decoded["decoded_count"] != float64(1) || len(decoded["samples"].([]any)) != 1 {
+		t.Fatalf("decoded frames = %+v", decoded)
+	}
 	if called {
 		t.Fatal("connector was called for offline blackbox inspect")
 	}
@@ -2358,7 +2362,7 @@ func writeTempBlackboxLog(t *testing.T) string {
 		"H Field I encoding:1,1",
 		"H Field P predictor:0,10",
 		"H Field P encoding:0,0",
-		"I\x00P\x00E",
+		"I\x02\x04E",
 	}, "\n")
 	if err := os.WriteFile(path, []byte(log), 0o600); err != nil {
 		t.Fatalf("WriteFile() error = %v", err)

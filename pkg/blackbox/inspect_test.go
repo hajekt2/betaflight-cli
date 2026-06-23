@@ -55,6 +55,38 @@ func TestInspectHeaderAndFieldDefinitions(t *testing.T) {
 	}
 }
 
+func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
+	log := strings.Join([]string{
+		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
+		"H Field I name:loopIteration,time,axisP[0]",
+		"H Field I signed:0,0,1",
+		"H Field I predictor:6,0,0",
+		"H Field I encoding:1,1,1",
+		"H Field P predictor:0,10,0",
+		"H Field P encoding:1,1,1",
+		"I\x02\x04\x03P\x06\x08\x04E",
+	}, "\n")
+	inspection, err := Inspect(strings.NewReader(log))
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	decoded := inspection.DecodedFrames
+	if decoded.AttemptedCount != 2 || decoded.DecodedCount != 2 || decoded.FailedCount != 0 {
+		t.Fatalf("decoded = %+v", decoded)
+	}
+	if len(decoded.Samples) != 2 {
+		t.Fatalf("samples = %+v", decoded.Samples)
+	}
+	first := decoded.Samples[0]
+	if first.Type != "I" || first.Values["loopIteration"] != 2 || first.Values["time"] != 4 || first.Values["axisP[0]"] != -2 {
+		t.Fatalf("first sample = %+v", first)
+	}
+	second := decoded.Samples[1]
+	if second.Type != "P" || second.Values["loopIteration"] != 6 || second.Values["time"] != 8 || second.Values["axisP[0]"] != 2 {
+		t.Fatalf("second sample = %+v", second)
+	}
+}
+
 func TestInspectRejectsMissingHeader(t *testing.T) {
 	if _, err := Inspect(strings.NewReader("not a blackbox log")); err == nil {
 		t.Fatal("Inspect() error = nil, want error")

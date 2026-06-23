@@ -335,7 +335,7 @@ func coverageGaps(domains []coverageDomain) []coverageGap {
 		},
 		{
 			Domain:     "blackbox-decoding",
-			Reason:     "Offline Blackbox inspection currently reports headers and approximate frame markers, not full decoded log frames.",
+			Reason:     "Offline Blackbox inspection currently decodes simple variable-byte samples, not full Blackbox frame streams.",
 			NextSteps:  []string{"implement binary frame decoding", "add typed gyro, motor, RC, PID, and event streams", "add JSON summaries suitable for agents"},
 			SafetyNote: "Offline only.",
 		},

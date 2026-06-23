@@ -23,18 +23,75 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPStatusEx:           decodeVia(commands.DecodeStatusEx),
 	msp.MSPAttitude:           decodeVia(commands.DecodeAttitude),
 	msp.MSPAltitude:           decodeVia(commands.DecodeAltitude),
-	msp.MSPBatteryState:       decodeVia(commands.DecodeBatteryRuntimeState),
 	msp.MSPSonarAltitude:      decodeVia(commands.DecodeRangefinderAltitude),
+	msp.MSPBatteryState:       decodeVia(commands.DecodeBatteryRuntimeState),
 	msp.MSPAnalog:             decodeVia(commands.DecodeAnalog),
+	msp.MSPBatteryConfig:       decodeVia(commands.DecodeBatteryConfig),
+	msp.MSPVoltageMeters:      decodeVia(commands.DecodeVoltageMeters),
+	msp.MSPCurrentMeters:      decodeVia(commands.DecodeCurrentMeters),
+	msp.MSPVoltageMeterConfig: decodeVia(commands.DecodeVoltageMeterConfigs),
+	msp.MSPCurrentMeterConfig: decodeVia(commands.DecodeCurrentMeterConfigs),
 	msp.MSPRC:                 decodeVia(commands.DecodeRC),
 	msp.MSPRtc:                decodeVia(commands.DecodeRTC),
-	msp.MSPVTXConfig:          decodeVia(commands.DecodeVTXConfig),
-	msp.MSPOSDConfig:          decodeVia(commands.DecodeOSDConfig),
-	msp.MSPMixerConfig:        decodeVia(commands.DecodeMixerStatus),
+	msp.MSPDataflashSummary:    decodeVia(commands.DecodeDataflashSummary),
+	msp.MSPDataflashRead:      decodeVia(commands.DecodeDataflashReadChunk),
+	msp.MSPSdcardSummary:      decodeVia(commands.DecodeSDCardSummary),
+	msp.MSPBoxnames:           decodeStringSlice(commands.DecodeBoxNames),
+	msp.MSPBoxids:             decodeByteSlice(commands.DecodeBoxIDs),
+	msp.MSPModeRanges:         decodeVia(commands.DecodeModeRanges),
+	msp.MSPModeRangesExtra:    decodeVia(commands.DecodeModeRangeExtras),
+	msp.MSPAdjustmentRanges:   decodeVia(commands.DecodeAdjustmentRanges),
+	msp.MSPAdvancedConfig:     decodeVia(commands.DecodeAdvancedConfig),
+	msp.MSPFilterConfig:       decodeVia(commands.DecodeFilterConfig),
+	msp.MSPPID:               decodeVia(decodeMSPPIDPayload),
+	msp.MSPPidnames:          decodeStringSlice(commands.DecodePIDNames),
+	msp.MSPPIDController:      decodeVia(commands.DecodePIDController),
+	msp.MSPRCTuning:           decodeVia(commands.DecodeRateProfile),
+	msp.MSPPIDAdvanced:        decodeVia(commands.DecodePIDAdvanced),
+	msp.MSPFeatureConfig:      decodeVia(commands.DecodeFeatureStatus),
 	msp.MSPArmingConfig:       decodeVia(commands.DecodeArmingConfig),
 	msp.MSPFailsafeConfig:     decodeVia(commands.DecodeFailsafeConfig),
 	msp.MSPBoardAlignmentConfig: decodeVia(commands.DecodeBoardAlignment),
+	msp.MSPRXConfig:           decodeVia(commands.DecodeReceiverConfig),
+	msp.MSPRSSIConfig:         decodeRawBytes,
+	msp.MSPRXMap:              decodeByteSlice(commands.DecodeBoxIDs),
+	msp.MSPRxfailConfig:       decodeVia(commands.DecodeRXFailConfig),
+	msp.MSPGPSConfig:          decodeVia(commands.DecodeGPSConfig),
+	msp.MSPRawGPS:             decodeVia(commands.DecodeGPSPosition),
+	msp.MSPCompGPS:            decodeRawBytes,
+	msp.MSPGpssvinfo:          decodeVia(commands.DecodeGPSSatellites),
+	msp.MSPSensorConfig:       decodeVia(commands.DecodeActiveGyros),
+	msp.MSPRawIMU:             decodeVia(commands.DecodeRawIMU),
+	msp.MSPSensorAlignment:     decodeVia(commands.DecodeSensorAlignment),
+	msp.MSPCompassConfig:      decodeVia(commands.DecodeCompassConfig),
+	msp.MSPMotorConfig:        decodeVia(commands.DecodeMotorConfig),
+	msp.MSPMotorTelemetry:     decodeVia(commands.DecodeMotorTelemetry),
+	msp.MSPMotor3dConfig:      decodeVia(commands.DecodeMotor3DConfig),
+	msp.MSPServoMixRules:      decodeVia(commands.DecodeServoMixRules),
+	msp.MSPServoConfigurations: decodeVia(commands.DecodeServoConfigurations),
+	msp.MSP2CommonSerialConfig: decodeVia(commands.DecodeSerialPortConfigV2),
+	msp.MSPCFSerialConfig:     decodeVia(commands.DecodeSerialPortConfigV1),
+	msp.MSPVTXConfig:          decodeVia(commands.DecodeVTXConfig),
+	msp.MSPOSDConfig:          decodeVia(commands.DecodeOSDConfig),
+	msp.MSPOSDCanvas:          decodeVia(commands.DecodeOSDCanvas),
+	msp.MSPOSDWarnings:        decodeVia(commands.DecodeOSDWarnings),
+	msp.MSPMixerConfig:        decodeVia(commands.DecodeMixerStatus),
+	msp.MSPBeeperConfig:       decodeVia(commands.DecodeBeeperConfig),
 	msp.MSPTransponderConfig:  decodeVia(commands.DecodeTransponderConfig),
+}
+
+var pidFallbackNames = []string{"ROLL", "PITCH", "YAW", "LEVEL", "MAG"}
+
+func decodeStringSlice(fn func([]byte) []string) mspPayloadDecoder {
+	return func(payload []byte) (any, error) {
+		return fn(payload), nil
+	}
+}
+
+func decodeByteSlice(fn func([]byte) []uint8) mspPayloadDecoder {
+	return func(payload []byte) (any, error) {
+		return fn(payload), nil
+	}
 }
 
 func decodeVia[T any](fn func([]byte) (T, error)) mspPayloadDecoder {
@@ -51,6 +108,27 @@ func decodeString(fn func([]byte) string) mspPayloadDecoder {
 	return func(payload []byte) (any, error) {
 		return fn(payload), nil
 	}
+}
+
+func decodeMSPPIDPayload(payload []byte) (any, error) {
+	gains, err := commands.DecodePIDGains(payload, pidFallbackNames)
+	if err != nil {
+		return nil, err
+	}
+	type pidPayload struct {
+		Names []string          `json:"names"`
+		Gains []commands.PIDGain `json:"gains"`
+	}
+	out := pidPayload{
+		Names: make([]string, len(pidFallbackNames)),
+		Gains: gains,
+	}
+	copy(out.Names, pidFallbackNames)
+	return out, nil
+}
+
+func decodeRawBytes(payload []byte) (any, error) {
+	return append([]byte(nil), payload...)
 }
 
 func decodeMSPPayload(code uint16, payload []byte) (any, bool, error) {

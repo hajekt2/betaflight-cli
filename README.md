@@ -102,6 +102,7 @@ betaflight-cli vtxtable list --port /dev/tty.usbmodem01
 betaflight-cli leds list --port /dev/tty.usbmodem01
 betaflight-cli leds set-values 50 20 120 --port /dev/tty.usbmodem01 --yes
 betaflight-cli servos list --port /dev/tty.usbmodem01
+betaflight-cli servos reverse-json servo-reverse.json --port /dev/tty.usbmodem01
 betaflight-cli adjustments list --port /dev/tty.usbmodem01
 betaflight-cli adjustments status --port /dev/tty.usbmodem01
 betaflight-cli rxrange list --port /dev/tty.usbmodem01
@@ -291,6 +292,7 @@ It never connects to hardware.
 `leds set-values-json` writes LED strip brightness, rainbow delta, and rainbow frequency through `MSP2_SET_LED_STRIP_CONFIG_VALUES`, accepts either a values object or an object with `led_values`, `values`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `servos set-json` writes servo configuration rows and servo mix rules through typed MSP row commands, accepts either a servo table object or an object with `servo_table` or `servos`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`servos reverse-json` accepts `servo`, `source`, and `mode`/`reverse`/`reversed`, returns a native CLI `change_plan`, and can apply the `smix reverse` row with `--apply --yes`.
 `servos set-config` writes one servo configuration row through `MSP_SET_SERVO_CONFIGURATION`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos set-config-json` writes one servo configuration row through `MSP_SET_SERVO_CONFIGURATION`, accepts either a servo configuration object or an object with `servo_config`, `servo`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos set-mix-rule` writes one servo mixer rule through `MSP_SET_SERVO_MIX_RULE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

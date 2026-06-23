@@ -578,6 +578,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if servoTable["operation"] != "write" || servoTable["confirmation"] != "--yes" || servoTable["requires_connection"] != true || servoTable["output_root"] != "servo_table" || servoTable["runnable"] != true {
 		t.Fatalf("servo table capability = %+v", servoTable)
 	}
+	servoReverseJSON := byCommand["betaflight-cli servos reverse-json"]
+	if servoReverseJSON["operation"] != "plan_or_write" || servoReverseJSON["confirmation"] != "--yes with --apply or --save" || servoReverseJSON["requires_connection"] != true || servoReverseJSON["output_root"] != "change_plan" || servoReverseJSON["input"] == "" || servoReverseJSON["runnable"] != true {
+		t.Fatalf("servo reverse json capability = %+v", servoReverseJSON)
+	}
 	servoMixRule := byCommand["betaflight-cli servos set-mix-rule"]
 	if servoMixRule["operation"] != "write" || servoMixRule["confirmation"] != "--yes" || servoMixRule["requires_connection"] != true || servoMixRule["output_root"] != "servo_mix_rule" || servoMixRule["runnable"] != true {
 		t.Fatalf("servo mix rule capability = %+v", servoMixRule)
@@ -8863,6 +8867,61 @@ func TestTableDomainSetValidationFailureDoesNotConnect(t *testing.T) {
 	}
 	if called {
 		t.Fatal("connector was called after table validation failure")
+	}
+}
+
+func TestServoReverseJSONPlanDoesNotConnect(t *testing.T) {
+	input := `{"servo_reverse":{"servo":0,"input_source":2,"reversed":true}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"servos", "reverse-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 1 || lines[0] != "smix reverse 0 2 r" || data["applied"] != false {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for plan-only servo reverse-json command")
+	}
+}
+
+func TestServoReverseJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"servo":0,"source":2,"mode":"sideways"}`
+	env, err := runTestCommandWithInput(t, []string{"servos", "reverse-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid servo reverse JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestServoReverseJSONApplyWithFakeFC(t *testing.T) {
+	input := `{"reverse_row":{"index":0,"source":2,"reverse":"n"}}`
+	env, err := runTestCommandWithInput(t, []string{"servos", "reverse-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "smix reverse 0 2 n" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

@@ -448,6 +448,8 @@ Successful LED value writes include a `led_values` side effect.
 `servos status` returns a `servos` object decoded from `MSP_SERVO`, `MSP_SERVO_CONFIGURATIONS`, and `MSP_SERVO_MIX_RULES`.
 The object includes current servo outputs, servo configuration rows, and servo mix rules.
 `servos set-json` returns a `servo_table` object with applied servo configuration rows, applied mix rules, row counts, MSP command names, acknowledgement flag, and `save_required`.
+`servos reverse-json` accepts `servo`, `source`, and `mode`/`reverse`/`reversed`, either directly or under `servo_reverse`, `reverse_row`, `reverse`, or `smix`.
+It returns a `change_plan` with the exact native `smix reverse SERVO SOURCE r|n` CLI line, and applying it requires `--apply --yes`.
 `servos set-config` returns a `servo_config` object with the written row, MSP command name/code, acknowledgement flag, and `save_required`.
 `servos set-config-json` accepts either a servo configuration object or an object with `servo_config`, `servo`, or `config`.
 It returns the same `servo_config` object as `servos set-config`.

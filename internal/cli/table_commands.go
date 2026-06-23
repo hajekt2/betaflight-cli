@@ -762,8 +762,103 @@ func (a *app) servosCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(reverse, &reverseFlags)
-	cmd.AddCommand(set, reverse, a.servoSetJSONCommand(), a.servoSetConfigCommand(), a.servoSetConfigJSONCommand(), a.servoSetMixRuleCommand(), a.servoSetMixRuleJSONCommand())
+	cmd.AddCommand(set, reverse, a.servoReverseJSONCommand(), a.servoSetJSONCommand(), a.servoSetConfigCommand(), a.servoSetConfigJSONCommand(), a.servoSetMixRuleCommand(), a.servoSetMixRuleJSONCommand())
 	return cmd
+}
+
+func (a *app) servoReverseJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "reverse-json FILE",
+		Short: "Plan or set one servo mixer reverse row from JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			line, err := parseServoReverseJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.planOrApplyCLI(cmd, []string{line}, "smix", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseServoReverseJSON(data []byte) (string, error) {
+	type servoReverseInput struct {
+		Servo       *int   `json:"servo"`
+		ServoIndex  *int   `json:"servo_index"`
+		Index       *int   `json:"index"`
+		Source      *int   `json:"source"`
+		InputSource *int   `json:"input_source"`
+		Mode        string `json:"mode"`
+		Reverse     string `json:"reverse"`
+		Reversed    *bool  `json:"reversed"`
+		Enabled     *bool  `json:"enabled"`
+	}
+	var wrapped struct {
+		ServoReverse *servoReverseInput `json:"servo_reverse"`
+		ReverseRow   *servoReverseInput `json:"reverse_row"`
+		Reverse      *servoReverseInput `json:"reverse"`
+		SMix         *servoReverseInput `json:"smix"`
+		servoReverseInput
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return "", err
+	}
+	input := wrapped.servoReverseInput
+	for _, candidate := range []*servoReverseInput{wrapped.ServoReverse, wrapped.ReverseRow, wrapped.Reverse, wrapped.SMix} {
+		if candidate != nil {
+			input = *candidate
+			break
+		}
+	}
+	servoValue := firstIntPtr(input.Servo, input.ServoIndex, input.Index)
+	if servoValue == nil {
+		return "", fmt.Errorf("servo is required")
+	}
+	sourceValue := firstIntPtr(input.Source, input.InputSource)
+	if sourceValue == nil {
+		return "", fmt.Errorf("source is required")
+	}
+	servoText := fmt.Sprintf("%d", *servoValue)
+	sourceText := fmt.Sprintf("%d", *sourceValue)
+	if err := requireInts([]string{servoText, sourceText}); err != nil {
+		return "", err
+	}
+	mode, err := parseServoReverseMode(firstString(input.Mode, input.Reverse), input.Reversed, input.Enabled)
+	if err != nil {
+		return "", err
+	}
+	return "smix reverse " + servoText + " " + sourceText + " " + mode, nil
+}
+
+func parseServoReverseMode(modeText string, reversed *bool, enabled *bool) (string, error) {
+	mode := strings.ToLower(modeText)
+	switch mode {
+	case "r", "reversed", "reverse", "true", "on", "yes":
+		return "r", nil
+	case "n", "normal", "false", "off", "no":
+		return "n", nil
+	case "":
+	default:
+		return "", fmt.Errorf("reverse mode must be r or n")
+	}
+	state := reversed
+	if state == nil {
+		state = enabled
+	}
+	if state == nil {
+		return "", fmt.Errorf("reverse mode is required")
+	}
+	if *state {
+		return "r", nil
+	}
+	return "n", nil
 }
 
 func (a *app) servoSetJSONCommand() *cobra.Command {

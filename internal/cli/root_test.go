@@ -1368,6 +1368,10 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 	if preflight["read_only"] != true || preflight["arming_blocked"] != true {
 		t.Fatalf("preflight = %+v", preflight)
 	}
+	postStop := plan["post_stop"].(map[string]any)
+	if postStop["read_only"] != true || len(postStop["outputs"].([]any)) == 0 || len(postStop["telemetry_rpm"].([]any)) == 0 {
+		t.Fatalf("post stop = %+v", postStop)
+	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "motor_output" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}

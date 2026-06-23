@@ -29,6 +29,7 @@ type motorTestPlan struct {
 	StopCommandPreview    string              `json:"stop_command_preview"`
 	Stopped               bool                `json:"stopped"`
 	Preflight             *motorTestPreflight `json:"preflight,omitempty"`
+	PostStop              *motorTestPostStop  `json:"post_stop,omitempty"`
 	ResponseLines         map[string][]string `json:"response_lines,omitempty"`
 	RequiredConfirmations []string            `json:"required_confirmations"`
 	SafetyChecks          []safetyCheck       `json:"safety_checks"`
@@ -43,6 +44,15 @@ type motorTestPreflight struct {
 	RebootRequired    *bool    `json:"reboot_required,omitempty"`
 	ActiveModes       []string `json:"active_modes,omitempty"`
 	ActiveArmingFlags []string `json:"active_arming_flags,omitempty"`
+}
+
+type motorTestPostStop struct {
+	Source          string   `json:"source"`
+	ReadOnly        bool     `json:"read_only"`
+	Outputs         []uint16 `json:"outputs,omitempty"`
+	TelemetryRPM    []uint32 `json:"telemetry_rpm,omitempty"`
+	OutputOrder     []uint8  `json:"output_order,omitempty"`
+	WarningMessages []string `json:"warning_messages,omitempty"`
 }
 
 type safetyCheck struct {
@@ -125,6 +135,13 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		plan.Applied = true
 		plan.Stopped = stopErr == nil
 		plan.ResponseLines = responses
+		postStopWarnings := []string{}
+		postStop, postStopErr := readMotorTestPostStop(cmd.Context(), client)
+		if postStopErr != nil {
+			postStopWarnings = append(postStopWarnings, fmt.Sprintf("post-stop motor status unavailable: %v", postStopErr))
+		} else {
+			plan.PostStop = postStop
+		}
 		env := output.Success(commandPath(cmd), &target, map[string]any{
 			"motor_test_plan": plan,
 		})
@@ -135,6 +152,9 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		})
 		if stopErr != nil {
 			addStringWarnings(&env, []string{fmt.Sprintf("motor stop command returned an error: %v", stopErr)})
+		}
+		if len(postStopWarnings) > 0 {
+			addStringWarnings(&env, postStopWarnings)
 		}
 		return env
 	})
@@ -164,6 +184,27 @@ func readMotorTestPreflight(ctx context.Context, client *connection.Client) (*mo
 		}
 	}
 	return preflight, nil
+}
+
+func readMotorTestPostStop(ctx context.Context, client *connection.Client) (*motorTestPostStop, error) {
+	status, warnings, err := bfcommands.ReadMotorStatus(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	post := &motorTestPostStop{
+		Source:          "motor status",
+		ReadOnly:        true,
+		Outputs:         append([]uint16(nil), status.Outputs...),
+		OutputOrder:     append([]uint8(nil), status.OutputOrder...),
+		WarningMessages: append([]string(nil), warnings...),
+	}
+	if len(status.Telemetry) > 0 {
+		post.TelemetryRPM = make([]uint32, 0, len(status.Telemetry))
+		for _, item := range status.Telemetry {
+			post.TelemetryRPM = append(post.TelemetryRPM, item.RPM)
+		}
+	}
+	return post, nil
 }
 
 func motorSafetyPassed(plan motorTestPlan, name string) bool {

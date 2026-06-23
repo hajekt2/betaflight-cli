@@ -471,6 +471,9 @@ func (a *app) planOrApplyCLIWithOperation(cmd *cobra.Command, lines []string, ki
 	if !flags.apply {
 		return a.render(output.Success(commandPath(cmd), nil, plan))
 	}
+	if !a.opts.yes {
+		return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "apply requires --yes")
+	}
 	if flags.save && !a.opts.yes {
 		return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--save requires --yes because it persists and usually reboots the flight controller"))
 	}

@@ -242,7 +242,7 @@ Saving should be explicit because Betaflight reboots or may disconnect afterward
 The basic settings flow is:
 
 1. `settings set name value` returns a JSON plan without writing.
-2. `settings set name value --apply` sends the CLI-backed change without saving.
+2. `settings set name value --apply --yes` sends the CLI-backed change without saving.
 3. `settings set name value --apply --save --yes` applies, saves, and reports the reboot or disconnect expectation.
 
 `--apply` must never imply `save`.

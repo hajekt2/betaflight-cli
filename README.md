@@ -251,6 +251,7 @@ Commands that can alter configuration require explicit write intent.
 The first implementation should distinguish between `plan`, `apply`, and `save`.
 By default, `settings set name value` should return a JSON change plan without writing.
 `--apply` sends the CLI-backed change but does not save.
+`--apply` requires `--yes` so writes remain explicit.
 `--save` persists and usually reboots, so it requires explicit confirmation.
 `--apply` must never imply `save`.
 Scripts may use `--apply --save --yes`, but that path must report the persistence and reboot expectation clearly.

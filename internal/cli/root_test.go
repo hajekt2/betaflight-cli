@@ -1535,7 +1535,7 @@ func TestTextStatusWithFakeFC(t *testing.T) {
 }
 
 func TestSettingsApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"settings", "set", "gyro_lpf1_static_hz", "0", "--apply", "--auto-port"}, nil)
+	env, err := runTestCommand(t, []string{"settings", "set", "gyro_lpf1_static_hz", "0", "--apply", "--auto-port", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3279,7 +3279,7 @@ func TestReceiverRXFailValidationFailureDoesNotConnect(t *testing.T) {
 }
 
 func TestReceiverRXFailApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"receiver", "rxfail", "2", "s", "1100", "--apply"}, nil)
+	env, err := runTestCommand(t, []string{"receiver", "rxfail", "2", "s", "1100", "--apply", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3296,7 +3296,7 @@ func TestReceiverRXFailApplyWithFakeFC(t *testing.T) {
 }
 
 func TestFeatureEnableApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply"}, nil)
+	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3430,7 +3430,7 @@ func TestProfilesBatterySelectValidationFailureDoesNotConnect(t *testing.T) {
 }
 
 func TestProfilesBatterySelectApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"profiles", "battery-select", "1", "--apply"}, nil)
+	env, err := runTestCommand(t, []string{"profiles", "battery-select", "1", "--apply", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3460,6 +3460,18 @@ func TestDomainSaveRequiresYesDoesNotConnect(t *testing.T) {
 	}
 	if called {
 		t.Fatal("connector was called after confirmation failure")
+	}
+}
+
+func TestPlanApplyRequiresYes(t *testing.T) {
+	env, err := runTestCommand(t, []string{"features", "enable", "gps", "--apply"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
 	}
 }
 
@@ -4187,7 +4199,7 @@ func TestTableDomainSetValidationFailureDoesNotConnect(t *testing.T) {
 }
 
 func TestTableDomainSetApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"rxrange", "set", "0", "1000", "2000", "--apply"}, nil)
+	env, err := runTestCommand(t, []string{"rxrange", "set", "0", "1000", "2000", "--apply", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -4308,7 +4320,7 @@ func TestSettingDomainSetRejectsWrongDomain(t *testing.T) {
 }
 
 func TestSettingDomainSetApplyWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"pid", "set", "p_roll", "46", "--apply"}, nil)
+	env, err := runTestCommand(t, []string{"pid", "set", "p_roll", "46", "--apply", "--yes"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

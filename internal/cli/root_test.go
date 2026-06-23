@@ -187,6 +187,10 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	if motors["status"] != "implemented" {
 		t.Fatalf("motors domain = %+v", motors)
 	}
+	settings := byDomain["settings"]
+	if settings["status"] != "implemented" || len(settings["read_commands"].([]any)) == 0 || len(settings["write_commands"].([]any)) == 0 {
+		t.Fatalf("settings domain = %+v", settings)
+	}
 	gaps := coverage["next_gaps"].([]any)
 	foundMotorTesting := false
 	for _, item := range gaps {

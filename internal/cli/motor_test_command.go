@@ -40,8 +40,7 @@ type motorTestPlan struct {
 }
 
 type motorTestPreflight struct {
-	Source            string   `json:"source"`
-	ReadOnly          bool     `json:"read_only"`
+	hazardousReadOnlyEvidence
 	ArmingBlocked     *bool    `json:"arming_blocked,omitempty"`
 	RebootRequired    *bool    `json:"reboot_required,omitempty"`
 	ActiveModes       []string `json:"active_modes,omitempty"`
@@ -49,8 +48,7 @@ type motorTestPreflight struct {
 }
 
 type motorTestPostStop struct {
-	Source          string   `json:"source"`
-	ReadOnly        bool     `json:"read_only"`
+	hazardousReadOnlyEvidence
 	Outputs         []uint16 `json:"outputs,omitempty"`
 	TelemetryRPM    []uint32 `json:"telemetry_rpm,omitempty"`
 	OutputOrder     []uint8  `json:"output_order,omitempty"`
@@ -58,10 +56,7 @@ type motorTestPostStop struct {
 }
 
 type motorTestComparison struct {
-	Source               string   `json:"source"`
-	ReadOnly             bool     `json:"read_only"`
-	PreflightCaptured    bool     `json:"preflight_captured"`
-	PostStopCaptured     bool     `json:"post_stop_captured"`
+	hazardousCaptureSummary
 	OutputCount          int      `json:"output_count"`
 	NonMinCommandOutputs int      `json:"non_min_command_outputs"`
 	MaxOutput            uint16   `json:"max_output,omitempty"`
@@ -71,19 +66,7 @@ type motorTestComparison struct {
 }
 
 type motorTestAudit struct {
-	Source              string   `json:"source"`
-	ReadOnlyEvidence    bool     `json:"read_only_evidence"`
-	RequestedDurationMS int64    `json:"requested_duration_ms"`
-	ElapsedDurationMS   int64    `json:"elapsed_duration_ms"`
-	StartCommand        string   `json:"start_command"`
-	StopCommand         string   `json:"stop_command"`
-	Confirmations       []string `json:"confirmations"`
-	SafetyPassed        bool     `json:"safety_passed"`
-	PreflightCaptured   bool     `json:"preflight_captured"`
-	PostStopCaptured    bool     `json:"post_stop_captured"`
-	StopAttempted       bool     `json:"stop_attempted"`
-	StopSucceeded       bool     `json:"stop_succeeded"`
-	WarningMessages     []string `json:"warning_messages,omitempty"`
+	hazardousActionAudit
 }
 
 type safetyCheck struct {
@@ -201,8 +184,10 @@ func readMotorTestPreflight(ctx context.Context, client *connection.Client) (*mo
 		return nil, err
 	}
 	preflight := &motorTestPreflight{
-		Source:   "runtime status",
-		ReadOnly: true,
+		hazardousReadOnlyEvidence: hazardousReadOnlyEvidence{
+			Source:   "runtime status",
+			ReadOnly: true,
+		},
 	}
 	if status.Health != nil {
 		preflight.ArmingBlocked = status.Health.ArmingBlocked
@@ -227,8 +212,10 @@ func readMotorTestPostStop(ctx context.Context, client *connection.Client) (*mot
 		return nil, err
 	}
 	post := &motorTestPostStop{
-		Source:          "motor status",
-		ReadOnly:        true,
+		hazardousReadOnlyEvidence: hazardousReadOnlyEvidence{
+			Source:   "motor status",
+			ReadOnly: true,
+		},
 		Outputs:         append([]uint16(nil), status.Outputs...),
 		OutputOrder:     append([]uint8(nil), status.OutputOrder...),
 		WarningMessages: append([]string(nil), warnings...),
@@ -247,10 +234,12 @@ func buildMotorTestComparison(preflight *motorTestPreflight, postStop *motorTest
 		return nil
 	}
 	comparison := &motorTestComparison{
-		Source:               "preflight to post-stop summary",
-		ReadOnly:             true,
-		PreflightCaptured:    preflight != nil,
-		PostStopCaptured:     postStop != nil,
+		hazardousCaptureSummary: hazardousCaptureSummary{
+			Source:             "preflight to post-stop summary",
+			ReadOnly:           true,
+			PreflightCaptured:  preflight != nil,
+			PostActionCaptured: postStop != nil,
+		},
 		OutputCount:          len(postStop.Outputs),
 		TelemetrySampleCount: len(postStop.TelemetryRPM),
 	}
@@ -289,19 +278,21 @@ func motorSafetyPassed(plan motorTestPlan, name string) bool {
 
 func buildMotorTestAudit(plan motorTestPlan, elapsedMS int64, stopErr error, warnings []string) *motorTestAudit {
 	return &motorTestAudit{
-		Source:              "motor test apply",
-		ReadOnlyEvidence:    true,
-		RequestedDurationMS: plan.DurationMS,
-		ElapsedDurationMS:   elapsedMS,
-		StartCommand:        plan.CommandPreview,
-		StopCommand:         plan.StopCommandPreview,
-		Confirmations:       append([]string(nil), plan.RequiredConfirmations...),
-		SafetyPassed:        motorSafetyPassed(plan, "props_off") && motorSafetyPassed(plan, "battery_awareness"),
-		PreflightCaptured:   plan.Preflight != nil,
-		PostStopCaptured:    plan.PostStop != nil,
-		StopAttempted:       true,
-		StopSucceeded:       stopErr == nil,
-		WarningMessages:     append([]string(nil), warnings...),
+		hazardousActionAudit: hazardousActionAudit{
+			Source:              "motor test apply",
+			ReadOnlyEvidence:    true,
+			RequestedDurationMS: plan.DurationMS,
+			ElapsedDurationMS:   elapsedMS,
+			StartCommand:        plan.CommandPreview,
+			StopCommand:         plan.StopCommandPreview,
+			Confirmations:       append([]string(nil), plan.RequiredConfirmations...),
+			SafetyPassed:        motorSafetyPassed(plan, "props_off") && motorSafetyPassed(plan, "battery_awareness"),
+			PreflightCaptured:   plan.Preflight != nil,
+			PostActionCaptured:  plan.PostStop != nil,
+			StopAttempted:       true,
+			StopSucceeded:       stopErr == nil,
+			WarningMessages:     append([]string(nil), warnings...),
+		},
 	}
 }
 

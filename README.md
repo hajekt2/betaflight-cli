@@ -192,6 +192,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `modes set-range` writes one AUX mode range through `MSP_SET_MODE_RANGE` using step values, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver status` reads receiver configuration, channel map, RSSI channel, RC deadband, RX failsafe rows, and live RC channels over MSP.
 `receiver set-rssi-channel` writes the RSSI channel through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`receiver set-map` writes the four-channel RC map through `MSP_SET_RX_MAP`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-deadband` writes RC deadband, yaw deadband, position-hold deadband, and 3D throttle deadband through `MSP_SET_RC_DEADBAND`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `gps set-config` writes provider, SBAS mode, auto-configuration, auto-baud, home-point-once, and u-blox Galileo flags through `MSP_SET_GPS_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

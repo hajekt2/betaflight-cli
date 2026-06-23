@@ -363,6 +363,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
 		t.Fatalf("rssi channel capability = %+v", rssiChannel)
 	}
+	rcMap := byCommand["betaflight-cli receiver set-map"]
+	if rcMap["operation"] != "write" || rcMap["confirmation"] != "--yes" || rcMap["requires_connection"] != true || rcMap["output_root"] != "rc_map" || rcMap["runnable"] != true {
+		t.Fatalf("rc map capability = %+v", rcMap)
+	}
 	rcDeadband := byCommand["betaflight-cli receiver set-deadband"]
 	if rcDeadband["operation"] != "write" || rcDeadband["confirmation"] != "--yes" || rcDeadband["requires_connection"] != true || rcDeadband["output_root"] != "rc_deadband" || rcDeadband["runnable"] != true {
 		t.Fatalf("rc deadband capability = %+v", rcDeadband)
@@ -3029,6 +3033,64 @@ func TestReceiverSetRSSIChannelRequiresYesDoesNotConnect(t *testing.T) {
 	}
 	if called {
 		t.Fatal("connector was called after RSSI channel confirmation failure")
+	}
+}
+
+func TestReceiverSetMapWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-map", "0", "1", "3", "2", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["rc_map"].(map[string]any)
+	names := result["names"].([]any)
+	if result["save_required"] != true || len(names) != 4 || names[2] != "THROTTLE" || names[3] != "YAW" {
+		t.Fatalf("rc_map = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_RX_MAP" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestReceiverSetMapRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-map", "0", "1", "3", "2"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestReceiverSetMapValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-map", "0", "1", "3", "300", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestReceiverSetMapRejectsDuplicateValuesBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-map", "0", "1", "1", "2", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

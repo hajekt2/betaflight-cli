@@ -478,6 +478,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPRXMap:
 		f.out.Write(response(frame.Code, []byte{0, 1, 3, 2}, false))
+	case msp.MSPSetRXMap:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 4))
 	case msp.MSPRSSIConfig:
 		f.out.Write(response(frame.Code, []byte{8}, false))
 	case msp.MSPSetRSSIConfig:

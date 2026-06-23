@@ -88,6 +88,14 @@ func TestEncodeRSSIChannel(t *testing.T) {
 	}
 }
 
+func TestEncodeRCMap(t *testing.T) {
+	got := EncodeRCMap([]uint8{0, 1, 3, 2})
+	want := []byte{0, 1, 3, 2}
+	if string(got) != string(want) {
+		t.Fatalf("EncodeRCMap() = %v, want %v", got, want)
+	}
+}
+
 func TestDecodeAndEncodeRCDeadband(t *testing.T) {
 	config, err := DecodeRCDeadband([]byte{5, 7, 3, 50, 0})
 	if err != nil {

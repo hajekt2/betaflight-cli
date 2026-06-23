@@ -61,6 +61,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.receiverStatusCommand())
 		cmd.AddCommand(a.receiverRXFailCommand())
 		cmd.AddCommand(a.receiverRSSIChannelCommand())
+		cmd.AddCommand(a.receiverMapCommand())
 		cmd.AddCommand(a.receiverDeadbandCommand())
 	}
 	if domain.use == "gps" {
@@ -183,6 +184,50 @@ func (a *app) receiverRSSIChannelCommand() *cobra.Command {
 				env.SideEffects = append(env.SideEffects, output.SideEffect{
 					Type:    "rssi_channel",
 					Command: "MSP_SET_RSSI_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) receiverMapCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-map ROLL PITCH YAW THROTTLE",
+		Short: "Set receiver channel map through MSP_SET_RX_MAP",
+		Args:  cobra.ExactArgs(4),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mapping := make([]uint8, 4)
+			for i, arg := range args {
+				value, err := parseUint8Arg("map", arg)
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				if value > 3 {
+					return validationFailureMessage(a, cmd, "receiver map values must be in [0..3]")
+				}
+				mapping[i] = value
+			}
+			seen := map[uint8]bool{}
+			for _, value := range mapping {
+				if seen[value] {
+					return validationFailureMessage(a, cmd, "receiver map values must be a permutation of 0,1,2,3")
+				}
+				seen[value] = true
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver map changes receiver configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRCMap(cmd.Context(), client, mapping)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rc_map": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rc_map",
+					Command: "MSP_SET_RX_MAP",
 					Detail:  "configuration changed but not saved",
 				})
 				return env

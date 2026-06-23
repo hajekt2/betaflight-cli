@@ -65,6 +65,15 @@ type RSSIChannelSetResult struct {
 	SaveRequired bool   `json:"save_required"`
 }
 
+type RCMapSetResult struct {
+	Map          []uint8  `json:"map"`
+	Names        []string `json:"names"`
+	MSPCode      uint16   `json:"msp_code"`
+	MSPName      string   `json:"msp_name"`
+	Acknowledged bool     `json:"acknowledged"`
+	SaveRequired bool     `json:"save_required"`
+}
+
 type RCDeadband struct {
 	Deadband           uint8  `json:"deadband"`
 	YawDeadband        uint8  `json:"yaw_deadband"`
@@ -136,6 +145,25 @@ func SetRSSIChannel(ctx context.Context, client *connection.Client, channel uint
 
 func EncodeRSSIChannel(channel uint8) []byte {
 	return []byte{channel}
+}
+
+func SetRCMap(ctx context.Context, client *connection.Client, mapping []uint8) (*RCMapSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetRXMap, EncodeRCMap(mapping)); err != nil {
+		return nil, fmt.Errorf("receiver map request failed: %w", err)
+	}
+	copied := append([]uint8(nil), mapping...)
+	return &RCMapSetResult{
+		Map:          copied,
+		Names:        rcMapNames(copied),
+		MSPCode:      msp.MSPSetRXMap,
+		MSPName:      "MSP_SET_RX_MAP",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeRCMap(mapping []uint8) []byte {
+	return append([]byte(nil), mapping...)
 }
 
 func SetRCDeadband(ctx context.Context, client *connection.Client, config RCDeadband) (*RCDeadbandSetResult, error) {

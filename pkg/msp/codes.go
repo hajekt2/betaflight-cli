@@ -1,6 +1,9 @@
 package msp
 
-import "strings"
+import (
+	"sort"
+	"strings"
+)
 
 //go:generate go run ../../internal/generate/cmd/bfmeta -betaflight-src ${BETAFLIGHT_SRC} -source-version=${BETAFLIGHT_VERSION} -out-msp codes_generated.go -out-settings ../../internal/settings/metadata_generated.go
 
@@ -28,6 +31,21 @@ func RegisterCommands(commands []CommandMeta) {
 	for _, command := range commands {
 		commandRegistry[command.Code] = command
 	}
+}
+
+func ListCommands() []CommandMeta {
+	commands := make([]CommandMeta, 0, len(commandRegistry))
+	for code, command := range commandRegistry {
+		command.Code = code
+		commands = append(commands, command)
+	}
+	sort.Slice(commands, func(i, j int) bool {
+		if commands[i].Code == commands[j].Code {
+			return commands[i].Name < commands[j].Name
+		}
+		return commands[i].Code < commands[j].Code
+	})
+	return commands
 }
 
 func LookupCommand(code uint16) (CommandMeta, bool) {

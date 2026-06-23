@@ -1467,6 +1467,67 @@ func TestMSPRequestNumericFallbackUsesCodeName(t *testing.T) {
 	}
 }
 
+func TestMSPMetadataByName(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["code"].(float64) != float64(msp.MSPName) {
+		t.Fatalf("code = %+v", data["code"])
+	}
+	if data["code_name"] != "MSP_NAME" {
+		t.Fatalf("code_name = %+v", data["code_name"])
+	}
+	if data["direction"] != string(msp.DirectionRead) {
+		t.Fatalf("direction = %+v", data["direction"])
+	}
+}
+
+func TestMSPListReturnsCommands(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "list", "--name", "MSP_NAME", "--direction", "read"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["count"].(float64) == 0 {
+		t.Fatalf("count = %+v", data["count"])
+	}
+	commands := data["commands"].([]any)
+	if len(commands) == 0 {
+		t.Fatalf("commands = %+v", data["commands"])
+	}
+	first := commands[0].(map[string]any)
+	if first["name"].(string) != "MSP_NAME" {
+		t.Fatalf("first name = %+v", first["name"])
+	}
+}
+
+func TestMSPListCanFilterByProtocol(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "list", "--protocol", "1", "--name", "MSP_NAME"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	commands := data["commands"].([]any)
+	if len(commands) != 1 {
+		t.Fatalf("commands = %+v", data["commands"])
+	}
+	command := commands[0].(map[string]any)
+	if command["protocol"].(float64) != 1 {
+		t.Fatalf("protocol = %+v", command["protocol"])
+	}
+}
+
 func TestMSPRequestRequiresYesForWriteLikeCommands(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "request", "MSP_SET_NAME", "--payload-hex", "466f6f"}, nil)
 	if err == nil {

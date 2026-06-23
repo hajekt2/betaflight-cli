@@ -1271,6 +1271,89 @@ func (a *app) rebootModeCommand(use, short string, mode bfcommands.RebootMode, s
 func (a *app) mspCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "msp", Short: "Raw MSP diagnostics"}
 	var payloadHex string
+	var directionFilter, sourceFilter, protocolFilter, nameFilter string
+	listCmd := &cobra.Command{
+		Use:   "list",
+		Short: "List known MSP commands from the compiled registry",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			direction := msp.CommandDirection(strings.ToLower(strings.TrimSpace(directionFilter)))
+			if direction != "" && direction != msp.DirectionRead && direction != msp.DirectionWrite && direction != msp.DirectionBoth && direction != msp.DirectionUnknown {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", "invalid --direction; use read, write, both, or unknown"))
+			}
+			protocolFilter = strings.TrimSpace(protocolFilter)
+			protocolValue := 0
+			if protocolFilter != "" {
+				p, err := strconv.Atoi(protocolFilter)
+				if err != nil {
+					return a.render(output.Failure(commandPath(cmd), nil, "validation_error", "invalid --protocol; expected integer"))
+				}
+				if p < 0 || p > 255 {
+					return a.render(output.Failure(commandPath(cmd), nil, "validation_error", "invalid --protocol; expected 0-255"))
+				}
+				protocolValue = p
+			}
+			commands := msp.ListCommands()
+			var filtered []map[string]any
+			for _, command := range commands {
+				if nameFilter != "" && !strings.Contains(strings.ToLower(command.Name), strings.ToLower(nameFilter)) {
+					continue
+				}
+				if direction != "" && command.Direction != direction {
+					continue
+				}
+				if protocolFilter != "" && command.Protocol != uint8(protocolValue) {
+					continue
+				}
+				if sourceFilter != "" && !strings.Contains(strings.ToLower(command.Source), strings.ToLower(sourceFilter)) {
+					continue
+				}
+				filtered = append(filtered, map[string]any{
+					"name":      command.Name,
+					"code":      command.Code,
+					"protocol":  command.Protocol,
+					"direction": command.Direction,
+					"source":    command.Source,
+					"line":      command.Line,
+				})
+			}
+			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+				"registry_version": msp.GeneratedMSPSourceVersion,
+				"count":           len(filtered),
+				"commands":        filtered,
+			}))
+		},
+	}
+	listCmd.Flags().StringVar(&directionFilter, "direction", "", "filter by command direction: read, write, both, unknown")
+	listCmd.Flags().StringVar(&protocolFilter, "protocol", "", "filter by MSP protocol version")
+	listCmd.Flags().StringVar(&sourceFilter, "source", "", "filter by source file substring")
+	listCmd.Flags().StringVar(&nameFilter, "name", "", "filter by command name substring")
+	cmd.AddCommand(listCmd)
+
+	cmd.AddCommand(&cobra.Command{
+		Use:   "metadata CODE",
+		Short: "Show compiled metadata for one MSP command",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			code, meta, err := parseMSPCode(args[0])
+			if err != nil {
+				return err
+			}
+			env := output.Success(commandPath(cmd), nil, map[string]any{
+				"registry_version": msp.GeneratedMSPSourceVersion,
+				"code":             code,
+				"code_name":        meta.Name,
+				"protocol":         meta.Protocol,
+				"direction":        meta.Direction,
+				"source":           meta.Source,
+				"line":             meta.Line,
+			})
+			if meta.Source == "" {
+				env.Warnings = append(env.Warnings, output.Warning{Code: "unknown_command", Message: "command has no known metadata and may be unsupported"})
+			}
+			return a.render(env)
+		},
+	})
+
 	cmd.AddCommand(&cobra.Command{
 		Use:   "request CODE",
 		Short: "Send a raw MSP request and return raw payload hex",

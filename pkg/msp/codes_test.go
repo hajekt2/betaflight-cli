@@ -15,3 +15,14 @@ func TestLookupCommandByName(t *testing.T) {
 	}
 }
 
+func TestListCommandsSortedByCode(t *testing.T) {
+	commands := ListCommands()
+	if len(commands) == 0 {
+		t.Fatal("expected commands")
+	}
+	for i := 1; i < len(commands); i++ {
+		if commands[i-1].Code > commands[i].Code {
+			t.Fatalf("commands not sorted by code: index %d code %d > index %d code %d", i-1, commands[i-1].Code, i, commands[i].Code)
+		}
+	}
+}

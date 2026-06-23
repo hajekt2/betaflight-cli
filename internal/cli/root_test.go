@@ -411,6 +411,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if save["operation"] != "dangerous" || save["confirmation"] != "--yes" || save["requires_connection"] != true || save["runnable"] != true {
 		t.Fatalf("save capability = %+v", save)
 	}
+	firmwareFlash := byCommand["betaflight-cli firmware flash"]
+	if firmwareFlash["operation"] != "plan_or_dangerous_execute" || firmwareFlash["requires_connection"] != false || !strings.Contains(firmwareFlash["confirmation"].(string), "--execute") || firmwareFlash["runnable"] != true {
+		t.Fatalf("firmware flash capability = %+v", firmwareFlash)
+	}
 	configurationDiff := byCommand["betaflight-cli configuration diff"]
 	if configurationDiff["operation"] != "read_only" || configurationDiff["requires_connection"] != true || configurationDiff["confirmation"] != "none" || configurationDiff["runnable"] != true {
 		t.Fatalf("configuration diff capability = %+v", configurationDiff)
@@ -1055,6 +1059,40 @@ func TestFirmwareFlashExecuteRequiresYes(t *testing.T) {
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
 		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
+func TestFirmwareFlashExecuteWithoutRebootDoesNotConnect(t *testing.T) {
+	tmp := t.TempDir()
+	image := filepath.Join(tmp, "firmware.bin")
+	if err := os.WriteFile(image, []byte{0x11, 0x22}, 0o600); err != nil {
+		t.Fatalf("write image: %v", err)
+	}
+	called := false
+	env, err := runTestCommand(t, []string{
+		"firmware", "flash", "--image", image, "--tool", "/bin/echo", "--execute", "--yes",
+	}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if called {
+		t.Fatal("connector was called for firmware flash execute without --reboot-first")
+	}
+	if env.Target != nil {
+		t.Fatalf("target = %+v, want nil for external-only flash", env.Target)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	flash := env.Data.(map[string]any)["firmware_flash"].(map[string]any)
+	if flash["executed"] != true || flash["successful"] != true {
+		t.Fatalf("firmware flash = %+v", flash)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "firmware_flash" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

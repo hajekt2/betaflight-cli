@@ -17,6 +17,7 @@ func TestCapabilityMetadataUsesKnownOperations(t *testing.T) {
 		"write_when_apply_is_set":         true,
 		"plan":                            true,
 		"plan_or_write":                   true,
+		"plan_or_dangerous_execute":       true,
 		"dangerous":                       true,
 	}
 
@@ -59,10 +60,11 @@ func TestCapabilityMetadataOfflineCommandClassifications(t *testing.T) {
 func TestCapabilityMetadataOperationSafetyContracts(t *testing.T) {
 	registry := capabilityMetadataRegistry()
 	yesRequired := map[string]bool{
-		"write":                   true,
-		"plan_or_write":           true,
-		"dangerous":               true,
-		"write_when_apply_is_set": true,
+		"write":                     true,
+		"plan_or_write":             true,
+		"plan_or_dangerous_execute": true,
+		"dangerous":                 true,
+		"write_when_apply_is_set":   true,
 	}
 
 	offlinedOperations := map[string]bool{

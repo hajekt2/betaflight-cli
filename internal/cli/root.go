@@ -1900,11 +1900,11 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 			if !a.opts.yes {
 				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "firmware flash is dangerous; pass --yes"))
 			}
-			run := func(cmd *cobra.Command, target output.Target, preflight *bfcommands.RebootResult) output.Envelope {
+			run := func(cmd *cobra.Command, target *output.Target, preflight *bfcommands.RebootResult) output.Envelope {
 				if preflight != nil {
 					result, err := bfcommands.ExecuteFirmwareFlash(cmd.Context(), *plan)
 					if err != nil {
-						env := output.Failure(commandPath(cmd), &target, "firmware_flash_failed", err.Error())
+						env := output.Failure(commandPath(cmd), target, "firmware_flash_failed", err.Error())
 						env.SideEffects = append(env.SideEffects, output.SideEffect{
 							Type:    "firmware_reboot",
 							Command: commandPath(cmd),
@@ -1920,7 +1920,7 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 						}
 						return env
 					}
-					env := output.Success(commandPath(cmd), &target, map[string]any{
+					env := output.Success(commandPath(cmd), target, map[string]any{
 						"firmware_flash": map[string]any{
 							"plan":       plan,
 							"reboot":     preflight,
@@ -1943,7 +1943,7 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 				}
 				result, err := bfcommands.ExecuteFirmwareFlash(cmd.Context(), *plan)
 				if err != nil {
-					env := output.Failure(commandPath(cmd), &target, "firmware_flash_failed", err.Error())
+					env := output.Failure(commandPath(cmd), target, "firmware_flash_failed", err.Error())
 					env.Data = map[string]any{
 						"firmware_flash": map[string]any{
 							"plan":       plan,
@@ -1953,7 +1953,7 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 					}
 					return env
 				}
-				env := output.Success(commandPath(cmd), &target, map[string]any{
+				env := output.Success(commandPath(cmd), target, map[string]any{
 					"firmware_flash": map[string]any{
 						"plan":       plan,
 						"result":     result,
@@ -1974,12 +1974,10 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 					if err != nil {
 						return a.failure(commandPath(cmd), &target, err)
 					}
-					return run(cmd, target, reboot)
+					return run(cmd, &target, reboot)
 				})
 			}
-			return a.withClient(cmd.Context(), commandPath(cmd), connection.Dangerous, func(client *connection.Client, target output.Target) output.Envelope {
-				return run(cmd, target, nil)
-			})
+			return a.render(run(cmd, nil, nil))
 		},
 	}
 	cmd.Flags().StringVar(&imagePath, "image", "", "firmware image path (.hex, .bin, .img)")

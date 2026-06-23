@@ -126,6 +126,10 @@ The object includes file sizes, header metadata, ordered header names, parsed fi
 `frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.
 The marker counts and candidate frame index are approximate until full binary frame decoding is implemented.
 
+`capabilities` returns a `capabilities` object without connecting to hardware.
+The object includes the introspected Cobra command tree, per-command runnable state, safety operation class, connection requirement, confirmation requirement, output root, input notes, and curated workflow sequences for common agent tasks.
+Agents should prefer this payload over scraping help text when selecting commands.
+
 `info` returns flight-controller identity from the initial handshake plus optional `board`, `mcu`, `uid`, `build`, and `legacy_name` fields.
 The `board` object is decoded from `MSP_BOARD_INFO` and includes board identity, target capabilities, optional target signature, MCU type ID, configuration state, gyro sample rate, configuration problem names, and SPI/I2C device counts when supplied by firmware.
 The `mcu` object is decoded from `MSP2_MCU_INFO` and includes the firmware-reported MCU type ID and MCU name.

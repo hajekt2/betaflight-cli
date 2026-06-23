@@ -10,7 +10,7 @@ Agents can call the binary directly and parse JSON.
 ## Status
 
 This repository now has an executable CLI foundation.
-Implemented functionality includes version output, port listing, read-only doctor diagnostics, MSP handshake, read-only info, telemetry snapshot, framed CLI exec, backup diff/create wrappers, settings change planning, safety-gated apply/save paths, and raw MSP diagnostics.
+Implemented functionality includes version output, machine-readable capability discovery, port listing, read-only doctor diagnostics, MSP handshake, read-only info, telemetry snapshot, framed CLI exec, backup diff/create wrappers, settings change planning, safety-gated apply/save paths, and raw MSP diagnostics.
 The repository also has generated MSP command metadata and generated Betaflight `2025.12.0` setting metadata compiled into the binary.
 Full non-graphical Configurator parity remains the product target and will be filled in by adding typed domain command families over this foundation.
 
@@ -40,6 +40,7 @@ Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of sc
 ```sh
 betaflight-cli ports list
 betaflight-cli ports diagnose
+betaflight-cli capabilities
 betaflight-cli doctor
 betaflight-cli info --port /dev/tty.usbmodem01
 betaflight-cli firmware status --port /dev/tty.usbmodem01
@@ -118,6 +119,7 @@ If multiple Betaflight-compatible devices answer the handshake, the command shou
 
 Configurator parity should be exposed as focused command families rather than one giant command.
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
+`capabilities` prints the command tree plus curated workflow metadata so agents can discover command safety class, connection requirements, output roots, and recommended workflow sequences without scraping help text.
 `info` reads firmware, board, MCU, device UID, build, build option, configuration state, gyro sample rate, and legacy craft-name identity fields over MSP.
 `firmware status` reads firmware identity, target metadata, build metadata, support-policy status, and compiled settings metadata details over MSP.
 `target status` composes firmware identity, CLI system status, and resource/timer/DMA diagnostics into one hardware inventory payload.

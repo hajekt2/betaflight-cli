@@ -67,6 +67,57 @@ func TestRedactLines(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"capabilities"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for capabilities")
+	}
+	data := env.Data.(map[string]any)
+	capabilities := data["capabilities"].(map[string]any)
+	commands := capabilities["commands"].([]any)
+	if len(commands) < 100 {
+		t.Fatalf("commands = %d", len(commands))
+	}
+	byCommand := map[string]map[string]any{}
+	for _, item := range commands {
+		command := item.(map[string]any)
+		byCommand[command["command"].(string)] = command
+	}
+	save := byCommand["betaflight-cli save"]
+	if save["operation"] != "dangerous" || save["confirmation"] != "--yes" || save["requires_connection"] != true || save["runnable"] != true {
+		t.Fatalf("save capability = %+v", save)
+	}
+	validate := byCommand["betaflight-cli configuration validate"]
+	if validate["operation"] != "offline" || validate["requires_connection"] != false || validate["output_root"] != "configuration_validation" {
+		t.Fatalf("validate capability = %+v", validate)
+	}
+	configuration := byCommand["betaflight-cli configuration"]
+	if configuration["operation"] != "group" || configuration["runnable"] != false {
+		t.Fatalf("configuration capability = %+v", configuration)
+	}
+	workflows := capabilities["workflows"].([]any)
+	foundBackup := false
+	for _, item := range workflows {
+		workflow := item.(map[string]any)
+		if workflow["name"] == "backup-before-change" && workflow["safety_class"] == "read_only" {
+			foundBackup = true
+		}
+	}
+	if !foundBackup {
+		t.Fatalf("workflows = %+v", workflows)
+	}
+}
+
 func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"telemetry", "snapshot"}, nil)
 	if err != nil {

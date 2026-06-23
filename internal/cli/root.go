@@ -87,6 +87,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.PersistentFlags().BoolVar(&a.opts.yes, "yes", false, "confirm non-interactive write or dangerous action")
 
 	root.AddCommand(a.versionCommand())
+	root.AddCommand(a.capabilitiesCommand())
 	root.AddCommand(a.portsCommand())
 	root.AddCommand(a.doctorCommand())
 	root.AddCommand(a.infoCommand())

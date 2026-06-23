@@ -89,6 +89,7 @@ betaflight-cli resources list --port /dev/tty.usbmodem01
 betaflight-cli profiles list --port /dev/tty.usbmodem01
 betaflight-cli profiles status --port /dev/tty.usbmodem01
 betaflight-cli profiles battery-select 1 --port /dev/tty.usbmodem01
+betaflight-cli profiles copy pid 0 1 --port /dev/tty.usbmodem01 --yes
 betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
 betaflight-cli vtxtable list --port /dev/tty.usbmodem01
 betaflight-cli leds list --port /dev/tty.usbmodem01
@@ -148,6 +149,7 @@ It preserves extended flight-mode bytes so new Betaflight modes beyond the legac
 `system status` reads Betaflight's CLI `status` output and returns parsed config, device, uptime, runtime, voltage, GPS, OSD, storage, build-key, and arming lines plus raw text.
 `resources status` reads Betaflight's `resource show all` output and returns parsed resource, timer, and DMA assignments plus raw text.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
+`profiles copy` copies PID or rate profiles through `MSP_COPY_PROFILE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `debug status` reads live debug channels and accelerometer trims over MSP.
 `debug set-accelerometer-trim` writes accelerometer pitch/roll trim through `MSP_SET_ACC_TRIM` and requires `--yes`.

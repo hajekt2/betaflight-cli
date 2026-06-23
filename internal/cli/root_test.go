@@ -335,6 +335,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if accTrim["operation"] != "write" || accTrim["confirmation"] != "--yes" || accTrim["requires_connection"] != true || accTrim["output_root"] != "accelerometer_trim" || accTrim["runnable"] != true {
 		t.Fatalf("accelerometer trim capability = %+v", accTrim)
 	}
+	profileCopy := byCommand["betaflight-cli profiles copy"]
+	if profileCopy["operation"] != "write" || profileCopy["confirmation"] != "--yes" || profileCopy["requires_connection"] != true || profileCopy["output_root"] != "profile_copy" || profileCopy["runnable"] != true {
+		t.Fatalf("profile copy capability = %+v", profileCopy)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -3628,6 +3632,62 @@ func TestProfilesBatterySelectApplyWithFakeFC(t *testing.T) {
 		t.Fatalf("data = %+v", data)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "battery_profile 1" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestProfilesCopyRejectsUnsupportedKindDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"profiles", "copy", "battery", "0", "1", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after profile copy validation failure")
+	}
+}
+
+func TestProfilesCopyRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"profiles", "copy", "pid", "0", "1"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after profile copy confirmation failure")
+	}
+}
+
+func TestProfilesCopyWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"profiles", "copy", "rate", "1", "2", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	copyResult := data["profile_copy"].(map[string]any)
+	request := copyResult["request"].(map[string]any)
+	if request["kind"] != "rate" || request["source"] != float64(1) || request["destination"] != float64(2) {
+		t.Fatalf("profile copy = %+v", copyResult)
+	}
+	if copyResult["msp_name"] != "MSP_COPY_PROFILE" || copyResult["save_required"] != true {
+		t.Fatalf("profile copy = %+v", copyResult)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "profile_copy" || env.SideEffects[0].Command != "MSP_COPY_PROFILE" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

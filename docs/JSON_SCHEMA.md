@@ -191,6 +191,8 @@ The object includes the raw feature mask, enabled feature names, per-feature bit
 
 `profiles status` returns a `profiles` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes active PID, rate, and battery profile indexes, profile counts when supplied by firmware, native CLI selector commands, and reboot-required state when supplied by firmware.
+`profiles copy` returns a `profile_copy` object with kind, source index, destination index, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful profile copy responses include a `profile_copy` side effect.
 
 `text status` returns a `text` object decoded from `MSP2_GET_TEXT`.
 The object includes text fields for pilot name, craft name, active PID profile name, active rate profile name, active battery profile name, build key, and release name.

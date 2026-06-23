@@ -2,6 +2,42 @@ package commands
 
 import "testing"
 
+func TestEncodeProfileCopy(t *testing.T) {
+	tests := []struct {
+		name string
+		in   ProfileCopyRequest
+		want []byte
+	}{
+		{
+			name: "pid",
+			in:   ProfileCopyRequest{Kind: ProfileCopyPID, Source: 1, Destination: 2},
+			want: []byte{0, 2, 1},
+		},
+		{
+			name: "rate",
+			in:   ProfileCopyRequest{Kind: ProfileCopyRate, Source: 3, Destination: 0},
+			want: []byte{1, 0, 3},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := EncodeProfileCopy(tt.in)
+			if err != nil {
+				t.Fatalf("EncodeProfileCopy error = %v", err)
+			}
+			if string(got) != string(tt.want) {
+				t.Fatalf("EncodeProfileCopy = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestEncodeProfileCopyRejectsUnsupportedKind(t *testing.T) {
+	if _, err := EncodeProfileCopy(ProfileCopyRequest{Kind: "battery"}); err == nil {
+		t.Fatal("EncodeProfileCopy error = nil, want error")
+	}
+}
+
 func TestProfileStatusFromStatus(t *testing.T) {
 	pidCount := uint8(4)
 	rate := uint8(2)

@@ -331,6 +331,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPAccCalibration, msp.MSPMagCalibration:
 		f.out.Write(response(frame.Code, nil, false))
+	case msp.MSPCopyProfile:
+		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPReboot:
 		if len(frame.Payload) == 0 {
 			f.out.Write(response(frame.Code, []byte{0}, false))

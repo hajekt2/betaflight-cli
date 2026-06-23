@@ -238,7 +238,47 @@ func (a *app) profilesCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(battery, &batteryFlags)
-	cmd.AddCommand(profile, rate, battery)
+	copyProfile := &cobra.Command{
+		Use:   "copy KIND SOURCE DESTINATION",
+		Short: "Copy PID or rate profile using MSP_COPY_PROFILE",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			kind, err := parseProfileCopyKind(args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			source, err := parseUint8Arg("source", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			destination, err := parseUint8Arg("destination", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "profile copy changes configuration; pass --yes"))
+			}
+			request := bfcommands.ProfileCopyRequest{
+				Kind:        kind,
+				Source:      source,
+				Destination: destination,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.CopyProfile(cmd.Context(), client, request)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"profile_copy": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "profile_copy",
+					Command: "MSP_COPY_PROFILE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+	cmd.AddCommand(profile, rate, battery, copyProfile)
 	return cmd
 }
 
@@ -523,6 +563,25 @@ func parseInt16Arg(name, value string) (int16, error) {
 		return 0, fmt.Errorf("%s must be a signed 16-bit integer", name)
 	}
 	return int16(parsed), nil
+}
+
+func parseUint8Arg(name, value string) (uint8, error) {
+	parsed, err := strconv.ParseUint(value, 10, 8)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an unsigned 8-bit integer", name)
+	}
+	return uint8(parsed), nil
+}
+
+func parseProfileCopyKind(value string) (bfcommands.ProfileCopyKind, error) {
+	switch strings.ToLower(value) {
+	case string(bfcommands.ProfileCopyPID):
+		return bfcommands.ProfileCopyPID, nil
+	case string(bfcommands.ProfileCopyRate):
+		return bfcommands.ProfileCopyRate, nil
+	default:
+		return "", fmt.Errorf("kind must be one of: pid, rate")
+	}
 }
 
 func validationFailure(a *app, cmd *cobra.Command, err error) error {

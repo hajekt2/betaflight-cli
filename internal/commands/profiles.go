@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
 type ProfileStatus struct {
@@ -23,12 +24,63 @@ type ProfileSelection struct {
 	CLICommand string `json:"cli_command"`
 }
 
+type ProfileCopyKind string
+
+const (
+	ProfileCopyPID  ProfileCopyKind = "pid"
+	ProfileCopyRate ProfileCopyKind = "rate"
+)
+
+type ProfileCopyRequest struct {
+	Kind        ProfileCopyKind `json:"kind"`
+	Source      uint8           `json:"source"`
+	Destination uint8           `json:"destination"`
+}
+
+type ProfileCopyResult struct {
+	Request      ProfileCopyRequest `json:"request"`
+	MSPCode      uint16             `json:"msp_code"`
+	MSPName      string             `json:"msp_name"`
+	Acknowledged bool               `json:"acknowledged"`
+	SaveRequired bool               `json:"save_required"`
+}
+
 func ReadProfileStatus(ctx context.Context, client *connection.Client) (*ProfileStatus, error) {
 	status, err := readStatus(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("profile status unavailable: %w", err)
 	}
 	return profileStatusFromStatus(status), nil
+}
+
+func CopyProfile(ctx context.Context, client *connection.Client, request ProfileCopyRequest) (*ProfileCopyResult, error) {
+	payload, err := EncodeProfileCopy(request)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPCopyProfile, payload); err != nil {
+		return nil, fmt.Errorf("profile copy request failed: %w", err)
+	}
+	return &ProfileCopyResult{
+		Request:      request,
+		MSPCode:      msp.MSPCopyProfile,
+		MSPName:      "MSP_COPY_PROFILE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeProfileCopy(request ProfileCopyRequest) ([]byte, error) {
+	var kind byte
+	switch request.Kind {
+	case ProfileCopyPID:
+		kind = 0
+	case ProfileCopyRate:
+		kind = 1
+	default:
+		return nil, fmt.Errorf("unsupported profile copy kind %q", request.Kind)
+	}
+	return []byte{kind, request.Destination, request.Source}, nil
 }
 
 func profileStatusFromStatus(status *Status) *ProfileStatus {

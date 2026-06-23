@@ -77,6 +77,21 @@ type VTXTablePowerSetResult struct {
 	SaveRequired bool                   `json:"save_required"`
 }
 
+type VTXTableSetConfig struct {
+	Bands  []VTXTableBandSetConfig  `json:"bands,omitempty"`
+	Powers []VTXTablePowerSetConfig `json:"powers,omitempty"`
+}
+
+type VTXTableSetResult struct {
+	Bands        []VTXTableBandSetConfig  `json:"bands,omitempty"`
+	Powers       []VTXTablePowerSetConfig `json:"powers,omitempty"`
+	BandCount    int                      `json:"band_count"`
+	PowerCount   int                      `json:"power_count"`
+	MSPNames     []string                 `json:"msp_names"`
+	Acknowledged bool                     `json:"acknowledged"`
+	SaveRequired bool                     `json:"save_required"`
+}
+
 func ReadVTXConfig(ctx context.Context, client *connection.Client) (*VTXConfig, error) {
 	frame, err := client.Request(ctx, msp.MSPVTXConfig, nil)
 	if err != nil {
@@ -108,6 +123,9 @@ func EncodeVTXConfig(config VTXConfigSetConfig) []byte {
 }
 
 func SetVTXTableBand(ctx context.Context, client *connection.Client, config VTXTableBandSetConfig) (*VTXTableBandSetResult, error) {
+	if err := ValidateVTXTableBand(config); err != nil {
+		return nil, err
+	}
 	if _, err := client.Request(ctx, msp.MSPSetVtxtableBand, EncodeVTXTableBand(config)); err != nil {
 		return nil, fmt.Errorf("vtx table band request failed: %w", err)
 	}
@@ -132,6 +150,9 @@ func EncodeVTXTableBand(config VTXTableBandSetConfig) []byte {
 }
 
 func SetVTXTablePower(ctx context.Context, client *connection.Client, config VTXTablePowerSetConfig) (*VTXTablePowerSetResult, error) {
+	if err := ValidateVTXTablePower(config); err != nil {
+		return nil, err
+	}
 	if _, err := client.Request(ctx, msp.MSPSetVtxtablePowerlevel, EncodeVTXTablePower(config)); err != nil {
 		return nil, fmt.Errorf("vtx table power request failed: %w", err)
 	}
@@ -150,6 +171,81 @@ func EncodeVTXTablePower(config VTXTablePowerSetConfig) []byte {
 	payload = append(payload, uint8(len(label)))
 	payload = append(payload, label...)
 	return payload
+}
+
+func SetVTXTable(ctx context.Context, client *connection.Client, config VTXTableSetConfig) (*VTXTableSetResult, error) {
+	if err := ValidateVTXTable(config); err != nil {
+		return nil, err
+	}
+	mspNames := make([]string, 0, 2)
+	for _, band := range config.Bands {
+		if _, err := SetVTXTableBand(ctx, client, band); err != nil {
+			return nil, err
+		}
+	}
+	if len(config.Bands) > 0 {
+		mspNames = append(mspNames, "MSP_SET_VTXTABLE_BAND")
+	}
+	for _, power := range config.Powers {
+		if _, err := SetVTXTablePower(ctx, client, power); err != nil {
+			return nil, err
+		}
+	}
+	if len(config.Powers) > 0 {
+		mspNames = append(mspNames, "MSP_SET_VTXTABLE_POWERLEVEL")
+	}
+	return &VTXTableSetResult{
+		Bands:        config.Bands,
+		Powers:       config.Powers,
+		BandCount:    len(config.Bands),
+		PowerCount:   len(config.Powers),
+		MSPNames:     mspNames,
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateVTXTable(config VTXTableSetConfig) error {
+	if len(config.Bands) == 0 && len(config.Powers) == 0 {
+		return fmt.Errorf("at least one band or power row is required")
+	}
+	for i, band := range config.Bands {
+		if err := ValidateVTXTableBand(band); err != nil {
+			return fmt.Errorf("bands[%d]: %w", i, err)
+		}
+	}
+	for i, power := range config.Powers {
+		if err := ValidateVTXTablePower(power); err != nil {
+			return fmt.Errorf("powers[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func ValidateVTXTableBand(config VTXTableBandSetConfig) error {
+	if config.Band == 0 {
+		return fmt.Errorf("band must be greater than 0")
+	}
+	if len(config.Name) == 0 || len(config.Name) > 8 {
+		return fmt.Errorf("name must be 1-8 bytes")
+	}
+	if len(config.Letter) != 1 {
+		return fmt.Errorf("letter must be exactly 1 byte")
+	}
+	if len(config.FrequenciesMHz) == 0 || len(config.FrequenciesMHz) > 8 {
+		return fmt.Errorf("frequencies_mhz must contain 1-8 values")
+	}
+	return nil
+}
+
+func ValidateVTXTablePower(config VTXTablePowerSetConfig) error {
+	if config.Level == 0 {
+		return fmt.Errorf("level must be greater than 0")
+	}
+	if len(config.Label) == 0 || len(config.Label) > 3 {
+		return fmt.Errorf("label must be 1-3 bytes")
+	}
+	return nil
 }
 
 func DecodeVTXConfig(payload []byte) (*VTXConfig, error) {

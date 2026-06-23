@@ -575,6 +575,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if vtxTableBand["operation"] != "write" || vtxTableBand["confirmation"] != "--yes" || vtxTableBand["requires_connection"] != true || vtxTableBand["output_root"] != "vtxtable_band" || vtxTableBand["runnable"] != true {
 		t.Fatalf("vtxtable band capability = %+v", vtxTableBand)
 	}
+	vtxTableSet := byCommand["betaflight-cli vtxtable set-json"]
+	if vtxTableSet["operation"] != "write" || vtxTableSet["confirmation"] != "--yes" || vtxTableSet["requires_connection"] != true || vtxTableSet["output_root"] != "vtxtable" || vtxTableSet["runnable"] != true {
+		t.Fatalf("vtxtable set-json capability = %+v", vtxTableSet)
+	}
 	vtxTablePower := byCommand["betaflight-cli vtxtable set-power"]
 	if vtxTablePower["operation"] != "write" || vtxTablePower["confirmation"] != "--yes" || vtxTablePower["requires_connection"] != true || vtxTablePower["output_root"] != "vtxtable_power" || vtxTablePower["runnable"] != true {
 		t.Fatalf("vtxtable power capability = %+v", vtxTablePower)
@@ -6889,6 +6893,52 @@ func TestVTXTableSetPowerWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_VTXTABLE_POWERLEVEL" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestVTXTableSetJSONWithFakeFC(t *testing.T) {
+	input := `{"vtxtable":{"bands":[{"band":1,"name":"raceband","letter":"r","factory":true,"frequencies_mhz":[5658,5695]}],"powers":[{"level":2,"value":200,"label":"200"}]}}`
+	env, err := runTestCommandWithInput(t, []string{"vtxtable", "set-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["vtxtable"].(map[string]any)
+	if result["band_count"] != float64(1) || result["power_count"] != float64(1) || result["save_required"] != true {
+		t.Fatalf("vtxtable = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_VTXTABLE_BAND,MSP_SET_VTXTABLE_POWERLEVEL" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestVTXTableSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"bands":[{"band":1,"name":"raceband","letter":"r","factory":true,"frequencies_mhz":[5658]}]}`
+	env, err := runTestCommandWithInput(t, []string{"vtxtable", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestVTXTableSetJSONValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"vtxtable", "set-json", "-", "--yes"}, `{"powers":[{"level":1,"value":25,"label":"TOOLONG"}]}`, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

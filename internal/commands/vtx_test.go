@@ -73,3 +73,22 @@ func TestEncodeVTXTablePower(t *testing.T) {
 		t.Fatalf("payload = %v, want %v", payload, want)
 	}
 }
+
+func TestValidateVTXTable(t *testing.T) {
+	err := ValidateVTXTable(VTXTableSetConfig{
+		Bands: []VTXTableBandSetConfig{{
+			Band:           1,
+			Name:           "RACEBAND",
+			Letter:         "R",
+			Factory:        true,
+			FrequenciesMHz: []uint16{5658},
+		}},
+		Powers: []VTXTablePowerSetConfig{{Level: 1, Value: 25, Label: "25"}},
+	})
+	if err != nil {
+		t.Fatalf("ValidateVTXTable() error = %v", err)
+	}
+	if err := ValidateVTXTable(VTXTableSetConfig{}); err == nil {
+		t.Fatal("ValidateVTXTable() error = nil")
+	}
+}

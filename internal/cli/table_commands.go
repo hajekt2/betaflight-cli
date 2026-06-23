@@ -28,8 +28,81 @@ func (a *app) vtxTableCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.vtxTableSetBandCommand(), a.vtxTableSetPowerCommand())
+	cmd.AddCommand(set, a.vtxTableSetJSONCommand(), a.vtxTableSetBandCommand(), a.vtxTableSetPowerCommand())
 	return cmd
+}
+
+func (a *app) vtxTableSetJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Set VTX table band and power rows from JSON through typed MSP writes",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseVTXTableJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "VTX table changes can affect RF channel and power mappings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVTXTable(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtxtable": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "vtxtable",
+					Command: strings.Join(result.MSPNames, ","),
+					Detail:  "VTX table rows changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseVTXTableJSON(data []byte) (bfcommands.VTXTableSetConfig, error) {
+	var wrapped struct {
+		VTXTable *bfcommands.VTXTableSetConfig `json:"vtxtable"`
+		Table    *bfcommands.VTXTableSetConfig `json:"vtx_table"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.VTXTableSetConfig{}, err
+	}
+	if wrapped.VTXTable != nil {
+		return validateVTXTableConfig(normalizeVTXTableConfig(*wrapped.VTXTable))
+	}
+	if wrapped.Table != nil {
+		return validateVTXTableConfig(normalizeVTXTableConfig(*wrapped.Table))
+	}
+	var config bfcommands.VTXTableSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.VTXTableSetConfig{}, err
+	}
+	return validateVTXTableConfig(normalizeVTXTableConfig(config))
+}
+
+func normalizeVTXTableConfig(config bfcommands.VTXTableSetConfig) bfcommands.VTXTableSetConfig {
+	for i := range config.Bands {
+		config.Bands[i].Name = strings.ToUpper(config.Bands[i].Name)
+		config.Bands[i].Letter = strings.ToUpper(config.Bands[i].Letter)
+	}
+	for i := range config.Powers {
+		config.Powers[i].Label = strings.ToUpper(config.Powers[i].Label)
+	}
+	return config
+}
+
+func validateVTXTableConfig(config bfcommands.VTXTableSetConfig) (bfcommands.VTXTableSetConfig, error) {
+	if err := bfcommands.ValidateVTXTable(config); err != nil {
+		return bfcommands.VTXTableSetConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) vtxTableSetBandCommand() *cobra.Command {

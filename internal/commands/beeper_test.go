@@ -20,3 +20,15 @@ func TestDecodeBeeperConfig(t *testing.T) {
 		t.Fatalf("config = %+v", config)
 	}
 }
+
+func TestEncodeBeeperConfig(t *testing.T) {
+	payload := EncodeBeeperConfig(BeeperConfig{
+		DisabledMask:            0x00000012,
+		DShotBeaconTone:         3,
+		DShotBeaconDisabledMask: 0x00000202,
+	})
+	want := []byte{0x12, 0, 0, 0, 3, 0x02, 0x02, 0, 0}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

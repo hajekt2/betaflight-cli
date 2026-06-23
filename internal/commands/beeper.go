@@ -63,12 +63,47 @@ type BeeperConfig struct {
 	DShotBeaconDisabled     []string `json:"dshot_beacon_disabled"`
 }
 
+type BeeperConfigSetResult struct {
+	Config       BeeperConfig `json:"config"`
+	MSPCode      uint16       `json:"msp_code"`
+	MSPName      string       `json:"msp_name"`
+	Acknowledged bool         `json:"acknowledged"`
+	SaveRequired bool         `json:"save_required"`
+}
+
 func ReadBeeperConfig(ctx context.Context, client *connection.Client) (*BeeperConfig, error) {
 	frame, err := client.Request(ctx, msp.MSPBeeperConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("beeper config unavailable: %w", err)
 	}
 	return DecodeBeeperConfig(frame.Payload)
+}
+
+func SetBeeperConfig(ctx context.Context, client *connection.Client, config BeeperConfig) (*BeeperConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetBeeperConfig, EncodeBeeperConfig(config)); err != nil {
+		return nil, fmt.Errorf("beeper config request failed: %w", err)
+	}
+	normalized := BeeperConfig{
+		DisabledMask:            config.DisabledMask,
+		Disabled:                beeperNamesForMask(config.DisabledMask),
+		DShotBeaconTone:         config.DShotBeaconTone,
+		DShotBeaconDisabledMask: config.DShotBeaconDisabledMask,
+		DShotBeaconDisabled:     beeperNamesForMask(config.DShotBeaconDisabledMask),
+	}
+	return &BeeperConfigSetResult{
+		Config:       normalized,
+		MSPCode:      msp.MSPSetBeeperConfig,
+		MSPName:      "MSP_SET_BEEPER_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeBeeperConfig(config BeeperConfig) []byte {
+	payload := appendU32Payload(nil, config.DisabledMask)
+	payload = append(payload, config.DShotBeaconTone)
+	payload = appendU32Payload(payload, config.DShotBeaconDisabledMask)
+	return payload
 }
 
 func DecodeBeeperConfig(payload []byte) (*BeeperConfig, error) {

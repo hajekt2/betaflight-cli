@@ -581,8 +581,51 @@ func (a *app) beeperCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(disable, &disableFlags)
-	cmd.AddCommand(disable)
+	cmd.AddCommand(disable, a.beeperSetConfigCommand())
 	return cmd
+}
+
+func (a *app) beeperSetConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config DISABLED_MASK DSHOT_TONE DSHOT_DISABLED_MASK",
+		Short: "Set beeper and DShot beacon masks over MSP",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			disabled, err := parseUint32FlexibleArg("disabled_mask", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			tone, err := parseUint8Arg("dshot_tone", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			dshotDisabled, err := parseUint32FlexibleArg("dshot_disabled_mask", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "beeper configuration changes beeper settings; pass --yes"))
+			}
+			config := bfcommands.BeeperConfig{
+				DisabledMask:            disabled,
+				DShotBeaconTone:         tone,
+				DShotBeaconDisabledMask: dshotDisabled,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetBeeperConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"beeper_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "beeper_config",
+					Command: "MSP_SET_BEEPER_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) transponderCommand() *cobra.Command {

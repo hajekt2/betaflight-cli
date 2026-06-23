@@ -216,6 +216,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `sensors set-compass-declination` writes compass declination in deci-degrees through `MSP_SET_COMPASS_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `sensors calibrate-accelerometer` and `sensors calibrate-magnetometer` send typed MSP calibration requests, require `--yes`, and report the calibration side effect.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
+`beeper set-config` writes beeper and DShot beacon disable masks through `MSP_SET_BEEPER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `transponder config` reads IR transponder provider requirements, active provider, code bytes, hex data, and native CLI commands over MSP.
 `mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.

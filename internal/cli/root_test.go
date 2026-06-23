@@ -323,6 +323,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if beeperDisable["operation"] != "plan_or_write" || beeperDisable["requires_connection"] != true || beeperDisable["confirmation"] != "--yes with --apply or --save" || beeperDisable["runnable"] != true {
 		t.Fatalf("beeper disable capability = %+v", beeperDisable)
 	}
+	beeperConfig := byCommand["betaflight-cli beeper set-config"]
+	if beeperConfig["operation"] != "write" || beeperConfig["confirmation"] != "--yes" || beeperConfig["requires_connection"] != true || beeperConfig["output_root"] != "beeper_config" || beeperConfig["runnable"] != true {
+		t.Fatalf("beeper config capability = %+v", beeperConfig)
+	}
 	cliInteractive := byCommand["betaflight-cli cli interactive"]
 	if cliInteractive["operation"] != "dangerous" || cliInteractive["confirmation"] != "--yes" || cliInteractive["requires_connection"] != true || cliInteractive["runnable"] != true {
 		t.Fatalf("cli interactive capability = %+v", cliInteractive)
@@ -3593,6 +3597,51 @@ func TestBeeperConfigWithFakeFC(t *testing.T) {
 	disabled := beeper["disabled"].([]any)
 	if len(disabled) != 2 || disabled[0] != "RX_LOST" || disabled[1] != "ARMING" {
 		t.Fatalf("disabled = %+v", disabled)
+	}
+}
+
+func TestBeeperSetConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"beeper", "set-config", "0x12", "3", "0x202", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["beeper_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["disabled_mask"] != float64(0x12) || config["dshot_beacon_disabled_mask"] != float64(0x202) || result["save_required"] != true {
+		t.Fatalf("beeper_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_BEEPER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBeeperSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"beeper", "set-config", "0x12", "3", "0x202"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestBeeperSetConfigValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"beeper", "set-config", "0x12", "300", "0x202", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

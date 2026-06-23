@@ -757,6 +757,14 @@ func parseUint32Arg(name, value string) (uint32, error) {
 	return uint32(parsed), nil
 }
 
+func parseUint32FlexibleArg(name, value string) (uint32, error) {
+	parsed, err := strconv.ParseUint(value, 0, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an unsigned 32-bit integer", name)
+	}
+	return uint32(parsed), nil
+}
+
 func parseProfileCopyKind(value string) (bfcommands.ProfileCopyKind, error) {
 	switch strings.ToLower(value) {
 	case string(bfcommands.ProfileCopyPID):

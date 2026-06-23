@@ -310,6 +310,8 @@ Successful calibration commands also include a `sensor_calibration` side effect.
 
 `beeper config` returns a `beeper` object decoded from `MSP_BEEPER_CONFIG`.
 The object includes raw disable masks, decoded disabled beeper condition names, DShot beacon tone, and decoded DShot beacon disabled condition names.
+`beeper set-config` returns a `beeper_config` object with the written masks, decoded condition names, DShot beacon tone, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful beeper config writes include a `beeper_config` side effect.
 
 `transponder config` returns a `transponder` object decoded from `MSP_TRANSPONDER_CONFIG`.
 The object includes provider requirements, the active provider ID and name, configured code bytes, uppercase hex data, native CLI commands, and decode warnings for unexpected disabled-provider data.

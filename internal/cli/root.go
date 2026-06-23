@@ -1205,7 +1205,9 @@ func (a *app) motorsCommand() *cobra.Command {
 		},
 	})
 	cmd.AddCommand(a.motorConfigCommand())
+	cmd.AddCommand(a.motorConfigJSONCommand())
 	cmd.AddCommand(a.motor3DConfigCommand())
+	cmd.AddCommand(a.motor3DConfigJSONCommand())
 	cmd.AddCommand(a.motorTestPlanCommand())
 	cmd.AddCommand(a.motorTestApplyCommand())
 	return cmd
@@ -1259,6 +1261,64 @@ func (a *app) motorConfigCommand() *cobra.Command {
 	}
 }
 
+func (a *app) motorConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set motor configuration from JSON through MSP_SET_MOTOR_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseMotorConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "motor configuration changes motor settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetMotorConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"motor_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "motor_config",
+					Command: "MSP_SET_MOTOR_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseMotorConfigJSON(data []byte) (bfcommands.MotorConfigSetConfig, error) {
+	var wrapped struct {
+		MotorConfig *bfcommands.MotorConfigSetConfig `json:"motor_config"`
+		Motors      *bfcommands.MotorConfigSetConfig `json:"motors"`
+		Config      *bfcommands.MotorConfigSetConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.MotorConfigSetConfig{}, err
+	}
+	switch {
+	case wrapped.MotorConfig != nil:
+		return *wrapped.MotorConfig, nil
+	case wrapped.Motors != nil:
+		return *wrapped.Motors, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.MotorConfigSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.MotorConfigSetConfig{}, err
+	}
+	return config, nil
+}
+
 func (a *app) motor3DConfigCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-3d-config DEADBAND_LOW DEADBAND_HIGH NEUTRAL",
@@ -1296,6 +1356,64 @@ func (a *app) motor3DConfigCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) motor3DConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-3d-config-json FILE",
+		Short: "Set 3D motor deadband and neutral values from JSON through MSP_SET_MOTOR_3D_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseMotor3DConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "3D motor configuration changes motor settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetMotor3DConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"motor_3d_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "motor_3d_config",
+					Command: "MSP_SET_MOTOR_3D_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseMotor3DConfigJSON(data []byte) (bfcommands.Motor3DConfig, error) {
+	var wrapped struct {
+		Motor3DConfig *bfcommands.Motor3DConfig `json:"motor_3d_config"`
+		Motors        *bfcommands.Motor3DConfig `json:"motors"`
+		Config        *bfcommands.Motor3DConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.Motor3DConfig{}, err
+	}
+	switch {
+	case wrapped.Motor3DConfig != nil:
+		return *wrapped.Motor3DConfig, nil
+	case wrapped.Motors != nil:
+		return *wrapped.Motors, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.Motor3DConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.Motor3DConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) versionCommand() *cobra.Command {

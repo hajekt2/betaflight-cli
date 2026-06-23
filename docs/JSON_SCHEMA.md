@@ -398,8 +398,12 @@ Successful mixer config writes include a `mixer_config` side effect.
 `motors status` returns a `motors` object decoded from `MSP_MOTOR_CONFIG`, `MSP_MOTOR`, `MSP_MOTOR_TELEMETRY`, `MSP_MOTOR_3D_CONFIG`, and `MSP2_MOTOR_OUTPUT_REORDERING`.
 The object includes motor configuration, current motor outputs, telemetry values with raw and scaled units, 3D motor config, and output reordering.
 `motors set-config` returns a `motor_config` object with max throttle, min command, motor pole count, DShot telemetry flag, MSP command name/code, acknowledgement flag, and `save_required`.
+`motors set-config-json` accepts either a motor config object or an object with `motor_config`, `motors`, or `config`.
+It returns the same `motor_config` object as `motors set-config`.
 Successful motor config writes include a `motor_config` side effect.
 `motors set-3d-config` returns a `motor_3d_config` object with deadband low, deadband high, neutral, MSP command name/code, acknowledgement flag, and `save_required`.
+`motors set-3d-config-json` accepts either a 3D motor config object or an object with `motor_3d_config`, `motors`, or `config`.
+It returns the same `motor_3d_config` object as `motors set-3d-config`.
 Successful 3D motor config writes include a `motor_3d_config` side effect.
 `motors test-plan` returns a `motor_test_plan` object without connecting to hardware.
 The object includes the motor index, output value, duration, dangerous flag, command preview, stop command preview, required confirmations, safety checks, recommended preflight steps, and an apply guidance message.

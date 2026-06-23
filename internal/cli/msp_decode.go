@@ -56,6 +56,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPFailsafeConfig:     decodeVia(commands.DecodeFailsafeConfig),
 	msp.MSPBoardAlignmentConfig: decodeVia(commands.DecodeBoardAlignment),
 	msp.MSPAccTrim:            decodeRawAccTrim,
+	msp.MSP2GetText:           decodeMSP2Text,
 	msp.MSPRXConfig:           decodeVia(commands.DecodeReceiverConfig),
 	msp.MSPRSSIConfig:         decodeRawBytes,
 	msp.MSPRXMap:              decodeByteSlice(commands.DecodeBoxIDs),
@@ -63,7 +64,9 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPMotor:              decodeVia(commands.DecodeU16Array),
 	msp.MSPGPSConfig:          decodeVia(commands.DecodeGPSConfig),
 	msp.MSPRawGPS:             decodeVia(commands.DecodeGPSPosition),
-	msp.MSPCompGPS:            decodeRawBytes,
+	msp.MSPGPSRescue:          decodeVia(commands.DecodeGPSRescue),
+	msp.MSPGPSRescuePids:      decodeVia(commands.DecodeGPSRescuePID),
+	msp.MSPCompGPS:            decodeVia(commands.DecodeGPSHome),
 	msp.MSPGpssvinfo:          decodeVia(commands.DecodeGPSSatellites),
 	msp.MSPSensorConfig:       decodeVia(commands.DecodeActiveGyros),
 	msp.MSPRawIMU:             decodeVia(commands.DecodeRawIMU),
@@ -83,6 +86,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPMixerConfig:        decodeVia(commands.DecodeMixerStatus),
 	msp.MSPBeeperConfig:       decodeVia(commands.DecodeBeeperConfig),
 	msp.MSPTransponderConfig:  decodeVia(commands.DecodeTransponderConfig),
+	msp.MSPDebug:              decodeVia(commands.DecodeDebugValues),
 	msp.MSPLedStripConfig:     decodeVia(commands.DecodeLEDStripConfig),
 	msp.MSPLedColors:          decodeVia(commands.DecodeLEDColors),
 	msp.MSPLedStripModecolor:  decodeVia(commands.DecodeLEDModeColors),
@@ -149,6 +153,31 @@ func decodeRawAccTrim(payload []byte) (any, error) {
 	roll := int16(binary.LittleEndian.Uint16(payload[:2]))
 	pitch := int16(binary.LittleEndian.Uint16(payload[2:4]))
 	return map[string]any{"roll": roll, "pitch": pitch}, nil
+}
+
+func decodeMSP2Text(payload []byte) (any, error) {
+	if len(payload) < 1 {
+		return nil, fmt.Errorf("payload is shorter than MSP2_GET_TEXT")
+	}
+	r := msp.NewPayloadReader(payload)
+	textType, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "MSP2_GET_TEXT text type")
+	}
+	text, err := r.PString()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "MSP2_GET_TEXT value")
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP2_GET_TEXT returned %d trailing byte(s)", r.Remaining())
+	}
+	decoded := map[string]any{
+		"type":        float64(textType),
+		"value":       text,
+		"raw":         append([]byte(nil), payload...),
+		"text_length": float64(len(text)),
+	}
+	return decoded, nil
 }
 
 func decodeMSPPayload(code uint16, payload []byte) (any, bool, error) {

@@ -1556,6 +1556,108 @@ func TestMSPRequestWithDecodeForLEDStripConfig(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForGPSRescue(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_GPS_RESCUE", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["max_rescue_angle"] != float64(3200) {
+		t.Fatalf("decoded max_rescue_angle = %v", decoded["max_rescue_angle"])
+	}
+	if decoded["return_altitude_m"] != float64(100) || decoded["descent_distance_m"] != float64(50) {
+		t.Fatalf("decoded altitude fields = %+v", decoded)
+	}
+	if decoded["sanity_checks"] != float64(1) || decoded["min_sats"] != float64(8) {
+		t.Fatalf("decoded rescue options = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForGPSHomeFromCompGPS(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_COMP_GPS", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["distance_m"] != float64(342) || decoded["direction_degrees"] != float64(184) || decoded["update"] != true {
+		t.Fatalf("decoded home = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForGPSRescuePIDs(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_GPS_RESCUE_PIDS", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["altitude_p"] != float64(80) || decoded["velocity_p"] != float64(120) || decoded["yaw_p"] != float64(45) {
+		t.Fatalf("decoded rescue pid = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForDebugValues(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_DEBUG", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].([]any)
+	if len(decoded) != 8 || decoded[0] != float64(-1) || decoded[7] != float64(8) {
+		t.Fatalf("decoded debug values = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForText(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_GET_TEXT", "--decode", "--payload-hex", "01"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["type"] != float64(1) {
+		t.Fatalf("decoded type = %v", decoded["type"])
+	}
+	if decoded["value"] != "BF pilot" {
+		t.Fatalf("decoded value = %v", decoded["value"])
+	}
+	if decoded["text_length"] != float64(7) {
+		t.Fatalf("decoded text_length = %v", decoded["text_length"])
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

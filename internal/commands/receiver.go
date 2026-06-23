@@ -56,6 +56,14 @@ type RXFailChannel struct {
 	CLICommand    string `json:"cli_command,omitempty"`
 }
 
+type RSSIChannelSetResult struct {
+	Channel      uint8  `json:"channel"`
+	MSPCode      uint16 `json:"msp_code"`
+	MSPName      string `json:"msp_name"`
+	Acknowledged bool   `json:"acknowledged"`
+	SaveRequired bool   `json:"save_required"`
+}
+
 func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*ReceiverStatus, []string, error) {
 	status := &ReceiverStatus{}
 	warnings := []string{}
@@ -90,6 +98,23 @@ func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*Receiv
 		warnings = append(warnings, err.Error())
 	}
 	return status, warnings, nil
+}
+
+func SetRSSIChannel(ctx context.Context, client *connection.Client, channel uint8) (*RSSIChannelSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetRSSIConfig, EncodeRSSIChannel(channel)); err != nil {
+		return nil, fmt.Errorf("rssi channel request failed: %w", err)
+	}
+	return &RSSIChannelSetResult{
+		Channel:      channel,
+		MSPCode:      msp.MSPSetRSSIConfig,
+		MSPName:      "MSP_SET_RSSI_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeRSSIChannel(channel uint8) []byte {
+	return []byte{channel}
 }
 
 func DecodeReceiverConfig(payload []byte) (*ReceiverConfig, error) {

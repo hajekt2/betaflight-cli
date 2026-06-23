@@ -104,6 +104,7 @@ betaflight-cli rates list --port /dev/tty.usbmodem01
 betaflight-cli filters list --port /dev/tty.usbmodem01
 betaflight-cli receiver list --port /dev/tty.usbmodem01
 betaflight-cli receiver status --port /dev/tty.usbmodem01
+betaflight-cli receiver set-rssi-channel 8 --port /dev/tty.usbmodem01 --yes
 betaflight-cli receiver rxfail 2 s 1100 --port /dev/tty.usbmodem01
 betaflight-cli vtx list --port /dev/tty.usbmodem01
 betaflight-cli vtx config --port /dev/tty.usbmodem01
@@ -177,6 +178,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
 `receiver status` reads receiver configuration, channel map, RSSI channel, RX failsafe rows, and live RC channels over MSP.
+`receiver set-rssi-channel` writes the RSSI channel through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `battery status` reads battery profile thresholds, runtime battery state, and voltage/current meter readings and calibration over MSP.
 `failsafe status` reads failsafe configuration, arming configuration, board alignment, and active arming-disable flags over MSP.

@@ -60,6 +60,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "receiver" {
 		cmd.AddCommand(a.receiverStatusCommand())
 		cmd.AddCommand(a.receiverRXFailCommand())
+		cmd.AddCommand(a.receiverRSSIChannelCommand())
 	}
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
@@ -152,6 +153,36 @@ func (a *app) receiverRXFailCommand() *cobra.Command {
 	}
 	addChangeFlags(cmd, &flags)
 	return cmd
+}
+
+func (a *app) receiverRSSIChannelCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rssi-channel CHANNEL",
+		Short: "Set RSSI channel through MSP_SET_RSSI_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			channel, err := strconv.Atoi(args[0])
+			if err != nil || channel < 0 || channel > 18 {
+				return validationFailureMessage(a, cmd, "channel must be an integer in [0..18]")
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "RSSI channel changes receiver configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRSSIChannel(cmd.Context(), client, uint8(channel))
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rssi_channel": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rssi_channel",
+					Command: "MSP_SET_RSSI_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func receiverRXFailLine(args []string) (string, error) {

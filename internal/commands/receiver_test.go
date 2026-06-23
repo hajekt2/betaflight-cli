@@ -81,6 +81,13 @@ func TestRCMapNames(t *testing.T) {
 	}
 }
 
+func TestEncodeRSSIChannel(t *testing.T) {
+	got := EncodeRSSIChannel(8)
+	if len(got) != 1 || got[0] != 8 {
+		t.Fatalf("EncodeRSSIChannel() = %v", got)
+	}
+}
+
 func TestDecodeRXFailConfig(t *testing.T) {
 	payload := []byte{0}
 	payload = appendU16Test(payload, 1000)

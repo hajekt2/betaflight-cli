@@ -347,6 +347,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if boardAlignment["operation"] != "write" || boardAlignment["confirmation"] != "--yes" || boardAlignment["requires_connection"] != true || boardAlignment["output_root"] != "board_alignment" || boardAlignment["runnable"] != true {
 		t.Fatalf("board alignment capability = %+v", boardAlignment)
 	}
+	rssiChannel := byCommand["betaflight-cli receiver set-rssi-channel"]
+	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
+		t.Fatalf("rssi channel capability = %+v", rssiChannel)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -2877,6 +2881,58 @@ func TestReceiverStatusWithFakeFC(t *testing.T) {
 	row := failsafe[2].(map[string]any)
 	if row["mode_name"] != "SET" || row["value"] != float64(1100) || row["cli_command"] != "rxfail 2 s 1100" {
 		t.Fatalf("failsafe row = %+v", row)
+	}
+}
+
+func TestReceiverSetRSSIChannelRejectsOutOfRangeDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"receiver", "set-rssi-channel", "19", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after RSSI channel validation failure")
+	}
+}
+
+func TestReceiverSetRSSIChannelRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"receiver", "set-rssi-channel", "8"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after RSSI channel confirmation failure")
+	}
+}
+
+func TestReceiverSetRSSIChannelWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-rssi-channel", "8", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["rssi_channel"].(map[string]any)
+	if result["channel"] != float64(8) || result["msp_name"] != "MSP_SET_RSSI_CONFIG" || result["save_required"] != true {
+		t.Fatalf("rssi channel = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "rssi_channel" || env.SideEffects[0].Command != "MSP_SET_RSSI_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

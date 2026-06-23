@@ -953,6 +953,9 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	if summary["domain_count"].(float64) < 15 || summary["implemented_count"].(float64) < 10 {
 		t.Fatalf("summary = %+v", summary)
 	}
+	if summary["blackbox_domains"].(float64) < 1 {
+		t.Fatalf("summary blackbox_domains = %v, want at least 1", summary["blackbox_domains"])
+	}
 	domains := coverage["domains"].([]any)
 	if len(domains) != int(summary["domain_count"].(float64)) {
 		t.Fatalf("coverage domain_count mismatch: got=%d want=%v", len(domains), summary["domain_count"])
@@ -993,6 +996,10 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	beeperTransponder := byDomain["beeper-transponder"]
 	if beeperTransponder["status"] != "implemented" || !containsAnyString(beeperTransponder["output_roots"].([]any), "change_plan") {
 		t.Fatalf("beeper-transponder domain = %+v", beeperTransponder)
+	}
+	storageBlackbox := byDomain["storage-blackbox"]
+	if storageBlackbox["status"] != "implemented" || !containsAnyString(storageBlackbox["output_roots"].([]any), "blackbox") {
+		t.Fatalf("storage-blackbox domain = %+v", storageBlackbox)
 	}
 	gaps := coverage["next_gaps"].([]any)
 	for _, item := range gaps {

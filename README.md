@@ -9,13 +9,13 @@ Agents can call the binary directly and parse JSON.
 
 ## Status
 
-This repository now has an executable CLI foundation.
-Implemented functionality includes version output, machine-readable capability discovery, port listing, read-only doctor diagnostics, MSP handshake, read-only info, telemetry snapshot, framed CLI exec, backup diff/create wrappers, settings change planning, safety-gated apply/save paths, and raw MSP diagnostics.
+This repository now has a broad executable CLI surface for non-graphical Betaflight Configurator parity.
+Implemented functionality includes machine-readable capability discovery, USB port diagnostics, MSP handshake, identity and firmware support reporting, telemetry snapshots, runtime status, framed CLI exec, backup/diff/restore workflows, generated settings metadata, typed domain commands, Blackbox storage workflows, safety-gated apply/save paths, firmware maintenance, and raw MSP diagnostics.
 The repository also has generated MSP command metadata and generated Betaflight `2025.12.0` setting metadata compiled into the binary.
-Full non-graphical Configurator parity remains the product target and will be filled in by adding typed domain command families over this foundation.
+`capabilities coverage` is the authoritative local parity map for the current binary and should remain green as new Betaflight releases change MSP messages, settings, or workflows.
 
 The product target is full non-graphical Betaflight Configurator parity.
-Early releases may ship incrementally, but the architecture must assume eventual coverage of the same configuration, telemetry, maintenance, and analysis workflows that the Configurator exposes without copying its graphical UI.
+The architecture assumes ongoing coverage of the same configuration, telemetry, maintenance, and analysis workflows that the Configurator exposes without copying its graphical UI.
 The first-class support target is official Betaflight `2025.12.x` and newer.
 Older `4.x` firmware and Betaflight forks are outside the initial support matrix.
 Domain commands should fail outside the compiled metadata support set unless `--allow-unsupported` is explicit.

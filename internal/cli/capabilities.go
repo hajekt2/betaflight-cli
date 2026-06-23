@@ -177,7 +177,7 @@ func buildCoverageReport(root *cobra.Command) coverageReport {
 		if len(domain.DangerousCommands) > 0 {
 			report.Summary.DangerousDomains++
 		}
-		if domain.Domain == "blackbox" {
+		if strings.Contains(domain.Domain, "blackbox") || containsString(domain.OutputRoots, "blackbox") {
 			report.Summary.BlackboxDomains++
 		}
 		if domain.Domain == "firmware-maintenance" {
@@ -189,6 +189,15 @@ func buildCoverageReport(root *cobra.Command) coverageReport {
 	}
 	report.Summary.UnsupportedOldFWNote = true
 	return report
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func collectCapabilityCommands(root *cobra.Command) []capabilityCommand {

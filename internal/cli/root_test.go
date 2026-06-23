@@ -165,6 +165,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if beeperDisable["operation"] != "plan_or_write" || beeperDisable["requires_connection"] != true || beeperDisable["confirmation"] != "--yes with --apply or --save" || beeperDisable["runnable"] != true {
 		t.Fatalf("beeper disable capability = %+v", beeperDisable)
 	}
+	cliInteractive := byCommand["betaflight-cli cli interactive"]
+	if cliInteractive["operation"] != "dangerous" || cliInteractive["confirmation"] != "--yes" || cliInteractive["requires_connection"] != true || cliInteractive["runnable"] != true {
+		t.Fatalf("cli interactive capability = %+v", cliInteractive)
+	}
 	transponderSetProvider := byCommand["betaflight-cli transponder set-provider"]
 	if transponderSetProvider["operation"] != "plan_or_write" || transponderSetProvider["requires_connection"] != true || transponderSetProvider["confirmation"] != "--yes with --apply or --save" || transponderSetProvider["runnable"] != true {
 		t.Fatalf("transponder set-provider capability = %+v", transponderSetProvider)

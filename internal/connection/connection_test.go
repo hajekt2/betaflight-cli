@@ -145,6 +145,17 @@ func TestCheckSupportedRequiresExplicitOverride(t *testing.T) {
 	}
 }
 
+func TestConnectWriteRequiresPortWhenAutoPortDisabled(t *testing.T) {
+	_, _, err := Connect(context.Background(), Config{AutoPort: false}, Write)
+	if err == nil {
+		t.Fatal("Connect() error = nil, want auto_port_required")
+	}
+	coded, ok := err.(*CodedError)
+	if !ok || coded.Code != "auto_port_required" {
+		t.Fatalf("Connect() error = %T %v, want auto_port_required", err, err)
+	}
+}
+
 func TestClientExecCLIRespectsContextDeadline(t *testing.T) {
 	client, err := NewClient(&silentPort{}, time.Second)
 	if err != nil {

@@ -277,6 +277,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	}
 	data := env.Data.(map[string]any)
 	capabilities := data["capabilities"].(map[string]any)
+	safety := capabilities["safety_model"].(map[string]any)
+	if safety["auto_port_writes_default"] != true || safety["auto_port_writes_require_opt_in"] != false {
+		t.Fatalf("safety_model auto-port fields = %+v", safety)
+	}
 	commands := capabilities["commands"].([]any)
 	if len(commands) < 100 {
 		t.Fatalf("commands = %d", len(commands))

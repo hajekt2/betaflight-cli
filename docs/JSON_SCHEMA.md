@@ -142,6 +142,8 @@ The marker counts and candidate frame index are approximate until full binary fr
 
 `capabilities` returns a `capabilities` object without connecting to hardware.
 The object includes the introspected Cobra command tree, per-command runnable state, safety operation class, connection requirement, confirmation requirement, output root, input notes, and curated workflow sequences for common agent tasks.
+`capabilities.safety_model.auto_port_writes_default` is `true` when write and dangerous commands may auto-select exactly one compatible USB Flight Controller if `--port` is omitted.
+`capabilities.safety_model.auto_port_writes_require_opt_in` is retained for compatibility and is `false` under the same policy.
 Agents should prefer this payload over scraping help text when selecting commands.
 `capabilities coverage` returns a `coverage` object without connecting to hardware.
 The object maps non-graphical Configurator parity domains to implemented read, write, and dangerous command surfaces, plus known next gaps.

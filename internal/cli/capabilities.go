@@ -22,6 +22,7 @@ type capabilitySafety struct {
 	ReadOnlyDefault          bool     `json:"read_only_default"`
 	WriteRequiresYes         bool     `json:"write_requires_yes"`
 	DangerousRequiresYes     bool     `json:"dangerous_requires_yes"`
+	AutoPortWritesDefault    bool     `json:"auto_port_writes_default"`
 	AutoPortWritesRequireOpt bool     `json:"auto_port_writes_require_opt_in"`
 	SaveIsExplicit           bool     `json:"save_is_explicit"`
 	Notes                    []string `json:"notes"`
@@ -129,6 +130,7 @@ func buildCapabilityIndex(root *cobra.Command) capabilityIndex {
 			ReadOnlyDefault:          true,
 			WriteRequiresYes:         true,
 			DangerousRequiresYes:     true,
+			AutoPortWritesDefault:    true,
 			AutoPortWritesRequireOpt: false,
 			SaveIsExplicit:           true,
 			Notes: []string{

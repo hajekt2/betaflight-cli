@@ -39,6 +39,7 @@ Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of sc
 
 ```sh
 betaflight-cli ports list
+betaflight-cli ports diagnose
 betaflight-cli doctor
 betaflight-cli info --port /dev/tty.usbmodem01
 betaflight-cli firmware status --port /dev/tty.usbmodem01
@@ -160,6 +161,7 @@ Firmware flashing and DFU workflows are part of eventual parity, but the first i
 Preset workflows should support local files through the same plan, apply, and save model.
 Network preset fetching is opt-in and must report source metadata.
 `doctor` should be an early read-only diagnostic command for ports, auto-detection, handshake checks, firmware support status, and platform hints.
+`ports diagnose` ranks local USB serial candidates without opening them and reports the recommended next action.
 By default, `doctor` lists ports without opening them.
 It should only send `MSP_API_VERSION` probes when `--probe` is passed.
 When probing succeeds, `doctor --probe` returns target identity, firmware support status, and compiled settings metadata details for each responding port.

@@ -361,6 +361,61 @@ func TestProbeSupportAndMetadata(t *testing.T) {
 	}
 }
 
+func TestDiagnosePortsRecommendations(t *testing.T) {
+	tests := []struct {
+		name              string
+		ports             []connection.PortInfo
+		candidateCount    int
+		singleCandidate   bool
+		recommendedPort   string
+		recommendedAction string
+		warningCount      int
+	}{
+		{
+			name: "none",
+			ports: []connection.PortInfo{
+				{Name: "/dev/cu.Bluetooth-Incoming-Port", Candidate: false, Reason: "ignored non-USB or debug port"},
+			},
+			recommendedAction: "connect a Betaflight flight controller over USB, then run doctor --probe",
+			warningCount:      1,
+		},
+		{
+			name: "single",
+			ports: []connection.PortInfo{
+				{Name: "/dev/cu.usbmodem01", Candidate: true, Reason: "macOS USB serial candidate"},
+			},
+			candidateCount:    1,
+			singleCandidate:   true,
+			recommendedPort:   "/dev/cu.usbmodem01",
+			recommendedAction: "run doctor --probe or use this port for read-only commands",
+		},
+		{
+			name: "multiple",
+			ports: []connection.PortInfo{
+				{Name: "/dev/cu.usbmodem01", Candidate: true, Reason: "macOS USB serial candidate"},
+				{Name: "/dev/cu.usbmodem02", Candidate: true, Reason: "macOS USB serial candidate"},
+			},
+			candidateCount:    2,
+			recommendedAction: "run doctor --probe or pass --port explicitly after selecting the intended flight controller",
+			warningCount:      1,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := diagnosePorts(tt.ports)
+			if got.CandidateCount != tt.candidateCount || got.SingleCandidate != tt.singleCandidate || got.RecommendedPort != tt.recommendedPort {
+				t.Fatalf("diagnostics = %+v", got)
+			}
+			if got.RecommendedAction != tt.recommendedAction {
+				t.Fatalf("recommended action = %q", got.RecommendedAction)
+			}
+			if len(got.Warnings) != tt.warningCount {
+				t.Fatalf("warnings = %+v", got.Warnings)
+			}
+		})
+	}
+}
+
 func TestTextStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"text", "status"}, nil)
 	if err != nil {

@@ -56,6 +56,9 @@ Agents should use `errors[].code` to distinguish safe refusals from transport, p
 `doctor --probe` returns `probe_results` entries for serial-port candidates.
 Successful entries include `target`, `support`, and `metadata` objects so agents can decide whether the detected firmware is inside the compiled metadata support range before running domain commands.
 
+`ports diagnose` returns a `diagnostics` object without opening serial ports.
+The object includes the raw local port list, USB serial candidates, candidate count, single-candidate recommendation, platform hint, recommended next action, and warnings when no or multiple candidates are present.
+
 ## Side Effects
 
 Commands must report externally visible side effects.

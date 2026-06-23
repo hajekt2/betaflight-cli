@@ -357,7 +357,61 @@ func (a *app) portsCommand() *cobra.Command {
 			return a.render(output.Success(commandPath(cmd), nil, map[string]any{"ports": ports}))
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "diagnose",
+		Short: "Rank USB serial candidates without opening ports",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			ports, err := connection.ListPorts()
+			if err != nil {
+				return a.render(a.failure(commandPath(cmd), nil, err))
+			}
+			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+				"diagnostics": diagnosePorts(ports),
+			}))
+		},
+	})
 	return cmd
+}
+
+type portDiagnostics struct {
+	Source            string                `json:"source"`
+	PlatformHint      string                `json:"platform_hint"`
+	Ports             []connection.PortInfo `json:"ports"`
+	Candidates        []connection.PortInfo `json:"candidates"`
+	CandidateCount    int                   `json:"candidate_count"`
+	SingleCandidate   bool                  `json:"single_candidate"`
+	RecommendedPort   string                `json:"recommended_port,omitempty"`
+	RecommendedAction string                `json:"recommended_action"`
+	Warnings          []string              `json:"warnings,omitempty"`
+}
+
+func diagnosePorts(ports []connection.PortInfo) portDiagnostics {
+	diagnostics := portDiagnostics{
+		Source:       "local serial port inventory",
+		PlatformHint: platformHint(),
+		Ports:        append([]connection.PortInfo(nil), ports...),
+		Candidates:   []connection.PortInfo{},
+		Warnings:     []string{},
+	}
+	for _, port := range ports {
+		if port.Candidate {
+			diagnostics.Candidates = append(diagnostics.Candidates, port)
+		}
+	}
+	diagnostics.CandidateCount = len(diagnostics.Candidates)
+	switch diagnostics.CandidateCount {
+	case 0:
+		diagnostics.RecommendedAction = "connect a Betaflight flight controller over USB, then run doctor --probe"
+		diagnostics.Warnings = append(diagnostics.Warnings, "no typical Betaflight USB serial candidates were found")
+	case 1:
+		diagnostics.SingleCandidate = true
+		diagnostics.RecommendedPort = diagnostics.Candidates[0].Name
+		diagnostics.RecommendedAction = "run doctor --probe or use this port for read-only commands"
+	default:
+		diagnostics.RecommendedAction = "run doctor --probe or pass --port explicitly after selecting the intended flight controller"
+		diagnostics.Warnings = append(diagnostics.Warnings, "multiple USB serial candidates were found")
+	}
+	return diagnostics
 }
 
 func (a *app) doctorCommand() *cobra.Command {

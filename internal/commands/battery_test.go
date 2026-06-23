@@ -103,6 +103,29 @@ func TestEncodeCurrentMeterConfig(t *testing.T) {
 	}
 }
 
+func TestEncodeBatteryConfig(t *testing.T) {
+	config, err := DecodeBatteryConfig(batteryConfigTestPayload())
+	if err != nil {
+		t.Fatalf("DecodeBatteryConfig() error = %v", err)
+	}
+	got := EncodeBatteryConfig(*config)
+	want := batteryConfigTestPayload()
+	if string(got) != string(want) {
+		t.Fatalf("EncodeBatteryConfig() = %v, want %v", got, want)
+	}
+}
+
+func TestValidateBatteryConfigRejectsInvalidVoltageOrder(t *testing.T) {
+	err := ValidateBatteryConfig(BatteryConfig{
+		MinCellVoltageV:     3.6,
+		WarningCellVoltageV: 3.5,
+		MaxCellVoltageV:     4.2,
+	})
+	if err == nil {
+		t.Fatal("ValidateBatteryConfig() error = nil, want invalid voltage order")
+	}
+}
+
 func TestDecodeBatteryRejectsShortPayload(t *testing.T) {
 	if _, err := DecodeBatteryConfig([]byte{1, 2}); err == nil {
 		t.Fatal("DecodeBatteryConfig() error = nil, want short payload error")

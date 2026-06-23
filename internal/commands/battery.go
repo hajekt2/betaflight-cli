@@ -52,6 +52,14 @@ type BatteryConfig struct {
 	TrailingBytesIgnored      int     `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type BatteryConfigSetResult struct {
+	Config       BatteryConfig `json:"config"`
+	MSPCode      uint16        `json:"msp_code"`
+	MSPName      string        `json:"msp_name"`
+	Acknowledged bool          `json:"acknowledged"`
+	SaveRequired bool          `json:"save_required"`
+}
+
 type BatteryProfile struct {
 	Index                     uint8   `json:"index"`
 	MinCellVoltageV           float64 `json:"min_cell_voltage_v"`
@@ -174,6 +182,62 @@ func ReadBatteryStatus(ctx context.Context, client *connection.Client) (*Battery
 		return nil, warnings, fmt.Errorf("battery status unavailable")
 	}
 	return status, warnings, nil
+}
+
+func SetBatteryConfig(ctx context.Context, client *connection.Client, config BatteryConfig) (*BatteryConfigSetResult, error) {
+	if err := ValidateBatteryConfig(config); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetBatteryConfig, EncodeBatteryConfig(config)); err != nil {
+		return nil, fmt.Errorf("battery config request failed: %w", err)
+	}
+	config.VoltageMeterSourceName = indexedName(voltageMeterSourceNames, config.VoltageMeterSource)
+	config.CurrentMeterSourceName = indexedName(currentMeterSourceNames, config.CurrentMeterSource)
+	return &BatteryConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetBatteryConfig,
+		MSPName:      "MSP_SET_BATTERY_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateBatteryConfig(config BatteryConfig) error {
+	if config.MinCellVoltageV > config.WarningCellVoltageV || config.WarningCellVoltageV > config.MaxCellVoltageV {
+		return fmt.Errorf("cell voltages must satisfy min_cell_voltage_v <= warning_cell_voltage_v <= max_cell_voltage_v")
+	}
+	return nil
+}
+
+func EncodeBatteryConfig(config BatteryConfig) []byte {
+	minCell := centivolts(config.MinCellVoltageV)
+	maxCell := centivolts(config.MaxCellVoltageV)
+	warnCell := centivolts(config.WarningCellVoltageV)
+	payload := []byte{
+		decivoltsByte(config.LegacyMinCellVoltageV, minCell),
+		decivoltsByte(config.LegacyMaxCellVoltageV, maxCell),
+		decivoltsByte(config.LegacyWarningCellVoltageV, warnCell),
+	}
+	payload = appendU16Payload(payload, config.CapacityMAh)
+	payload = append(payload, config.VoltageMeterSource, config.CurrentMeterSource)
+	payload = appendU16Payload(payload, minCell)
+	payload = appendU16Payload(payload, maxCell)
+	payload = appendU16Payload(payload, warnCell)
+	return payload
+}
+
+func centivolts(value float64) uint16 {
+	if value <= 0 {
+		return 0
+	}
+	return uint16(value*100 + 0.5)
+}
+
+func decivoltsByte(value float64, centivoltFallback uint16) uint8 {
+	if value <= 0 {
+		return uint8((centivoltFallback + 5) / 10)
+	}
+	return uint8(value*10 + 0.5)
 }
 
 func SetVoltageMeterConfig(ctx context.Context, client *connection.Client, config VoltageMeterConfig) (*VoltageMeterConfigSetResult, error) {

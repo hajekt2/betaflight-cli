@@ -214,6 +214,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `gps set-rescue` writes GPS Rescue return, throttle, sanity, climb, and arming parameters through `MSP_SET_GPS_RESCUE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `gps set-rescue-pids` writes GPS Rescue altitude, velocity, and yaw PID terms through `MSP_SET_GPS_RESCUE_PIDS`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery status` reads battery profile thresholds, runtime battery state, and voltage/current meter readings and calibration over MSP.
+`battery set-config-json` writes battery capacity, voltage/current meter sources, and cell voltage thresholds through `MSP_SET_BATTERY_CONFIG`, accepts either a battery config object or an object with `battery_config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery set-voltage-meter` writes one voltage meter calibration row through `MSP_SET_VOLTAGE_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery set-current-meter` writes one current meter calibration row through `MSP_SET_CURRENT_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `failsafe status` reads failsafe configuration, arming configuration, board alignment, and active arming-disable flags over MSP.

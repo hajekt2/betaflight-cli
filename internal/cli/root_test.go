@@ -459,6 +459,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if adjustmentRange["operation"] != "write" || adjustmentRange["confirmation"] != "--yes" || adjustmentRange["requires_connection"] != true || adjustmentRange["output_root"] != "adjustment_range" || adjustmentRange["runnable"] != true {
 		t.Fatalf("adjustment range capability = %+v", adjustmentRange)
 	}
+	batteryConfig := byCommand["betaflight-cli battery set-config-json"]
+	if batteryConfig["operation"] != "write" || batteryConfig["confirmation"] != "--yes" || batteryConfig["requires_connection"] != true || batteryConfig["output_root"] != "battery_config" || batteryConfig["runnable"] != true {
+		t.Fatalf("battery config capability = %+v", batteryConfig)
+	}
 	voltageMeter := byCommand["betaflight-cli battery set-voltage-meter"]
 	if voltageMeter["operation"] != "write" || voltageMeter["confirmation"] != "--yes" || voltageMeter["requires_connection"] != true || voltageMeter["output_root"] != "voltage_meter_config" || voltageMeter["runnable"] != true {
 		t.Fatalf("voltage meter capability = %+v", voltageMeter)
@@ -6074,6 +6078,58 @@ func TestBatteryStatusWithFakeFC(t *testing.T) {
 	firstCurrentConfig := currentConfigs[0].(map[string]any)
 	if firstCurrentConfig["sensor_type_name"] != "ADC" || firstCurrentConfig["offset"] != float64(-10) {
 		t.Fatalf("current configs = %+v", currentConfigs)
+	}
+}
+
+func TestBatterySetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"battery_config":{"legacy_min_cell_voltage_v":3.3,"legacy_max_cell_voltage_v":4.3,"legacy_warning_cell_voltage_v":3.5,"capacity_mah":1300,"voltage_meter_source":1,"current_meter_source":1,"min_cell_voltage_v":3.3,"max_cell_voltage_v":4.35,"warning_cell_voltage_v":3.5}}`
+	env, err := runTestCommandWithInput(t, []string{"battery", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["battery_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["capacity_mah"] != float64(1300) || config["voltage_meter_source_name"] != "ADC" || result["save_required"] != true {
+		t.Fatalf("battery_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "battery_config" || env.SideEffects[0].Command != "MSP_SET_BATTERY_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBatterySetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"battery_config":{"capacity_mah":1300,"voltage_meter_source":1,"current_meter_source":1,"min_cell_voltage_v":3.3,"max_cell_voltage_v":4.35,"warning_cell_voltage_v":3.5}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"battery", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after battery config confirmation failure")
+	}
+}
+
+func TestBatterySetConfigJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"battery_config":{"capacity_mah":1300,"min_cell_voltage_v":3.6,"max_cell_voltage_v":4.35,"warning_cell_voltage_v":3.5}}`
+	env, err := runTestCommandWithInput(t, []string{"battery", "set-config-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid battery config")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

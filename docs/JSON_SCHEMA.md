@@ -440,7 +440,9 @@ It returns the same `motor_3d_config` object as `motors set-3d-config`.
 Successful 3D motor config writes include a `motor_3d_config` side effect.
 `motors test-plan` returns a `motor_test_plan` object without connecting to hardware.
 The object includes the motor index, output value, duration, dangerous flag, command preview, stop command preview, required confirmations, safety checks, recommended preflight steps, and an apply guidance message.
+Offline plans include a `dry_run_only` safety check.
 `motors test-apply` returns the same `motor_test_plan` object after running the bounded motor command and stop command.
+Apply runs include a `bounded_apply` safety check and require `--yes --props-off --battery-aware`.
 Successful apply responses set `applied` and `stopped`, include read-only runtime preflight state, include a read-only post-stop motor snapshot, include command response lines, emit a `motor_output` side effect, include an `audit` record summarizing confirmations, requested and observed elapsed timing, evidence capture, stop attempt, stop result, and warning messages, and include a `comparison` summary for quick post-stop interpretation.
 
 `leds status` returns a `leds` object decoded from `MSP_LED_STRIP_CONFIG`, `MSP_LED_COLORS`, `MSP_LED_STRIP_MODECOLOR`, and `MSP2_GET_LED_STRIP_CONFIG_VALUES`.

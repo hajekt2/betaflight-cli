@@ -385,7 +385,7 @@ func buildMotorTestPlan(motor int, all bool, motorCount int, value int, duration
 		StopCommandPreviews:   append([]string(nil), stopCommandPreviews...),
 		RequiredConfirmations: []string{"--yes", "--props-off", "--battery-aware"},
 		SafetyChecks: []safetyCheck{
-			{Name: "props_off", Passed: propsOff, Required: true, Detail: "propellers must be removed before any future motor output apply command"},
+			{Name: "props_off", Passed: propsOff, Required: true, Detail: "propellers must be removed before any motor output apply command"},
 			{Name: "battery_awareness", Passed: batteryAware, Required: true, Detail: "operator must review power source, bench restraint, and ESC arming state"},
 			modeCheck,
 		},

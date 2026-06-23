@@ -123,6 +123,50 @@ func TestCLIInteractiveRequiresYes(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWriteLikeRequiresYes(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"msp", "request", "11"}, "", func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("msp request was sent without --yes")
+	}
+
+	_, err = runTestCommandWithInput(t, []string{"msp", "request", "11", "--yes", "--payload-hex", ""}, "", nil)
+	if err != nil {
+		// connection path is backed by fake serial transport in tests, so protocol-level failures are expected.
+	}
+}
+
+func TestMSPRequestReadLikeDoesNotRequireYes(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"msp", "request", "MSP_API_VERSION"}, "", func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	for _, e := range env.Errors {
+		if e.Code == "confirmation_required" {
+			t.Fatalf("unexpected confirmation_required for read-like MSP request: %+v", env.Errors)
+		}
+	}
+	if !called {
+		t.Fatal("msp request did not attempt connection")
+	}
+}
+
 func TestParseCLISections(t *testing.T) {
 	sections := parseCLISections([]string{
 		"# comment",
@@ -212,6 +256,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	cliInteractive := byCommand["betaflight-cli cli interactive"]
 	if cliInteractive["operation"] != "dangerous" || cliInteractive["confirmation"] != "--yes" || cliInteractive["requires_connection"] != true || cliInteractive["runnable"] != true {
 		t.Fatalf("cli interactive capability = %+v", cliInteractive)
+	}
+	cliExec := byCommand["betaflight-cli cli exec"]
+	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
+		t.Fatalf("cli exec capability = %+v", cliExec)
+	}
+	mspRequest := byCommand["betaflight-cli msp request"]
+	if mspRequest["operation"] != "read_only" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "none" || mspRequest["runnable"] != true {
+		t.Fatalf("msp request capability = %+v", mspRequest)
 	}
 	transponderSetProvider := byCommand["betaflight-cli transponder set-provider"]
 	if transponderSetProvider["operation"] != "plan_or_write" || transponderSetProvider["requires_connection"] != true || transponderSetProvider["confirmation"] != "--yes with --apply or --save" || transponderSetProvider["runnable"] != true {

@@ -61,6 +61,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "receiver" {
 		cmd.AddCommand(a.receiverStatusCommand())
+		cmd.AddCommand(a.receiverSetConfigJSONCommand())
 		cmd.AddCommand(a.receiverRXFailCommand())
 		cmd.AddCommand(a.receiverSetRXFailCommand())
 		cmd.AddCommand(a.receiverRSSIChannelCommand())
@@ -149,6 +150,67 @@ func (a *app) receiverStatusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) receiverSetConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set receiver configuration from JSON through MSP_SET_RX_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseReceiverConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver changes affect control input; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetReceiverConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"receiver_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "receiver_config",
+					Command: "MSP_SET_RX_CONFIG",
+					Detail:  "receiver config changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseReceiverConfigJSON(data []byte) (bfcommands.ReceiverConfig, error) {
+	var wrapped struct {
+		ReceiverConfig *bfcommands.ReceiverConfig `json:"receiver_config"`
+		Config         *bfcommands.ReceiverConfig `json:"config"`
+		Receiver       *struct {
+			Config *bfcommands.ReceiverConfig `json:"config"`
+		} `json:"receiver"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.ReceiverConfig{}, err
+	}
+	if wrapped.ReceiverConfig != nil {
+		return *wrapped.ReceiverConfig, nil
+	}
+	if wrapped.Config != nil {
+		return *wrapped.Config, nil
+	}
+	if wrapped.Receiver != nil && wrapped.Receiver.Config != nil {
+		return *wrapped.Receiver.Config, nil
+	}
+	var config bfcommands.ReceiverConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.ReceiverConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) vtxSetConfigCommand() *cobra.Command {

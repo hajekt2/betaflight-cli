@@ -46,6 +46,14 @@ type ReceiverConfig struct {
 	DeprecatedRCSmoothingDerivative uint8   `json:"deprecated_rc_smoothing_derivative_type"`
 }
 
+type ReceiverConfigSetResult struct {
+	Config       ReceiverConfig `json:"config"`
+	MSPCode      uint16         `json:"msp_code"`
+	MSPName      string         `json:"msp_name"`
+	Acknowledged bool           `json:"acknowledged"`
+	SaveRequired bool           `json:"save_required"`
+}
+
 type RXFailChannel struct {
 	Index         int    `json:"index"`
 	Name          string `json:"name"`
@@ -136,6 +144,58 @@ func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*Receiv
 		warnings = append(warnings, err.Error())
 	}
 	return status, warnings, nil
+}
+
+func SetReceiverConfig(ctx context.Context, client *connection.Client, config ReceiverConfig) (*ReceiverConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetRXConfig, EncodeReceiverConfig(config)); err != nil {
+		return nil, fmt.Errorf("receiver config request failed: %w", err)
+	}
+	return &ReceiverConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetRXConfig,
+		MSPName:      "MSP_SET_RX_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeReceiverConfig(config ReceiverConfig) []byte {
+	payload := []byte{config.SerialProvider}
+	payload = appendU16Payload(payload, config.StickMax)
+	payload = appendU16Payload(payload, config.StickCenter)
+	payload = appendU16Payload(payload, config.StickMin)
+	payload = append(payload, config.SpektrumSatelliteBind)
+	payload = appendU16Payload(payload, config.RXMinUsec)
+	payload = appendU16Payload(payload, config.RXMaxUsec)
+	payload = append(payload, config.DeprecatedRCInterpolation, config.DeprecatedRCInterpolationIntv)
+	payload = appendU16Payload(payload, config.AirModeActivateThreshold)
+	payload = append(payload, config.RXSPIProtocol)
+	payload = appendU32Payload(payload, config.RXSPIID)
+	payload = append(payload,
+		config.RXSPIRFChannelCount,
+		config.FPVCamAngleDegrees,
+		config.DeprecatedRCInterpolationChans,
+		config.DeprecatedRCSmoothingType,
+		optionalU8(config.RCSmoothingSetpointCutoff),
+		optionalU8(config.RCSmoothingThrottleCutoff),
+		optionalU8(config.RCSmoothingAutoFactorThrottle),
+		config.DeprecatedRCSmoothingDerivative,
+		optionalU8(config.USBCdcHidType),
+		optionalU8(config.RCSmoothingAutoFactor),
+		optionalU8(config.RCSmoothing),
+	)
+	uid := make([]uint8, 6)
+	copy(uid, config.ELRSUID)
+	payload = append(payload, uid...)
+	payload = append(payload, optionalU8(config.ELRSModelID))
+	return payload
+}
+
+func optionalU8(value *uint8) uint8 {
+	if value == nil {
+		return 0
+	}
+	return *value
 }
 
 func SetRSSIChannel(ctx context.Context, client *connection.Client, channel uint8) (*RSSIChannelSetResult, error) {

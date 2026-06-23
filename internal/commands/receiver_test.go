@@ -3,19 +3,7 @@ package commands
 import "testing"
 
 func TestDecodeReceiverConfig(t *testing.T) {
-	payload := []byte{2}
-	payload = appendU16Test(payload, 2000)
-	payload = appendU16Test(payload, 1500)
-	payload = appendU16Test(payload, 1000)
-	payload = append(payload, 0)
-	payload = appendU16Test(payload, 885)
-	payload = appendU16Test(payload, 2115)
-	payload = append(payload, 0, 0)
-	payload = appendU16Test(payload, 1350)
-	payload = append(payload, 0)
-	payload = appendU32Test(payload, 0)
-	payload = append(payload, 0, 10, 0, 0, 50, 60, 70, 0, 0, 80, 1)
-	payload = append(payload, 1, 2, 3, 4, 5, 6, 7)
+	payload := receiverConfigTestPayload()
 	config, err := DecodeReceiverConfig(payload)
 	if err != nil {
 		t.Fatalf("DecodeReceiverConfig() error = %v", err)
@@ -52,6 +40,18 @@ func TestDecodeReceiverConfig(t *testing.T) {
 	}
 }
 
+func TestEncodeReceiverConfig(t *testing.T) {
+	config, err := DecodeReceiverConfig(receiverConfigTestPayload())
+	if err != nil {
+		t.Fatalf("DecodeReceiverConfig() error = %v", err)
+	}
+	payload := EncodeReceiverConfig(*config)
+	want := receiverConfigTestPayload()
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodeReceiverConfigLegacyPayload(t *testing.T) {
 	payload := []byte{2}
 	payload = appendU16Test(payload, 2000)
@@ -72,6 +72,23 @@ func TestDecodeReceiverConfigLegacyPayload(t *testing.T) {
 	if config.RCSmoothingSetpointCutoff != nil || config.RCSmoothingAutoFactor != nil || config.ELRSModelID != nil || len(config.ELRSUID) != 0 {
 		t.Fatalf("config = %+v", config)
 	}
+}
+
+func receiverConfigTestPayload() []byte {
+	payload := []byte{2}
+	payload = appendU16Test(payload, 2000)
+	payload = appendU16Test(payload, 1500)
+	payload = appendU16Test(payload, 1000)
+	payload = append(payload, 0)
+	payload = appendU16Test(payload, 885)
+	payload = appendU16Test(payload, 2115)
+	payload = append(payload, 0, 0)
+	payload = appendU16Test(payload, 1350)
+	payload = append(payload, 0)
+	payload = appendU32Test(payload, 0)
+	payload = append(payload, 0, 10, 0, 0, 50, 60, 70, 0, 0, 80, 1)
+	payload = append(payload, 1, 2, 3, 4, 5, 6, 7)
+	return payload
 }
 
 func TestRCMapNames(t *testing.T) {

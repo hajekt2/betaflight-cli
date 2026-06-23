@@ -482,6 +482,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 0, 10, 0, 0, 50, 60, 70, 0, 0, 80, 1)
 		payload = append(payload, 1, 2, 3, 4, 5, 6, 7)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetRXConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 48))
 	case msp.MSPRXMap:
 		f.out.Write(response(frame.Code, []byte{0, 1, 3, 2}, false))
 	case msp.MSPSetRXMap:

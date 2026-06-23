@@ -367,6 +367,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if boardAlignment["operation"] != "write" || boardAlignment["confirmation"] != "--yes" || boardAlignment["requires_connection"] != true || boardAlignment["output_root"] != "board_alignment" || boardAlignment["runnable"] != true {
 		t.Fatalf("board alignment capability = %+v", boardAlignment)
 	}
+	receiverConfig := byCommand["betaflight-cli receiver set-config-json"]
+	if receiverConfig["operation"] != "write" || receiverConfig["confirmation"] != "--yes" || receiverConfig["requires_connection"] != true || receiverConfig["output_root"] != "receiver_config" || receiverConfig["runnable"] != true {
+		t.Fatalf("receiver config capability = %+v", receiverConfig)
+	}
 	rssiChannel := byCommand["betaflight-cli receiver set-rssi-channel"]
 	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
 		t.Fatalf("rssi channel capability = %+v", rssiChannel)
@@ -3154,6 +3158,44 @@ func TestReceiverStatusWithFakeFC(t *testing.T) {
 	row := failsafe[2].(map[string]any)
 	if row["mode_name"] != "SET" || row["value"] != float64(1100) || row["cli_command"] != "rxfail 2 s 1100" {
 		t.Fatalf("failsafe row = %+v", row)
+	}
+}
+
+func TestReceiverSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"receiver_config":{"serial_provider":2,"stick_max":2000,"stick_center":1500,"stick_min":1000,"spektrum_satellite_bind":0,"rx_min_usec":885,"rx_max_usec":2115,"airmode_activate_threshold":1350,"rx_spi_protocol":0,"rx_spi_id":0,"rx_spi_rf_channel_count":0,"fpv_cam_angle_degrees":10,"rc_smoothing_setpoint_cutoff":50,"rc_smoothing_throttle_cutoff":60,"rc_smoothing_auto_factor_throttle":70,"usb_cdc_hid_type":0,"rc_smoothing_auto_factor":80,"rc_smoothing":1,"elrs_uid":[1,2,3,4,5,6],"elrs_model_id":7}}`
+	env, err := runTestCommandWithInput(t, []string{"receiver", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["receiver_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["serial_provider"] != float64(2) || config["stick_center"] != float64(1500) || result["save_required"] != true {
+		t.Fatalf("receiver_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "receiver_config" || env.SideEffects[0].Command != "MSP_SET_RX_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestReceiverSetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"receiver_config":{"serial_provider":2,"stick_max":2000,"stick_center":1500,"stick_min":1000}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"receiver", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after receiver config confirmation failure")
 	}
 }
 

@@ -90,6 +90,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.infoCommand())
 	root.AddCommand(a.textCommand())
 	root.AddCommand(a.statusCommand())
+	root.AddCommand(a.tasksCommand())
 	root.AddCommand(a.telemetryCommand())
 	root.AddCommand(a.debugCommand())
 	root.AddCommand(a.environmentCommand())
@@ -433,6 +434,28 @@ func (a *app) statusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) tasksCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "tasks", Short: "Inspect scheduler task diagnostics"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read scheduler task statistics through Betaflight CLI",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				tasks, err := bfcommands.ReadTaskStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"tasks": tasks,
+				})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "task_stats_reset", Command: "tasks", Detail: "Betaflight resets max task execution statistics after printing tasks"})
+				return env
+			})
+		},
+	})
+	return cmd
 }
 
 func (a *app) telemetryCommand() *cobra.Command {

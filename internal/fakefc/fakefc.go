@@ -29,6 +29,13 @@ func New() *FC {
 				"# Betaflight / STM32F405 (F405) 2025.12.1 Jan 01 2026 / 00:00:00 (fake) MSP API: 1.48",
 				"# board: manufacturer_id: FAKE, board_name: FAKEF405",
 			},
+			"tasks": {
+				"Task list             rate/hz  max/us  avg/us maxload avgload  total/ms   late    run reqd/us",
+				"00 - (         SYSTEM)    1000      10       4  0.2%  0.1%       100      0   1000       5",
+				"01 - (            PID)    8000      20       8  2.5%  1.5%       200      1   2000      10",
+				"Check Functions (RX, ...)          6       2          0.3%        50",
+				"Total (excluding SERIAL)                       1.6%",
+			},
 			"diff all": {
 				"# version",
 				"batch start",

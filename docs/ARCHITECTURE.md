@@ -264,6 +264,7 @@ Raw CLI commands are also dangerous when they bypass reviewed workflows.
 `cli exec` should intercept high-risk commands such as `save`, `defaults`, motor operations, reboot, bootloader, and erase.
 Reviewed reboot commands use `MSP_REBOOT`, require `--yes`, use the dangerous operation class, and report reboot or USB-mode changes in `side_effects`.
 `cli interactive` can allow unrestricted input because the user intentionally entered an interactive terminal session.
+Read-only CLI-backed diagnostics such as `tasks status` should preserve raw text and report firmware diagnostic side effects such as statistic counters being reset.
 Motor testing is eventual Configurator parity, but not part of the first implementation slice.
 When added, it must require explicit command-specific confirmation, no ambiguous auto-port selection, clear props-off metadata, low defaults, automatic stop on exit, and fake Flight Controller tests.
 

@@ -173,6 +173,33 @@ func TestStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestTasksStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"tasks", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	tasks := data["tasks"].(map[string]any)
+	rows := tasks["tasks"].([]any)
+	if len(rows) != 2 {
+		t.Fatalf("tasks = %+v", rows)
+	}
+	pid := rows[1].(map[string]any)
+	if pid["name"] != "PID" || pid["rate_hz"] != float64(8000) || pid["late_count"] != float64(1) {
+		t.Fatalf("pid row = %+v", pid)
+	}
+	total := tasks["total"].(map[string]any)
+	if total["average_load_percent"] != 1.6 {
+		t.Fatalf("total = %+v", total)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "task_stats_reset" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"info"}, nil)
 	if err != nil {

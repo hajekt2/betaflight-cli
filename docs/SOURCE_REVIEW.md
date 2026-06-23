@@ -108,6 +108,10 @@ Its configuration-state byte currently uses bit 0 for reboot-required state and 
 `MSP_REBOOT` accepts reboot modes used by Configurator: firmware, ROM bootloader, USB mass storage, UTC USB mass storage, and flash bootloader.
 The response echoes the accepted reboot mode and may include MSC readiness for USB mass-storage mode.
 
+The `tasks` CLI command prints scheduler task rows.
+When task statistics are enabled, the output includes rate, max and average execution time, max and average load, total execution time, and optionally late-task counters.
+Firmware resets max task execution statistics after printing the table.
+
 `MSP_SONAR_ALTITUDE` returns the latest rangefinder altitude in centimeters.
 
 `MSP_ANALOG` returns legacy voltage, drawn mAh, RSSI, amperage in 0.01A units, and battery voltage in 0.01V units.

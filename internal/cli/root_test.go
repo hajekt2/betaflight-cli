@@ -340,6 +340,16 @@ func TestFirmwareFlashExecuteRequiresYes(t *testing.T) {
 	}
 }
 
+func TestFirmwareFlashPlanModeRequiresImage(t *testing.T) {
+	env, err := runTestCommand(t, []string{"firmware", "flash", "--tool", "dfu-util"}, nil)
+	if err == nil {
+		t.Fatalf("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
 func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"capabilities", "coverage"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

@@ -621,6 +621,11 @@ func (a *app) firmwareFlashCommand() *cobra.Command {
 						},
 					})
 					env.SideEffects = append(env.SideEffects, output.SideEffect{
+						Type:    "firmware_reboot",
+						Command: commandPath(cmd),
+						Detail:  "bootloader reboot requested before flashing",
+					})
+					env.SideEffects = append(env.SideEffects, output.SideEffect{
 						Type:    "firmware_flash",
 						Command: strings.Join(result.Plan.EstimatedCommand, " "),
 						Detail:  "external flash tool executed",

@@ -159,6 +159,12 @@ The object includes Dataflash support and readiness flags, sector count, total/u
 `storage export FILE` returns a `dataflash_export` object with the output path, offset, requested size, exported byte count, chunk metadata, completion state, truncation state, and the storage summary used to bound the export.
 `storage erase` returns a `storage_erase` object with dangerous confirmation requirements, read-only before and after snapshots, a `dataflash_erase` side effect, and an `audit` record that includes freed bytes.
 
+`firmware flash` supports a default plan mode and a gated execute mode.
+`firmware flash` returns a `firmware_flash` object with a generated plan (`image_path`, `image_size_bytes`, `image_sha256`, `tool`, and `tool_args`) and optional execution results when `--execute` is provided.
+Plan mode (`--execute` omitted) never runs external commands and never requires a connection.
+Execute mode requires `--yes --execute` and `--image` and returns execution output, exit code, and timestamps on success.
+When `--reboot-first` is set, a reboot command is sent first and the response includes both the reboot and flash result metadata as structured side effects.
+
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
 

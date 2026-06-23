@@ -182,7 +182,7 @@ It never connects to hardware.
 `adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.
 `blackbox inspect FILE` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, decode-validated frame samples with common Betaflight predictors and field encodings applied, best-effort event summaries, and stream summaries for decoded fields.
 `blackbox inspect --log-index N` inspects one detected onboard Blackbox log directly from the flight controller without writing a local file first.
-Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
+Firmware flashing is now supported as an external-tool workflow (`firmware flash`) with explicit planning and confirmation, and still requires `--execute --yes` for any external flashing action.
 Preset workflows should support local files through the same plan, apply, and save model.
 Network preset fetching is opt-in and must report source metadata.
 `doctor` should be an early read-only diagnostic command for ports, auto-detection, handshake checks, firmware support status, and platform hints.

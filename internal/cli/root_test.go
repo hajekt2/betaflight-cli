@@ -377,6 +377,54 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestMSPListDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"msp", "list"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if called {
+		t.Fatalf("msp list should not connect")
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data, ok := env.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("env.Data type = %T", env.Data)
+	}
+	if data["count"] == nil {
+		t.Fatalf("msp list payload = %+v", data)
+	}
+}
+
+func TestMSPMetadataDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if called {
+		t.Fatalf("msp metadata should not connect")
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data, ok := env.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("env.Data type = %T", env.Data)
+	}
+	if data["code"] == nil || data["code_name"] != "MSP_NAME" {
+		t.Fatalf("msp metadata payload = %+v", data)
+	}
+}
+
 func TestFirmwareFlashPlanModeWorksOffline(t *testing.T) {
 	tmp := t.TempDir()
 	image := filepath.Join(tmp, "firmware.bin")

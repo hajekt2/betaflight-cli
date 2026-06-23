@@ -51,3 +51,25 @@ func TestEncodeVTXConfig(t *testing.T) {
 		t.Fatalf("payload = %v, want %v", payload, want)
 	}
 }
+
+func TestEncodeVTXTableBand(t *testing.T) {
+	payload := EncodeVTXTableBand(VTXTableBandSetConfig{
+		Band:           1,
+		Name:           "RACEBAND",
+		Letter:         "R",
+		Factory:        true,
+		FrequenciesMHz: []uint16{5658, 5695},
+	})
+	want := []byte{1, 8, 'R', 'A', 'C', 'E', 'B', 'A', 'N', 'D', 'R', 1, 2, 0x1a, 0x16, 0x3f, 0x16}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
+func TestEncodeVTXTablePower(t *testing.T) {
+	payload := EncodeVTXTablePower(VTXTablePowerSetConfig{Level: 2, Value: 200, Label: "200"})
+	want := []byte{2, 0xc8, 0x00, 3, '2', '0', '0'}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

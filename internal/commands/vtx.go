@@ -47,6 +47,36 @@ type VTXConfigSetResult struct {
 	SaveRequired bool               `json:"save_required"`
 }
 
+type VTXTableBandSetConfig struct {
+	Band           uint8    `json:"band"`
+	Name           string   `json:"name"`
+	Letter         string   `json:"letter"`
+	Factory        bool     `json:"factory"`
+	FrequenciesMHz []uint16 `json:"frequencies_mhz"`
+}
+
+type VTXTableBandSetResult struct {
+	Config       VTXTableBandSetConfig `json:"config"`
+	MSPCode      uint16                `json:"msp_code"`
+	MSPName      string                `json:"msp_name"`
+	Acknowledged bool                  `json:"acknowledged"`
+	SaveRequired bool                  `json:"save_required"`
+}
+
+type VTXTablePowerSetConfig struct {
+	Level uint8  `json:"level"`
+	Value uint16 `json:"value"`
+	Label string `json:"label"`
+}
+
+type VTXTablePowerSetResult struct {
+	Config       VTXTablePowerSetConfig `json:"config"`
+	MSPCode      uint16                 `json:"msp_code"`
+	MSPName      string                 `json:"msp_name"`
+	Acknowledged bool                   `json:"acknowledged"`
+	SaveRequired bool                   `json:"save_required"`
+}
+
 func ReadVTXConfig(ctx context.Context, client *connection.Client) (*VTXConfig, error) {
 	frame, err := client.Request(ctx, msp.MSPVTXConfig, nil)
 	if err != nil {
@@ -74,6 +104,51 @@ func EncodeVTXConfig(config VTXConfigSetConfig) []byte {
 	payload = appendU16Payload(payload, config.PitModeFrequency)
 	payload = append(payload, config.Band, config.Channel)
 	payload = appendU16Payload(payload, config.FrequencyMHz)
+	return payload
+}
+
+func SetVTXTableBand(ctx context.Context, client *connection.Client, config VTXTableBandSetConfig) (*VTXTableBandSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetVtxtableBand, EncodeVTXTableBand(config)); err != nil {
+		return nil, fmt.Errorf("vtx table band request failed: %w", err)
+	}
+	return &VTXTableBandSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetVtxtableBand,
+		MSPName:      "MSP_SET_VTXTABLE_BAND",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeVTXTableBand(config VTXTableBandSetConfig) []byte {
+	name := []byte(config.Name)
+	payload := []byte{config.Band, uint8(len(name))}
+	payload = append(payload, name...)
+	payload = append(payload, config.Letter[0], boolByte(config.Factory), uint8(len(config.FrequenciesMHz)))
+	for _, frequency := range config.FrequenciesMHz {
+		payload = appendU16Payload(payload, frequency)
+	}
+	return payload
+}
+
+func SetVTXTablePower(ctx context.Context, client *connection.Client, config VTXTablePowerSetConfig) (*VTXTablePowerSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetVtxtablePowerlevel, EncodeVTXTablePower(config)); err != nil {
+		return nil, fmt.Errorf("vtx table power request failed: %w", err)
+	}
+	return &VTXTablePowerSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetVtxtablePowerlevel,
+		MSPName:      "MSP_SET_VTXTABLE_POWERLEVEL",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeVTXTablePower(config VTXTablePowerSetConfig) []byte {
+	label := []byte(config.Label)
+	payload := appendU16Payload([]byte{config.Level}, config.Value)
+	payload = append(payload, uint8(len(label)))
+	payload = append(payload, label...)
 	return payload
 }
 

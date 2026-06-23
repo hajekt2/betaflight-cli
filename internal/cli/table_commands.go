@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -26,8 +27,96 @@ func (a *app) vtxTableCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set)
+	cmd.AddCommand(set, a.vtxTableSetBandCommand(), a.vtxTableSetPowerCommand())
 	return cmd
+}
+
+func (a *app) vtxTableSetBandCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-band BAND NAME LETTER FACTORY FREQ_MHZ...",
+		Short: "Set one VTX table band over MSP",
+		Args:  cobra.RangeArgs(5, 12),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			band, err := parseUint8Arg("band", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			name := strings.ToUpper(args[1])
+			if len(name) == 0 || len(name) > 8 {
+				return validationFailure(a, cmd, fmt.Errorf("name must be 1-8 bytes"))
+			}
+			letter := strings.ToUpper(args[2])
+			if len(letter) != 1 {
+				return validationFailure(a, cmd, fmt.Errorf("letter must be exactly 1 byte"))
+			}
+			factory, err := parseBoolArg("factory", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			frequencies := make([]uint16, 0, len(args)-4)
+			for i, value := range args[4:] {
+				frequency, err := parseUint16Arg("frequency_mhz", value)
+				if err != nil {
+					return validationFailure(a, cmd, fmt.Errorf("frequency %d: %v", i+1, err))
+				}
+				frequencies = append(frequencies, frequency)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "VTX table band changes can affect RF channel mappings; pass --yes"))
+			}
+			config := bfcommands.VTXTableBandSetConfig{
+				Band:           band,
+				Name:           name,
+				Letter:         letter,
+				Factory:        factory,
+				FrequenciesMHz: frequencies,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVTXTableBand(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtxtable_band": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "vtxtable_band", Command: "MSP_SET_VTXTABLE_BAND", Detail: "VTX table band changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) vtxTableSetPowerCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-power LEVEL VALUE LABEL",
+		Short: "Set one VTX table power level over MSP",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			level, err := parseUint8Arg("level", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			value, err := parseUint16Arg("value", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			label := strings.ToUpper(args[2])
+			if len(label) == 0 || len(label) > 3 {
+				return validationFailure(a, cmd, fmt.Errorf("label must be 1-3 bytes"))
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "VTX table power changes can affect RF output; pass --yes"))
+			}
+			config := bfcommands.VTXTablePowerSetConfig{Level: level, Value: value, Label: label}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVTXTablePower(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtxtable_power": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "vtxtable_power", Command: "MSP_SET_VTXTABLE_POWERLEVEL", Detail: "VTX table power level changed but not saved"})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) ledsCommand() *cobra.Command {

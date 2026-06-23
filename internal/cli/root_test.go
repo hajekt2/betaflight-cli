@@ -479,6 +479,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if vtxConfig["operation"] != "write" || vtxConfig["confirmation"] != "--yes" || vtxConfig["requires_connection"] != true || vtxConfig["output_root"] != "vtx_config" || vtxConfig["runnable"] != true {
 		t.Fatalf("vtx config capability = %+v", vtxConfig)
 	}
+	vtxTableBand := byCommand["betaflight-cli vtxtable set-band"]
+	if vtxTableBand["operation"] != "write" || vtxTableBand["confirmation"] != "--yes" || vtxTableBand["requires_connection"] != true || vtxTableBand["output_root"] != "vtxtable_band" || vtxTableBand["runnable"] != true {
+		t.Fatalf("vtxtable band capability = %+v", vtxTableBand)
+	}
+	vtxTablePower := byCommand["betaflight-cli vtxtable set-power"]
+	if vtxTablePower["operation"] != "write" || vtxTablePower["confirmation"] != "--yes" || vtxTablePower["requires_connection"] != true || vtxTablePower["output_root"] != "vtxtable_power" || vtxTablePower["runnable"] != true {
+		t.Fatalf("vtxtable power capability = %+v", vtxTablePower)
+	}
 	validate := byCommand["betaflight-cli configuration validate"]
 	if validate["operation"] != "offline" || validate["requires_connection"] != false || validate["output_root"] != "configuration_validation" {
 		t.Fatalf("validate capability = %+v", validate)
@@ -5800,6 +5808,70 @@ func TestVTXTableListIncludesSummary(t *testing.T) {
 	powerValues := vtx["power_values"].([]any)
 	if len(powerValues) != 2 || powerValues[1] != float64(200) {
 		t.Fatalf("power values = %+v", powerValues)
+	}
+}
+
+func TestVTXTableSetBandWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtxtable", "set-band", "1", "raceband", "r", "true", "5658", "5695", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["vtxtable_band"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["name"] != "RACEBAND" || config["letter"] != "R" || config["factory"] != true || result["save_required"] != true {
+		t.Fatalf("vtxtable_band = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_VTXTABLE_BAND" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestVTXTableSetPowerWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtxtable", "set-power", "2", "200", "200", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["vtxtable_power"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["level"] != float64(2) || config["value"] != float64(200) || config["label"] != "200" || result["save_required"] != true {
+		t.Fatalf("vtxtable_power = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_VTXTABLE_POWERLEVEL" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestVTXTableSetBandRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtxtable", "set-band", "1", "raceband", "r", "true", "5658"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestVTXTableSetPowerValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtxtable", "set-power", "2", "200", "TOOLONG", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

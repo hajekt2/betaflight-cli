@@ -706,6 +706,25 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetVTXConfig:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 11))
+	case msp.MSPSetVtxtableBand:
+		ok := len(frame.Payload) >= 7
+		if ok {
+			nameLen := int(frame.Payload[1])
+			channelCountIndex := 2 + nameLen + 2
+			ok = channelCountIndex < len(frame.Payload)
+			if ok {
+				channelCount := int(frame.Payload[channelCountIndex])
+				ok = len(frame.Payload) == channelCountIndex+1+(channelCount*2)
+			}
+		}
+		f.out.Write(response(frame.Code, nil, !ok))
+	case msp.MSPSetVtxtablePowerlevel:
+		ok := len(frame.Payload) >= 4
+		if ok {
+			labelLen := int(frame.Payload[3])
+			ok = len(frame.Payload) == 4+labelLen
+		}
+		f.out.Write(response(frame.Code, nil, !ok))
 	case msp.MSPLedStripConfig:
 		payload := appendU32(nil, fakeLEDConfigRaw(1, 2, 0, 1, 3, 0x03))
 		payload = appendU32(payload, fakeLEDConfigRaw(3, 4, 1, 1<<3, 5, 0x04))

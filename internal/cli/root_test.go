@@ -514,6 +514,59 @@ func TestConfigurationApplyIncludeDefaultsRequiresYesDoesNotConnect(t *testing.T
 	}
 }
 
+func TestConfigurationApplySaveRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"configuration", "apply", "--save"}, "feature GPS\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after configuration apply save confirmation failure")
+	}
+}
+
+func TestConfigurationApplyWithSaveWritesAndSaves(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommandWithInput(t, []string{"configuration", "apply", "--save", "--yes"}, "feature GPS\n", func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true || data["saved"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 2 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+	if env.SideEffects[0].Type != "cli_command" || env.SideEffects[1].Type != "save" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestConfigurationValidateReportsDangerousLine(t *testing.T) {
 	env, err := runTestCommandWithInput(t, []string{"configuration", "validate"}, "reboot\nfeature GPS\n", nil)
 	if err != nil {

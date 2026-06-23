@@ -22,12 +22,16 @@ type settingDomain struct {
 
 func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	cmd := &cobra.Command{Use: domain.use, Short: domain.short}
-	cmd.AddCommand(a.configListCommand("list", "List current "+domain.use+" settings", func(doc bfconfig.Document) any {
-		return map[string]any{
-			"settings": currentDomainSettings(doc, domain.matches),
-			"metadata": settings.DefaultRegistry.Filter(domain.matches),
-		}
-	}))
+	if domain.use == "vtx" {
+		cmd.AddCommand(a.vtxListCommand())
+	} else {
+		cmd.AddCommand(a.configListCommand("list", "List current "+domain.use+" settings", func(doc bfconfig.Document) any {
+			return map[string]any{
+				"settings": currentDomainSettings(doc, domain.matches),
+				"metadata": settings.DefaultRegistry.Filter(domain.matches),
+			}
+		}))
+	}
 	var flags changeFlags
 	set := &cobra.Command{
 		Use:   "set NAME VALUE",
@@ -78,6 +82,19 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	return cmd
 }
 
+func (a *app) vtxListCommand() *cobra.Command {
+	matches := vtxSettingMatch()
+	return a.configListCommand("list", "List VTX settings and VTX table rows", func(doc bfconfig.Document) any {
+		return map[string]any{
+			"settings":  currentDomainSettings(doc, matches),
+			"metadata":  settings.DefaultRegistry.Filter(matches),
+			"vtx":       doc.VTX,
+			"vtx_table": doc.VTXTable,
+			"lines":     doc.Sections["vtx_table"],
+		}
+	})
+}
+
 func (a *app) receiverStatusCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "status",
@@ -94,6 +111,12 @@ func (a *app) receiverStatusCommand() *cobra.Command {
 				})
 			})
 		},
+	}
+}
+
+func vtxSettingMatch() func(settings.Metadata) bool {
+	return func(s settings.Metadata) bool {
+		return strings.Contains(s.PG, "VTX") || strings.HasPrefix(s.Name, "vtx_")
 	}
 }
 
@@ -317,7 +340,7 @@ func receiverDomain() settingDomain {
 
 func vtxDomain() settingDomain {
 	return settingDomain{use: "vtx", short: "Inspect and change VTX settings", matches: func(s settings.Metadata) bool {
-		return strings.Contains(s.PG, "VTX") || strings.HasPrefix(s.Name, "vtx_")
+		return vtxSettingMatch()(s)
 	}}
 }
 

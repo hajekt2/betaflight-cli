@@ -4088,6 +4088,15 @@ func TestSettingDomainListsWithFakeFC(t *testing.T) {
 		if len(items) == 0 {
 			t.Fatalf("%v view = %+v", tt.args, view)
 		}
+		if tt.args[0] == "vtx" {
+			if _, ok := view["vtx"]; !ok {
+				t.Fatalf("%v view = %+v", tt.args, view)
+			}
+			table, ok := view["vtx_table"].([]any)
+			if !ok || len(table) == 0 {
+				t.Fatalf("%v vtx_table = %+v", tt.args, view["vtx_table"])
+			}
+		}
 	}
 }
 

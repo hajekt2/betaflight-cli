@@ -465,6 +465,13 @@ func (a *app) inspectOnboardBlackboxLog(cmd *cobra.Command, logIndex int, size u
 		inspection := selected.Inspection
 		envValue := output.Success(commandPath(cmd), &target, map[string]any{
 			"log_index":  logIndex,
+			"log": map[string]any{
+				"index":            selected.Index,
+				"offset_bytes":     selected.OffsetBytes,
+				"size_bytes":       selected.SizeBytes,
+				"product":          selected.Product,
+				"firmware_revision": selected.FirmwareRevision,
+			},
 			"blackbox":   config,
 			"storage":    storage,
 			"inspection": inspection,

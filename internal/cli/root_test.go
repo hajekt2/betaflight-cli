@@ -1137,6 +1137,13 @@ func TestBlackboxInspectOnboardLogIndexWithFakeFC(t *testing.T) {
 	if inspection["product"] == "" || inspection["firmware_revision"] == "" {
 		t.Fatalf("inspection = %+v", inspection)
 	}
+	log := data["log"].(map[string]any)
+	if log["index"].(float64) != 0 || log["offset_bytes"].(float64) < 0 || log["size_bytes"].(float64) == 0 {
+		t.Fatalf("log = %+v", log)
+	}
+	if log["product"] == "" || log["firmware_revision"] == "" {
+		t.Fatalf("log = %+v", log)
+	}
 	storage := data["storage"].(map[string]any)
 	if storage["dataflash"] == nil {
 		t.Fatalf("storage = %+v", storage)

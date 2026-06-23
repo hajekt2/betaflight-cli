@@ -399,6 +399,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if pidGains["operation"] != "write" || pidGains["confirmation"] != "--yes" || pidGains["requires_connection"] != true || pidGains["output_root"] != "pid_gains" || pidGains["runnable"] != true {
 		t.Fatalf("pid gains capability = %+v", pidGains)
 	}
+	rateProfile := byCommand["betaflight-cli rates set-profile-json"]
+	if rateProfile["operation"] != "write" || rateProfile["confirmation"] != "--yes" || rateProfile["requires_connection"] != true || rateProfile["output_root"] != "rate_profile" || rateProfile["runnable"] != true {
+		t.Fatalf("rate profile capability = %+v", rateProfile)
+	}
 	motorConfig := byCommand["betaflight-cli motors set-config"]
 	if motorConfig["operation"] != "write" || motorConfig["confirmation"] != "--yes" || motorConfig["requires_connection"] != true || motorConfig["output_root"] != "motor_config" || motorConfig["runnable"] != true {
 		t.Fatalf("motor config capability = %+v", motorConfig)
@@ -5717,6 +5721,56 @@ func TestRatesStatusWithFakeFC(t *testing.T) {
 	tpa := rates["tpa"].(map[string]any)
 	if tpa["mode"] != float64(2) || tpa["rate"] != float64(15) || tpa["breakpoint"] != float64(1350) {
 		t.Fatalf("tpa = %+v", tpa)
+	}
+}
+
+func TestRatesSetProfileJSONWithFakeFC(t *testing.T) {
+	input := `{"rate_profile":{"axes":[{"axis":"roll","rc_rate":7,"expo":10,"rate":70,"rate_limit_dps":900},{"axis":"pitch","rc_rate":7,"expo":9,"rate":72,"rate_limit_dps":850},{"axis":"yaw","rc_rate":8,"expo":5,"rate":65,"rate_limit_dps":800}],"throttle":{"mid_percent":50,"expo_percent":20,"hover_percent":45,"limit_type":1,"limit_percent":80},"rates_type":3}}`
+	env, err := runTestCommandWithInput(t, []string{"rates", "set-profile-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["rate_profile"].(map[string]any)
+	profile := result["rate_profile"].(map[string]any)
+	axes := profile["axes"].([]any)
+	roll := axes[0].(map[string]any)
+	if roll["axis"] != "roll" || roll["rate_limit_dps"] != float64(900) || result["save_required"] != true {
+		t.Fatalf("rate_profile = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_RC_TUNING" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestRatesSetProfileJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"axes":[{"axis":"roll"},{"axis":"pitch"},{"axis":"yaw"}]}`
+	env, err := runTestCommandWithInput(t, []string{"rates", "set-profile-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestRatesSetProfileJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"axes":[{"axis":"roll"},{"axis":"roll"},{"axis":"yaw"}]}`
+	env, err := runTestCommandWithInput(t, []string{"rates", "set-profile-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid JSON shape")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

@@ -200,6 +200,8 @@ Successful PID gain writes include a `pid_gains` side effect.
 
 `rates status` returns a `rates` object decoded from `MSP_RC_TUNING` and `MSP_PID_ADVANCED`.
 The object includes per-axis RC rates, expo, super rate values, rate limits, throttle curve fields, rates type, throttle limit mode, and TPA settings.
+`rates set-profile-json` returns a `rate_profile` object with the requested rate profile, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful rate profile writes include a `rate_profile` side effect.
 
 `filters status` returns a `filters` object decoded from `MSP_ADVANCED_CONFIG` and `MSP_FILTER_CONFIG`.
 The object includes loop and motor protocol fields, gyro calibration and overflow settings, gyro and D-term lowpass filters, static notches, dynamic lowpass fields, dynamic notch fields, and RPM filter fields.

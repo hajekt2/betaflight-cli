@@ -625,6 +625,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 800)
 		payload = append(payload, 3, 45)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetRCTuning:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 24))
 	case msp.MSPPIDAdvanced:
 		f.out.Write(response(frame.Code, fakePIDAdvancedPayload(), false))
 	case msp.MSPAdvancedConfig:

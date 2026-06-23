@@ -86,6 +86,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "rates" {
 		cmd.AddCommand(a.ratesStatusCommand())
+		cmd.AddCommand(a.ratesSetProfileJSONCommand())
 	}
 	if domain.use == "filters" {
 		cmd.AddCommand(a.filtersStatusCommand())
@@ -898,6 +899,73 @@ func (a *app) ratesStatusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) ratesSetProfileJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-profile-json FILE",
+		Short: "Set the active rate profile from JSON through MSP_SET_RC_TUNING",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			profile, err := parseRateProfileJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "rate profile changes affect flight tuning; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRateProfile(cmd.Context(), client, profile)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rate_profile": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rate_profile",
+					Command: "MSP_SET_RC_TUNING",
+					Detail:  "rate profile changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseRateProfileJSON(data []byte) (bfcommands.RateProfile, error) {
+	var profile bfcommands.RateProfile
+	if err := json.Unmarshal(data, &profile); err != nil {
+		var wrapped struct {
+			RateProfile bfcommands.RateProfile `json:"rate_profile"`
+		}
+		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
+			return bfcommands.RateProfile{}, err
+		}
+		profile = wrapped.RateProfile
+	}
+	if len(profile.Axes) != 3 {
+		return bfcommands.RateProfile{}, fmt.Errorf("rate profile must include exactly three axes")
+	}
+	seen := map[string]bool{}
+	for _, axis := range profile.Axes {
+		name := strings.ToLower(axis.Axis)
+		if name != "roll" && name != "pitch" && name != "yaw" {
+			return bfcommands.RateProfile{}, fmt.Errorf("rate profile axis %q must be roll, pitch, or yaw", axis.Axis)
+		}
+		if seen[name] {
+			return bfcommands.RateProfile{}, fmt.Errorf("rate profile axis %q is duplicated", axis.Axis)
+		}
+		seen[name] = true
+	}
+	for _, name := range []string{"roll", "pitch", "yaw"} {
+		if !seen[name] {
+			return bfcommands.RateProfile{}, fmt.Errorf("rate profile missing %s axis", name)
+		}
+	}
+	return profile, nil
 }
 
 func (a *app) filtersStatusCommand() *cobra.Command {

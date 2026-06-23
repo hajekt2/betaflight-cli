@@ -54,6 +54,28 @@ func TestDecodeRateProfile(t *testing.T) {
 	}
 }
 
+func TestEncodeRateProfile(t *testing.T) {
+	payload := EncodeRateProfile(RateProfile{
+		Axes: []RateAxis{
+			{Axis: "roll", RCRate: 7, Expo: 10, Rate: 70, RateLimitDPS: 900},
+			{Axis: "pitch", RCRate: 7, Expo: 9, Rate: 72, RateLimitDPS: 850},
+			{Axis: "yaw", RCRate: 8, Expo: 5, Rate: 65, RateLimitDPS: 800},
+		},
+		Throttle: Throttle{
+			MidPercent:   50,
+			ExpoPercent:  20,
+			HoverPercent: 45,
+			LimitType:    1,
+			LimitPercent: 80,
+		},
+		RatesType: 3,
+	})
+	want := []byte{7, 10, 70, 72, 65, 0, 50, 20, 0, 0, 5, 8, 7, 9, 1, 80, 0x84, 0x03, 0x52, 0x03, 0x20, 0x03, 3, 45}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodePIDAdvanced(t *testing.T) {
 	advanced, err := DecodePIDAdvanced(pidAdvancedTestPayload())
 	if err != nil {

@@ -70,6 +70,14 @@ type RateProfile struct {
 	TrailingBytesIgnored int        `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type RateProfileSetResult struct {
+	RateProfile  RateProfile `json:"rate_profile"`
+	MSPCode      uint16      `json:"msp_code"`
+	MSPName      string      `json:"msp_name"`
+	Acknowledged bool        `json:"acknowledged"`
+	SaveRequired bool        `json:"save_required"`
+}
+
 type RateAxis struct {
 	Axis         string  `json:"axis"`
 	RCRate       uint8   `json:"rc_rate"`
@@ -227,6 +235,58 @@ func SetPIDGains(ctx context.Context, client *connection.Client, gains []PIDGain
 		Acknowledged: true,
 		SaveRequired: true,
 	}, nil
+}
+
+func SetRateProfile(ctx context.Context, client *connection.Client, profile RateProfile) (*RateProfileSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetRCTuning, EncodeRateProfile(profile)); err != nil {
+		return nil, fmt.Errorf("rate profile request failed: %w", err)
+	}
+	return &RateProfileSetResult{
+		RateProfile:  profile,
+		MSPCode:      msp.MSPSetRCTuning,
+		MSPName:      "MSP_SET_RC_TUNING",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeRateProfile(profile RateProfile) []byte {
+	roll := rateAxisByName(profile.Axes, "roll")
+	pitch := rateAxisByName(profile.Axes, "pitch")
+	yaw := rateAxisByName(profile.Axes, "yaw")
+	payload := []byte{
+		roll.RCRate,
+		roll.Expo,
+		roll.Rate,
+		pitch.Rate,
+		yaw.Rate,
+		0,
+		profile.Throttle.MidPercent,
+		profile.Throttle.ExpoPercent,
+	}
+	payload = appendU16Payload(payload, 0)
+	payload = append(payload,
+		yaw.Expo,
+		yaw.RCRate,
+		pitch.RCRate,
+		pitch.Expo,
+		profile.Throttle.LimitType,
+		profile.Throttle.LimitPercent,
+	)
+	payload = appendU16Payload(payload, roll.RateLimitDPS)
+	payload = appendU16Payload(payload, pitch.RateLimitDPS)
+	payload = appendU16Payload(payload, yaw.RateLimitDPS)
+	payload = append(payload, profile.RatesType, profile.Throttle.HoverPercent)
+	return payload
+}
+
+func rateAxisByName(axes []RateAxis, name string) RateAxis {
+	for _, axis := range axes {
+		if strings.EqualFold(axis.Axis, name) {
+			return axis
+		}
+	}
+	return RateAxis{Axis: name}
 }
 
 func EncodePIDGains(gains []PIDGain) []byte {

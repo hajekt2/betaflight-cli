@@ -191,6 +191,10 @@ Input may be raw CLI text or JSON containing `lines` or `raw` at the top level o
 The object includes parsed reference and current documents, wrapper-insensitive line differences, machine-readable setting differences, summary counts, and recommended review actions.
 Input may be raw CLI text or JSON containing `lines` or `raw` at the top level or under `data`.
 
+`configuration export` reads current configuration through `dump all` or `diff all` based on `--source`.
+Default JSON output matches backup-style fields with raw CLI text, parsed sections, redaction metadata, and `raw_authoritative`.
+With `--raw-cli`, command data is plain CLI text for direct `.cli` artifact creation.
+
 `tasks status` returns a `tasks` object parsed from the Betaflight `tasks` CLI command.
 The object includes raw lines, parsed task rows, optional check-function stats, optional total load, parser warnings, and a `task_stats_reset` side effect because Betaflight resets max task execution statistics after printing them.
 

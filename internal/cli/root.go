@@ -538,6 +538,7 @@ func (a *app) configurationCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "configuration", Short: "Inspect configuration state and write readiness"}
 	cmd.AddCommand(a.configurationValidateCommand())
 	cmd.AddCommand(a.configurationCompareCommand())
+	cmd.AddCommand(a.configurationExportCommand())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "status",
 		Short: "Read configuration state, profiles, arming blockers, and write guidance",
@@ -567,6 +568,32 @@ func (a *app) configurationCommand() *cobra.Command {
 			})
 		},
 	})
+	return cmd
+}
+
+func (a *app) configurationExportCommand() *cobra.Command {
+	var source string
+	var redact bool
+	var rawCLI bool
+	cmd := &cobra.Command{
+		Use:   "export",
+		Short: "Export current Betaflight configuration as JSON or raw CLI text",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			cliLine := ""
+			switch strings.ToLower(source) {
+			case "full", "dump", "dump-all":
+				cliLine = "dump all"
+			case "diff", "diff-all":
+				cliLine = "diff all"
+			default:
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", "--source must be one of full or diff"))
+			}
+			return a.runBackupCommand(cmd, cliLine, redact, rawCLI)
+		},
+	}
+	cmd.Flags().StringVar(&source, "source", "full", "configuration source: full or diff")
+	cmd.Flags().BoolVar(&redact, "redact", false, "redact sensitive values for sharing")
+	cmd.Flags().BoolVar(&rawCLI, "raw-cli", false, "emit raw CLI text as the command data")
 	return cmd
 }
 

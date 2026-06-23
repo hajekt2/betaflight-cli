@@ -382,6 +382,51 @@ func TestConfigurationCompareAcceptsJSONRaw(t *testing.T) {
 	}
 }
 
+func TestConfigurationExportFullIncludesConfiguration(t *testing.T) {
+	env, err := runTestCommand(t, []string{"configuration", "export"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["command"] != "dump all" || data["raw_authoritative"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	configuration := data["configuration"].(map[string]any)
+	if len(configuration["settings"].([]any)) < 8 {
+		t.Fatalf("configuration = %+v", configuration)
+	}
+}
+
+func TestConfigurationExportDiffRawCLI(t *testing.T) {
+	env, err := runTestCommand(t, []string{"configuration", "export", "--source", "diff", "--raw-cli"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	raw, ok := env.Data.(string)
+	if !ok {
+		t.Fatalf("data = %+v", env.Data)
+	}
+	if !strings.Contains(raw, "feature GPS") || !strings.Contains(raw, "save") {
+		t.Fatalf("raw = %q", raw)
+	}
+}
+
+func TestConfigurationExportRejectsUnknownSource(t *testing.T) {
+	env, err := runTestCommand(t, []string{"configuration", "export", "--source", "nope"}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want error")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestTasksStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"tasks", "status"}, nil)
 	if err != nil {

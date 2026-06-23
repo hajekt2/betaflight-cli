@@ -52,9 +52,9 @@ betaflight-cli configuration validate --file backup.txt
 betaflight-cli configuration compare --file backup.txt --port /dev/tty.usbmodem01
 betaflight-cli configuration export --source full --raw-cli --format text --port /dev/tty.usbmodem01 > backup.cli
 betaflight-cli text status --port /dev/tty.usbmodem01
-betaflight-cli text set craft_name Quad --port /dev/tty.usbmodem01 --yes
+betaflight-cli text set-json text.json --port /dev/tty.usbmodem01 --yes
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
-betaflight-cli debug set-accelerometer-trim -12 34 --port /dev/tty.usbmodem01 --yes
+betaflight-cli debug set-accelerometer-trim-json trim.json --port /dev/tty.usbmodem01 --yes
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01
 betaflight-cli backup create --redact --port /dev/tty.usbmodem01
 betaflight-cli backup create --raw-cli --format text --port /dev/tty.usbmodem01 > backup.cli
@@ -90,7 +90,7 @@ betaflight-cli features enable GPS --port /dev/tty.usbmodem01 --apply --yes
 betaflight-cli serial list --port /dev/tty.usbmodem01
 betaflight-cli modes list --port /dev/tty.usbmodem01
 betaflight-cli modes active --port /dev/tty.usbmodem01
-betaflight-cli rtc set --timestamp 2026-06-23T12:34:56.789Z --port /dev/tty.usbmodem01 --yes
+betaflight-cli rtc set-json rtc.json --port /dev/tty.usbmodem01 --yes
 betaflight-cli resources list --port /dev/tty.usbmodem01
 betaflight-cli profiles list --port /dev/tty.usbmodem01
 betaflight-cli profiles status --port /dev/tty.usbmodem01
@@ -167,11 +167,14 @@ It preserves extended flight-mode bytes so new Betaflight modes beyond the legac
 `profiles copy` copies PID or rate profiles through `MSP_COPY_PROFILE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `text set` writes pilot, craft, PID profile, rate profile, or battery profile names through `MSP2_SET_TEXT`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`text set-json` accepts a JSON object with `field` or `key` plus `value`, or an object with `text`, `set`, or `request`, writes through `MSP2_SET_TEXT`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `debug status` reads live debug channels and accelerometer trims over MSP.
 `debug set-accelerometer-trim` writes accelerometer pitch/roll trim through `MSP_SET_ACC_TRIM` and requires `--yes`.
+`debug set-accelerometer-trim-json` accepts a direct trim object or an object with `accelerometer_trim`, `trim`, or `config`, writes through `MSP_SET_ACC_TRIM`, and requires `--yes`.
 `environment status` reads altitude, vario, rangefinder altitude, and legacy analog telemetry over MSP.
 `rtc status` reads the flight controller real-time clock over MSP and returns a normalized UTC timestamp when firmware supplies one.
 `rtc set` writes the flight controller real-time clock using `MSP_SET_RTC` with either `--timestamp` or `--now`, and requires `--yes`.
+`rtc set-json` accepts a JSON object with exactly one timestamp field from `timestamp`, `timestamp_utc`, or `iso_utc`, or `now: true`, optionally nested under `rtc`, writes through `MSP_SET_RTC`, and requires `--yes`.
 Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch plan` validates without connecting.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.

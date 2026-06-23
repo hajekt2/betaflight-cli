@@ -242,7 +242,8 @@ Successful profile copy responses include a `profile_copy` side effect.
 `text status` returns a `text` object decoded from `MSP2_GET_TEXT`.
 The object includes text fields for pilot name, craft name, active PID profile name, active rate profile name, active battery profile name, build key, and release name.
 The object also includes a `by_key` map for direct agent lookup and per-field warnings when custom firmware rejects one text type.
-`text set` returns a `text` object with the requested field, value, MSP command name/code, acknowledgement flag, and `save_required`.
+`text set` and `text set-json` return a `text` object with the requested field, value, MSP command name/code, acknowledgement flag, and `save_required`.
+`text set-json` accepts a JSON object with `field` or `key` plus `value`, or an object with `text`, `set`, or `request`.
 Successful text writes include a `text_set` side effect.
 
 `firmware status` returns a `firmware` object built from MSP identity requests and compiled metadata.
@@ -289,7 +290,8 @@ The object includes raw lines, resource assignments, timer alternate-function as
 
 `debug status` returns a `debug` object decoded from `MSP_DEBUG` and `MSP_ACC_TRIM`.
 The object includes signed debug channel values, signed accelerometer pitch/roll trims, source metadata, and per-message warnings when one optional request is unavailable.
-`debug set-accelerometer-trim` returns an `accelerometer_trim` object with the requested trim, MSP command name/code, and acknowledgement flag.
+`debug set-accelerometer-trim` and `debug set-accelerometer-trim-json` return an `accelerometer_trim` object with the requested trim, MSP command name/code, and acknowledgement flag.
+`debug set-accelerometer-trim-json` accepts a direct trim object or an object with `accelerometer_trim`, `trim`, or `config`.
 Successful trim writes include an `accelerometer_trim` side effect.
 
 `environment status` returns an `environment` object decoded from `MSP_ALTITUDE`, `MSP_SONAR_ALTITUDE`, and `MSP_ANALOG`.
@@ -298,8 +300,9 @@ The object includes estimated altitude in centimeters/meters, vario, rangefinder
 `rtc status` returns an `rtc` object decoded from `MSP_RTC`.
 The object includes `available`, date/time components, milliseconds, the `MSP_RTC` source, and `iso_utc` when firmware returns a complete datetime.
 An empty payload is treated as a successful unavailable state because Betaflight returns no bytes when RTC time is not set.
-`rtc set` returns an `rtc` object with the UTC timestamp written, MSP command name/code, and acknowledgement flag.
-Successful `rtc set` responses include an `rtc_set` side effect.
+`rtc set` and `rtc set-json` return an `rtc` object with the UTC timestamp written, MSP command name/code, and acknowledgement flag.
+`rtc set-json` accepts exactly one timestamp field from `timestamp`, `timestamp_utc`, or `iso_utc`, or `now: true`, optionally nested under `rtc`.
+Successful RTC set responses include an `rtc_set` side effect.
 
 `receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC_DEADBAND`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, RC deadband values, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.

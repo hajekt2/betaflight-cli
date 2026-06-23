@@ -311,6 +311,18 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if settingsDiff["operation"] != "read_only" || settingsDiff["requires_connection"] != true || settingsDiff["confirmation"] != "none" || settingsDiff["runnable"] != true {
 		t.Fatalf("settings diff capability = %+v", settingsDiff)
 	}
+	textSetJSON := byCommand["betaflight-cli text set-json"]
+	if textSetJSON["operation"] != "write" || textSetJSON["confirmation"] != "--yes" || textSetJSON["requires_connection"] != true || textSetJSON["output_root"] != "text" || textSetJSON["input"] == "" || textSetJSON["runnable"] != true {
+		t.Fatalf("text set json capability = %+v", textSetJSON)
+	}
+	rtcSetJSON := byCommand["betaflight-cli rtc set-json"]
+	if rtcSetJSON["operation"] != "write" || rtcSetJSON["confirmation"] != "--yes" || rtcSetJSON["requires_connection"] != true || rtcSetJSON["output_root"] != "rtc" || rtcSetJSON["input"] == "" || rtcSetJSON["runnable"] != true {
+		t.Fatalf("rtc set json capability = %+v", rtcSetJSON)
+	}
+	debugTrimJSON := byCommand["betaflight-cli debug set-accelerometer-trim-json"]
+	if debugTrimJSON["operation"] != "write" || debugTrimJSON["confirmation"] != "--yes" || debugTrimJSON["requires_connection"] != true || debugTrimJSON["output_root"] != "accelerometer_trim" || debugTrimJSON["input"] == "" || debugTrimJSON["runnable"] != true {
+		t.Fatalf("debug trim json capability = %+v", debugTrimJSON)
+	}
 	featureMask := byCommand["betaflight-cli features set-mask"]
 	if featureMask["operation"] != "write" || featureMask["confirmation"] != "--yes" || featureMask["requires_connection"] != true || featureMask["output_root"] != "feature_mask" || featureMask["runnable"] != true {
 		t.Fatalf("feature mask capability = %+v", featureMask)
@@ -1096,6 +1108,27 @@ func TestDebugSetAccelerometerTrimRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestDebugSetAccelerometerTrimJSONRequiresYesDoesNotConnect(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trim.json")
+	if err := os.WriteFile(path, []byte(`{"accelerometer_trim":{"pitch":-12,"roll":34}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	called := false
+	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim-json", path}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after trim confirmation failure")
+	}
+}
+
 func TestDebugSetAccelerometerTrimWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim", "-12", "34", "--yes"}, nil)
 	if err != nil {
@@ -1112,6 +1145,26 @@ func TestDebugSetAccelerometerTrimWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "accelerometer_trim" || env.SideEffects[0].Command != "MSP_SET_ACC_TRIM" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestDebugSetAccelerometerTrimJSONWithFakeFC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "trim.json")
+	if err := os.WriteFile(path, []byte(`{"trim":{"pitch":-7,"roll":11}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim-json", path, "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["accelerometer_trim"].(map[string]any)
+	trim := result["trim"].(map[string]any)
+	if trim["pitch"] != float64(-7) || trim["roll"] != float64(11) || result["msp_name"] != "MSP_SET_ACC_TRIM" {
+		t.Fatalf("accelerometer trim = %+v", result)
 	}
 }
 
@@ -1188,6 +1241,48 @@ func TestRTCSetRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestRTCSetJSONRequiresYesDoesNotConnect(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rtc.json")
+	if err := os.WriteFile(path, []byte(`{"timestamp_utc":"2026-06-23T12:34:56.789Z"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	called := false
+	env, err := runTestCommand(t, []string{"rtc", "set-json", path}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after rtc set confirmation failure")
+	}
+}
+
+func TestRTCSetJSONRequiresExactlyOneTimeSource(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rtc.json")
+	if err := os.WriteFile(path, []byte(`{"timestamp_utc":"2026-06-23T12:34:56.789Z","now":true}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	called := false
+	env, err := runTestCommand(t, []string{"rtc", "set-json", path, "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after rtc set validation failure")
+	}
+}
+
 func TestRTCSetWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"rtc", "set", "--timestamp", "2026-06-23T12:34:56.789Z", "--yes"}, nil)
 	if err != nil {
@@ -1203,6 +1298,25 @@ func TestRTCSetWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "rtc_set" || env.SideEffects[0].Command != "MSP_SET_RTC" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestRTCSetJSONWithFakeFC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "rtc.json")
+	if err := os.WriteFile(path, []byte(`{"rtc":{"iso_utc":"2026-06-23T12:34:56.789Z"}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	env, err := runTestCommand(t, []string{"rtc", "set-json", path, "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	rtc := data["rtc"].(map[string]any)
+	if rtc["timestamp_utc"] != "2026-06-23T12:34:56.789Z" || rtc["msp_name"] != "MSP_SET_RTC" || rtc["acknowledged"] != true {
+		t.Fatalf("rtc = %+v", rtc)
 	}
 }
 
@@ -2026,6 +2140,48 @@ func TestTextSetRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestTextSetJSONRejectsReadOnlyFieldDoesNotConnect(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "text.json")
+	if err := os.WriteFile(path, []byte(`{"field":"build_key","value":"abc"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	called := false
+	env, err := runTestCommand(t, []string{"text", "set-json", path, "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after read-only text field validation failure")
+	}
+}
+
+func TestTextSetJSONRequiresYesDoesNotConnect(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "text.json")
+	if err := os.WriteFile(path, []byte(`{"field":"craft_name","value":"Quad"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	called := false
+	env, err := runTestCommand(t, []string{"text", "set-json", path}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after text set confirmation failure")
+	}
+}
+
 func TestTextSetWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"text", "set", "craft_name", "Quad", "--yes"}, nil)
 	if err != nil {
@@ -2042,6 +2198,26 @@ func TestTextSetWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "text_set" || env.SideEffects[0].Command != "MSP2_SET_TEXT" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestTextSetJSONWithFakeFC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "text.json")
+	if err := os.WriteFile(path, []byte(`{"request":{"key":"craft_name","value":"Quad JSON"}}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	env, err := runTestCommand(t, []string{"text", "set-json", path, "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	text := data["text"].(map[string]any)
+	request := text["request"].(map[string]any)
+	if request["key"] != "craft_name" || request["value"] != "Quad JSON" || text["msp_name"] != "MSP2_SET_TEXT" || text["save_required"] != true {
+		t.Fatalf("text set = %+v", text)
 	}
 }
 

@@ -302,33 +302,35 @@ func (a *app) schemaCommand() *cobra.Command {
 				},
 			}
 			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
-				"command": "schema",
-				"schema_version": map[string]any{
-					"envelope":         output.SchemaVersion,
-					"inversion_level":  "command-output-schema-first",
-					"description":      "stable JSON envelope contract currently used for all machine-facing output",
-					"supported_minors": []string{"stable"},
-				},
-				"envelope":             envelopeFields,
-				"envelope_json_schema": envelopeJSONSchema,
-				"command_contracts": map[string]any{
-					"total_commands":               commandCount,
-					"runnable_commands":            runnableCount,
-					"requires_connection_commands": requiresConnectionCount,
-					"operation_counts":             operationCounts,
-					"operations":                   operations,
-					"requires_connection_default":  "when command touches transport",
-				},
-				"capabilities": map[string]any{
-					"coverage": map[string]any{
-						"implemented_domains": coverage.Summary.ImplementedCount,
-						"partial_domains":     coverage.Summary.PartialCount,
-						"domain_count":        coverage.Summary.DomainCount,
-						"next_gaps":           coverage.NextGaps,
+				"schema": map[string]any{
+					"command": "schema",
+					"schema_version": map[string]any{
+						"envelope":         output.SchemaVersion,
+						"inversion_level":  "command-output-schema-first",
+						"description":      "stable JSON envelope contract currently used for all machine-facing output",
+						"supported_minors": []string{"stable"},
 					},
+					"envelope":             envelopeFields,
+					"envelope_json_schema": envelopeJSONSchema,
+					"command_contracts": map[string]any{
+						"total_commands":               commandCount,
+						"runnable_commands":            runnableCount,
+						"requires_connection_commands": requiresConnectionCount,
+						"operation_counts":             operationCounts,
+						"operations":                   operations,
+						"requires_connection_default":  "when command touches transport",
+					},
+					"capabilities": map[string]any{
+						"coverage": map[string]any{
+							"implemented_domains": coverage.Summary.ImplementedCount,
+							"partial_domains":     coverage.Summary.PartialCount,
+							"domain_count":        coverage.Summary.DomainCount,
+							"next_gaps":           coverage.NextGaps,
+						},
+					},
+					"output_roots":  outputRoots,
+					"command_count": commandCount,
 				},
-				"output_roots":  outputRoots,
-				"command_count": commandCount,
 			}))
 		},
 	}

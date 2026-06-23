@@ -55,10 +55,10 @@ Agents should use `errors[].code` to distinguish safe refusals from transport, p
 
 `doctor --probe` returns `probe_results` entries for serial-port candidates.
 Successful entries include `target`, `support`, and `metadata` objects so agents can decide whether the detected firmware is inside the compiled metadata support range before running domain commands.
-`schema` returns a stable machine-readable contract object with:
+`schema` returns a stable machine-readable contract object under `data.schema` with:
 
 - the shared envelope fields and envelope version
-- a draft 2020-12 JSON Schema object in `envelope_json_schema` for validating the top-level response envelope
+- a draft 2020-12 JSON Schema object in `schema.envelope_json_schema` for validating the top-level response envelope
 - command-contract metadata, including total/runnable/connection-using command counts, operation count map, and operation catalog
 - the canonical output roots exposed by current commands
 - a curated coverage summary with implemented / partial domain counts and next parity gaps.

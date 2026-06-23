@@ -916,14 +916,15 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 		t.Fatalf("schema command should be offline and never connect")
 	}
 	data := env.Data.(map[string]any)
-	if data["command"] != "schema" {
-		t.Fatalf("command = %v", data["command"])
+	schemaData := data["schema"].(map[string]any)
+	if schemaData["command"] != "schema" {
+		t.Fatalf("command = %v", schemaData["command"])
 	}
-	schemaVersion := data["schema_version"].(map[string]any)
+	schemaVersion := schemaData["schema_version"].(map[string]any)
 	if schemaVersion["envelope"] != output.SchemaVersion {
 		t.Fatalf("schema_version = %+v", schemaVersion)
 	}
-	envelopeJSONSchema := data["envelope_json_schema"].(map[string]any)
+	envelopeJSONSchema := schemaData["envelope_json_schema"].(map[string]any)
 	if envelopeJSONSchema["$schema"] != "https://json-schema.org/draft/2020-12/schema" {
 		t.Fatalf("envelope_json_schema = %+v", envelopeJSONSchema)
 	}
@@ -938,7 +939,7 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 			t.Fatalf("envelope_json_schema required = %+v, missing %q", required, field)
 		}
 	}
-	contract := data["command_contracts"].(map[string]any)
+	contract := schemaData["command_contracts"].(map[string]any)
 	if contract["total_commands"] == nil {
 		t.Fatalf("command_contracts = %+v", contract)
 	}
@@ -958,17 +959,66 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 			t.Fatalf("operation_counts[%s]=%v", key, total)
 		}
 	}
-	outputRoots := data["output_roots"].([]any)
+	outputRoots := schemaData["output_roots"].([]any)
 	if len(outputRoots) == 0 {
 		t.Fatalf("output_roots = %+v", outputRoots)
 	}
-	caps := data["capabilities"].(map[string]any)
+	caps := schemaData["capabilities"].(map[string]any)
 	coverage := caps["coverage"].(map[string]any)
 	if coverage["implemented_domains"] == nil || coverage["partial_domains"] == nil || coverage["domain_count"] == nil {
 		t.Fatalf("capabilities.coverage = %+v", coverage)
 	}
 	if _, ok := coverage["next_gaps"].([]any); !ok {
 		t.Fatalf("capabilities.coverage.next_gaps = %+v", coverage["next_gaps"])
+	}
+}
+
+func TestOfflineCommandOutputRootsMatchCapabilities(t *testing.T) {
+	tmp := t.TempDir()
+	image := filepath.Join(tmp, "firmware.bin")
+	if err := os.WriteFile(image, []byte{0xaa, 0xbb}, 0o600); err != nil {
+		t.Fatalf("write firmware image: %v", err)
+	}
+
+	cases := []struct {
+		command string
+		args    []string
+	}{
+		{command: "betaflight-cli version", args: []string{"version"}},
+		{command: "betaflight-cli schema", args: []string{"schema"}},
+		{command: "betaflight-cli capabilities", args: []string{"capabilities"}},
+		{command: "betaflight-cli capabilities coverage", args: []string{"capabilities", "coverage"}},
+		{command: "betaflight-cli msp list", args: []string{"msp", "list", "--name", "MSP_NAME"}},
+		{command: "betaflight-cli msp metadata", args: []string{"msp", "metadata", "MSP_NAME"}},
+		{command: "betaflight-cli firmware flash", args: []string{"firmware", "flash", "--image", image, "--tool", "dfu-util"}},
+	}
+
+	roots := capabilityOutputRoots(t)
+	for _, tt := range cases {
+		t.Run(tt.command, func(t *testing.T) {
+			want := roots[tt.command]
+			if want == "" {
+				t.Fatalf("missing capability output root for %q", tt.command)
+			}
+			called := false
+			env, err := runTestCommand(t, tt.args, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+				called = true
+				return nil, connection.TargetInfo{}, nil
+			})
+			if err != nil {
+				t.Fatalf("command error = %v", err)
+			}
+			if called {
+				t.Fatalf("%s unexpectedly connected", tt.command)
+			}
+			if !env.OK {
+				t.Fatalf("env.OK = false: %+v", env.Errors)
+			}
+			data := env.Data.(map[string]any)
+			if _, ok := data[want]; !ok {
+				t.Fatalf("%s data missing advertised output root %q: %+v", tt.command, want, data)
+			}
+		})
 	}
 }
 
@@ -9849,6 +9899,30 @@ func mspResponseData(t *testing.T, env output.Envelope) map[string]any {
 		t.Fatalf("data.msp = %T %+v", data["msp"], data["msp"])
 	}
 	return mspData
+}
+
+func capabilityOutputRoots(t *testing.T) map[string]string {
+	t.Helper()
+	env, err := runTestCommand(t, []string{"capabilities"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("capabilities unexpectedly connected")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("capabilities command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("capabilities env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	capabilities := data["capabilities"].(map[string]any)
+	commands := capabilities["commands"].([]any)
+	roots := map[string]string{}
+	for _, item := range commands {
+		command := item.(map[string]any)
+		root, _ := command["output_root"].(string)
+		roots[command["command"].(string)] = root
+	}
+	return roots
 }
 
 func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.Envelope, error) {

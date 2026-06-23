@@ -1319,6 +1319,56 @@ func TestMotorsTestPlanValidatesBounds(t *testing.T) {
 	}
 }
 
+func TestMotorsTestApplyRequiresConfirmationBeforeConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"motors", "test-apply", "--motor", "1", "--value", "1050", "--duration", "1ms", "--props-off", "--battery-aware"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if called {
+		t.Fatal("connector was called before --yes confirmation")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommand(t, []string{"motors", "test-apply", "--motor", "1", "--value", "1050", "--duration", "1ms", "--props-off", "--battery-aware", "--yes"}, func(ctx context.Context, cfg connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(ctx)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)["motor_test_plan"].(map[string]any)
+	if plan["applied"] != true || plan["stopped"] != true || plan["command_preview"] != "motor 1 1050" || plan["stop_command_preview"] != "motor 1 1000" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "motor_output" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestServosStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"servos", "status"}, nil)
 	if err != nil {

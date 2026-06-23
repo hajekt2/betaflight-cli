@@ -272,7 +272,7 @@ func coverageDomains(commandSet map[string]bool) []coverageDomain {
 		implementedDomain("gps", commandSet, []string{"betaflight-cli gps list", "betaflight-cli gps status"}, []string{"betaflight-cli gps set"}, nil, []string{"gps", "change_plan"}, "GPS config, position, rescue settings, PID terms, and satellite info are covered when firmware supplies them."),
 		implementedDomain("battery-failsafe", commandSet, []string{"betaflight-cli battery list", "betaflight-cli battery status", "betaflight-cli failsafe list", "betaflight-cli failsafe status"}, []string{"betaflight-cli battery set", "betaflight-cli failsafe set"}, nil, []string{"battery", "failsafe", "change_plan"}, "Battery and failsafe settings plus arming/failsafe status are covered."),
 		implementedDomain("vtx-osd-leds", commandSet, []string{"betaflight-cli vtx config", "betaflight-cli vtx list", "betaflight-cli osd list", "betaflight-cli osd status", "betaflight-cli vtxtable list", "betaflight-cli leds list", "betaflight-cli leds status"}, []string{"betaflight-cli vtx set", "betaflight-cli osd set", "betaflight-cli vtxtable set", "betaflight-cli leds set"}, nil, []string{"vtx", "osd", "vtxtable", "leds", "change_plan"}, "VTX, OSD, VTX table, and LED strip surfaces are implemented without graphical layout editing."),
-		implementedDomain("motors-servos-mixer", commandSet, []string{"betaflight-cli mixer status", "betaflight-cli motors status", "betaflight-cli motors test-plan", "betaflight-cli servos list", "betaflight-cli servos status", "betaflight-cli adjustments list", "betaflight-cli adjustments status"}, []string{"betaflight-cli servos set", "betaflight-cli servos reverse", "betaflight-cli adjustments set"}, nil, []string{"mixer", "motors", "motor_test_plan", "servos", "adjustments", "change_plan"}, "Motor and servo reads are implemented; motor output testing currently has a dry-run safety plan only."),
+		implementedDomain("motors-servos-mixer", commandSet, []string{"betaflight-cli mixer status", "betaflight-cli motors status", "betaflight-cli motors test-plan", "betaflight-cli servos list", "betaflight-cli servos status", "betaflight-cli adjustments list", "betaflight-cli adjustments status"}, []string{"betaflight-cli servos set", "betaflight-cli servos reverse", "betaflight-cli adjustments set"}, []string{"betaflight-cli motors test-apply"}, []string{"mixer", "motors", "motor_test_plan", "servos", "adjustments", "change_plan"}, "Motor and servo reads are implemented; motor output testing is bounded, dangerous, and confirmation-gated."),
 		implementedDomain("storage-blackbox", commandSet, []string{"betaflight-cli storage status", "betaflight-cli blackbox config", "betaflight-cli blackbox inspect"}, nil, nil, []string{"storage", "blackbox", "inspection"}, "Storage summaries, Blackbox configuration, and initial offline log inspection are implemented."),
 		implementedDomain("beeper-transponder", commandSet, []string{"betaflight-cli beeper config", "betaflight-cli transponder config"}, nil, nil, []string{"beeper", "transponder"}, "Beeper and transponder configuration reads are covered."),
 		implementedDomain("raw-protocol-access", commandSet, []string{"betaflight-cli cli exec"}, nil, []string{"betaflight-cli cli interactive", "betaflight-cli msp request"}, []string{"cli", "msp"}, "Raw CLI and raw MSP access exist for unsupported gaps with safety gates."),
@@ -329,8 +329,8 @@ func coverageGaps(domains []coverageDomain) []coverageGap {
 	gaps := []coverageGap{
 		{
 			Domain:     "motor-testing",
-			Reason:     "Configurator exposes live motor test workflows, but this CLI currently provides only an offline motor test safety plan.",
-			NextSteps:  []string{"add a dangerous apply command only after the dry-run contract is stable", "require explicit props-off acknowledgement", "require --yes and a short duration limit", "record side effects in JSON"},
+			Reason:     "Configurator exposes richer live motor test workflows; this CLI currently provides a bounded single-motor test apply path.",
+			NextSteps:  []string{"add optional status preflight summaries", "support controlled all-motor idle tests only with stronger confirmation", "capture post-test motor outputs after stop"},
 			SafetyNote: "This must be dangerous by default because motors can spin.",
 		},
 		{
@@ -407,6 +407,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli blackbox inspect":       {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "inspection", Input: "Blackbox log file or stdin", Tags: []string{"blackbox", "offline"}},
 		"betaflight-cli configuration validate": {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "configuration_validation", Input: "raw CLI text or JSON lines/raw", Tags: []string{"configuration", "validate", "offline"}},
 		"betaflight-cli motors test-plan":       {RequiresConnection: false, Operation: "offline_dangerous_plan", Confirmation: "none", OutputRoot: "motor_test_plan", Tags: []string{"motors", "dangerous", "plan", "offline"}},
+		"betaflight-cli motors test-apply":      {RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes --props-off --battery-aware", OutputRoot: "motor_test_plan", Tags: []string{"motors", "dangerous", "apply"}},
 		"betaflight-cli batch plan":             writePlan,
 		"betaflight-cli restore plan":           writePlan,
 		"betaflight-cli presets plan":           writePlan,

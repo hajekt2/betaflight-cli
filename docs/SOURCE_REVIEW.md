@@ -135,11 +135,11 @@ That is a good pattern for compatibility-aware commands.
 The skill emphasizes machine-readable JSON, live reads before writes, explicit confirmation before saving, and props-off warnings for high-risk actions.
 Those are product requirements for this CLI, not just documentation preferences.
 
-It also treats Blackbox analysis as a future structured workflow.
-The Go CLI should keep room for Blackbox commands without coupling them to live serial sessions.
+It also treats Blackbox analysis as a structured workflow for agents.
+The Go CLI keeps Blackbox commands package-separated so offline log inspection does not depend on live serial sessions.
 
 ## Blackbox Log Viewer
 
 The viewer remains the reference for Blackbox decoding and analysis behavior.
 Initial `betaflight-cli` work should not copy its graphical behavior.
-Future Blackbox support should focus on extraction, decoding, summaries, CSV, and JSON.
+Implemented Blackbox support focuses on extraction, best-effort decoding, summaries, and JSON output without copying graphical behavior.

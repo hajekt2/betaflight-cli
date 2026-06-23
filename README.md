@@ -366,7 +366,7 @@ Primary sources reviewed for the initial architecture:
 - `betaflight/betaflight-configurator`: MSP frame encoding and decoding, CLI command framing, request queueing, and connect handshake.
 - `SebGalina/betaflight-mcp`: Practical request and parser patterns for agent-facing Betaflight operations.
 - `SebGalina/betaflight-claude-skill`: Agent workflow expectations, safety expectations, and machine-readable analysis patterns.
-- `betaflight/blackbox-log-viewer`: Future Blackbox parser reference.
+- `betaflight/blackbox-log-viewer`: Blackbox parser and analysis reference.
 
 See [docs/SOURCE_REVIEW.md](docs/SOURCE_REVIEW.md) for the first source review notes.
 

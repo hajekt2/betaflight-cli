@@ -157,6 +157,8 @@ When running on older or partial firmware where one telemetry command is missing
 
 `blackbox config` returns a `blackbox` object decoded from `MSP_BLACKBOX_CONFIG`.
 The object includes support status, device index and name, rate fields, optional sample-rate metadata, and optional enabled or disabled Blackbox field selections when the firmware supplies the mask.
+`blackbox set-config-json` returns a `blackbox_config` object with the requested Blackbox config, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful Blackbox config writes include a `blackbox_config` side effect.
 `blackbox list` returns a `blackbox_logs` object with scan bounds, byte count, storage snapshot, Blackbox config, detected log count, and per-log inspection summaries.
 `blackbox export FILE` returns a `blackbox_export` object with the local path, optional `log_index`, exported byte count, completion state, nested `dataflash_export` metadata, and parsed `inspection` output for the written log.
 

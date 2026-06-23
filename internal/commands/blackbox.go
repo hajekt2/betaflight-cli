@@ -22,12 +22,49 @@ type BlackboxConfig struct {
 	EnabledFields      []string `json:"enabled_fields,omitempty"`
 }
 
+type BlackboxConfigSetResult struct {
+	Config       BlackboxConfig `json:"config"`
+	MSPCode      uint16         `json:"msp_code"`
+	MSPName      string         `json:"msp_name"`
+	Acknowledged bool           `json:"acknowledged"`
+	SaveRequired bool           `json:"save_required"`
+}
+
 func ReadBlackboxConfig(ctx context.Context, client *connection.Client) (*BlackboxConfig, error) {
 	frame, err := client.Request(ctx, msp.MSPBlackboxConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("blackbox config unavailable: %w", err)
 	}
 	return DecodeBlackboxConfig(frame.Payload)
+}
+
+func SetBlackboxConfig(ctx context.Context, client *connection.Client, config BlackboxConfig) (*BlackboxConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetBlackboxConfig, EncodeBlackboxConfig(config)); err != nil {
+		return nil, fmt.Errorf("blackbox config request failed: %w", err)
+	}
+	return &BlackboxConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetBlackboxConfig,
+		MSPName:      "MSP_SET_BLACKBOX_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeBlackboxConfig(config BlackboxConfig) []byte {
+	payload := []byte{config.Device, config.RateNumerator, config.RateDenominator}
+	payload = appendU16Payload(payload, config.PRatio)
+	if config.SampleRate != nil {
+		payload = append(payload, *config.SampleRate)
+	} else {
+		payload = append(payload, 0)
+	}
+	if config.FieldsDisabledMask != nil {
+		payload = appendU32Payload(payload, *config.FieldsDisabledMask)
+	} else {
+		payload = appendU32Payload(payload, 0)
+	}
+	return payload
 }
 
 func DecodeBlackboxConfig(payload []byte) (*BlackboxConfig, error) {

@@ -401,6 +401,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 2)
 		payload = appendU32(payload, 0x1001)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetBlackboxConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 10))
 	case msp.MSPDataflashSummary:
 		payload := []byte{3}
 		payload = appendU32(payload, 16)

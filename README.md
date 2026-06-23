@@ -181,6 +181,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `--include-defaults` escalates the operation class to dangerous because `defaults nosave` resets configuration before applying later lines.
 `reboot firmware`, `reboot bootloader`, `reboot bootloader-flash`, `reboot msc`, and `reboot msc-utc` send reviewed `MSP_REBOOT` requests and always require `--yes`.
 `blackbox config` reads current Blackbox configuration over MSP and returns decoded device, sample rate, and enabled or disabled field selections.
+`blackbox set-config-json` writes Blackbox device, sample rate, and disabled-field mask through `MSP_SET_BLACKBOX_CONFIG`, accepts either a Blackbox config object or an object with `blackbox` or `blackbox_config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `blackbox list` scans onboard Blackbox storage and returns detected log boundaries with per-log inspection summaries, without writing a local file.
 `blackbox export FILE` exports onboard Blackbox data to a local file using `MSP_DATAFLASH_READ`, supports `--log-index` to export one detected onboard log, refuses overwrite unless `--force` is explicit, and returns both a `blackbox_export` summary and a parsed `inspection` of the written log.
 `storage status` reads Dataflash and SD card summaries over MSP and returns capacity, usage, readiness, and state fields.

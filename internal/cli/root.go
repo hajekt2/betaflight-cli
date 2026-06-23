@@ -8,9 +8,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"sort"
 	"strconv"
-	"runtime"
 	"strings"
 	"time"
 
@@ -261,6 +261,37 @@ func (a *app) blackboxCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set Blackbox configuration from JSON through MSP_SET_BLACKBOX_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseBlackboxConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "Blackbox config changes require --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetBlackboxConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"blackbox_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "blackbox_config",
+					Command: "MSP_SET_BLACKBOX_CONFIG",
+					Detail:  "Blackbox config changed but not saved",
+				})
+				return env
+			})
+		},
+	})
 	inspectCmd := &cobra.Command{
 		Use:   "inspect FILE",
 		Short: "Inspect a Blackbox log file without connecting to hardware",
@@ -307,6 +338,31 @@ func (a *app) blackboxCommand() *cobra.Command {
 	cmd.AddCommand(a.blackboxListCommand())
 	cmd.AddCommand(a.blackboxExportCommand())
 	return cmd
+}
+
+func parseBlackboxConfigJSON(data []byte) (bfcommands.BlackboxConfig, error) {
+	var wrapped struct {
+		Blackbox       *bfcommands.BlackboxConfig `json:"blackbox"`
+		BlackboxConfig *bfcommands.BlackboxConfig `json:"blackbox_config"`
+		Config         *bfcommands.BlackboxConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.BlackboxConfig{}, err
+	}
+	if wrapped.BlackboxConfig != nil {
+		return *wrapped.BlackboxConfig, nil
+	}
+	if wrapped.Blackbox != nil {
+		return *wrapped.Blackbox, nil
+	}
+	if wrapped.Config != nil {
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.BlackboxConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.BlackboxConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) storageCommand() *cobra.Command {

@@ -415,6 +415,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if filterConfig["operation"] != "write" || filterConfig["confirmation"] != "--yes" || filterConfig["requires_connection"] != true || filterConfig["output_root"] != "filter_config" || filterConfig["runnable"] != true {
 		t.Fatalf("filter config capability = %+v", filterConfig)
 	}
+	blackboxConfig := byCommand["betaflight-cli blackbox set-config-json"]
+	if blackboxConfig["operation"] != "write" || blackboxConfig["confirmation"] != "--yes" || blackboxConfig["requires_connection"] != true || blackboxConfig["output_root"] != "blackbox_config" || blackboxConfig["runnable"] != true {
+		t.Fatalf("blackbox config capability = %+v", blackboxConfig)
+	}
 	motorConfig := byCommand["betaflight-cli motors set-config"]
 	if motorConfig["operation"] != "write" || motorConfig["confirmation"] != "--yes" || motorConfig["requires_connection"] != true || motorConfig["output_root"] != "motor_config" || motorConfig["runnable"] != true {
 		t.Fatalf("motor config capability = %+v", motorConfig)
@@ -2192,6 +2196,40 @@ func TestBlackboxConfigWithFakeFC(t *testing.T) {
 	disabled := config["disabled_fields"].([]any)
 	if len(disabled) != 2 || disabled[0] != "PID" || disabled[1] != "GPS" {
 		t.Fatalf("disabled = %+v", disabled)
+	}
+}
+
+func TestBlackboxSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"blackbox":{"device":2,"rate_numerator":1,"rate_denominator":4,"p_ratio":16,"sample_rate":2,"fields_disabled_mask":4097}}`
+	env, err := runTestCommandWithInput(t, []string{"blackbox", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["blackbox_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["device"] != float64(2) || config["p_ratio"] != float64(16) || result["save_required"] != true {
+		t.Fatalf("blackbox_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_BLACKBOX_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBlackboxSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"blackbox_config":{"device":2,"rate_numerator":1,"rate_denominator":4,"p_ratio":16,"sample_rate":2,"fields_disabled_mask":4097}}`
+	env, err := runTestCommandWithInput(t, []string{"blackbox", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

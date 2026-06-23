@@ -169,8 +169,8 @@ func SetFilterConfig(ctx context.Context, client *connection.Client, config Filt
 }
 
 func ValidateFilterConfig(config FilterConfig) error {
-	if config.DynamicNotch.Count > 5 {
-		return fmt.Errorf("dynamic_notch.count must be 0-5")
+	if config.DynamicNotch.Count > 7 {
+		return fmt.Errorf("dynamic_notch.count must be 0-7")
 	}
 	if config.RPMFilter.FadeRangeHz > 1000 {
 		return fmt.Errorf("rpm_filter.fade_range_hz must be 0-1000")

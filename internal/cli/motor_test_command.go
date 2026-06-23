@@ -30,6 +30,7 @@ type motorTestPlan struct {
 	Stopped               bool                `json:"stopped"`
 	Preflight             *motorTestPreflight `json:"preflight,omitempty"`
 	PostStop              *motorTestPostStop  `json:"post_stop,omitempty"`
+	Audit                 *motorTestAudit     `json:"audit,omitempty"`
 	ResponseLines         map[string][]string `json:"response_lines,omitempty"`
 	RequiredConfirmations []string            `json:"required_confirmations"`
 	SafetyChecks          []safetyCheck       `json:"safety_checks"`
@@ -53,6 +54,21 @@ type motorTestPostStop struct {
 	TelemetryRPM    []uint32 `json:"telemetry_rpm,omitempty"`
 	OutputOrder     []uint8  `json:"output_order,omitempty"`
 	WarningMessages []string `json:"warning_messages,omitempty"`
+}
+
+type motorTestAudit struct {
+	Source            string   `json:"source"`
+	ReadOnlyEvidence  bool     `json:"read_only_evidence"`
+	DurationMS        int64    `json:"duration_ms"`
+	StartCommand      string   `json:"start_command"`
+	StopCommand       string   `json:"stop_command"`
+	Confirmations     []string `json:"confirmations"`
+	SafetyPassed      bool     `json:"safety_passed"`
+	PreflightCaptured bool     `json:"preflight_captured"`
+	PostStopCaptured  bool     `json:"post_stop_captured"`
+	StopAttempted     bool     `json:"stop_attempted"`
+	StopSucceeded     bool     `json:"stop_succeeded"`
+	WarningMessages   []string `json:"warning_messages,omitempty"`
 }
 
 type safetyCheck struct {
@@ -142,6 +158,7 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		} else {
 			plan.PostStop = postStop
 		}
+		plan.Audit = buildMotorTestAudit(plan, stopErr, postStopWarnings)
 		env := output.Success(commandPath(cmd), &target, map[string]any{
 			"motor_test_plan": plan,
 		})
@@ -214,6 +231,23 @@ func motorSafetyPassed(plan motorTestPlan, name string) bool {
 		}
 	}
 	return false
+}
+
+func buildMotorTestAudit(plan motorTestPlan, stopErr error, warnings []string) *motorTestAudit {
+	return &motorTestAudit{
+		Source:            "motor test apply",
+		ReadOnlyEvidence:  true,
+		DurationMS:        plan.DurationMS,
+		StartCommand:      plan.CommandPreview,
+		StopCommand:       plan.StopCommandPreview,
+		Confirmations:     append([]string(nil), plan.RequiredConfirmations...),
+		SafetyPassed:      motorSafetyPassed(plan, "props_off") && motorSafetyPassed(plan, "battery_awareness"),
+		PreflightCaptured: plan.Preflight != nil,
+		PostStopCaptured:  plan.PostStop != nil,
+		StopAttempted:     true,
+		StopSucceeded:     stopErr == nil,
+		WarningMessages:   append([]string(nil), warnings...),
+	}
 }
 
 func buildMotorTestPlan(motor, value int, duration time.Duration, propsOff, batteryAware bool) (motorTestPlan, error) {

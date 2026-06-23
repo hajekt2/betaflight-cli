@@ -1372,6 +1372,10 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 	if postStop["read_only"] != true || len(postStop["outputs"].([]any)) == 0 || len(postStop["telemetry_rpm"].([]any)) == 0 {
 		t.Fatalf("post stop = %+v", postStop)
 	}
+	audit := plan["audit"].(map[string]any)
+	if audit["safety_passed"] != true || audit["preflight_captured"] != true || audit["post_stop_captured"] != true || audit["stop_succeeded"] != true {
+		t.Fatalf("audit = %+v", audit)
+	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "motor_output" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}

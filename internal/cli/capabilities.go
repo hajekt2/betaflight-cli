@@ -330,7 +330,7 @@ func coverageGaps(domains []coverageDomain) []coverageGap {
 		{
 			Domain:     "motor-testing",
 			Reason:     "Configurator exposes richer live motor test workflows; this CLI currently provides a bounded single-motor test apply path.",
-			NextSteps:  []string{"add optional status preflight summaries", "support controlled all-motor idle tests only with stronger confirmation", "capture post-test motor outputs after stop"},
+			NextSteps:  []string{"support controlled all-motor idle tests only with stronger confirmation", "capture timing and elapsed-clock evidence", "consider optional pre- and post-test diff helpers for repeated runs"},
 			SafetyNote: "This must be dangerous by default because motors can spin.",
 		},
 		{

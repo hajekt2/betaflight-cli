@@ -174,6 +174,11 @@ When `--reboot-first` is set, a reboot command is sent first and the response in
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
 
+`serial status` returns a `serial` object decoded from `MSP2_COMMON_SERIAL_CONFIG` with legacy `MSP_CF_SERIAL_CONFIG` fallback.
+The object includes port identifiers, decoded port names, function masks, decoded functions, baudrate indexes, and decoded baudrate names.
+`serial apply-config-json` returns a `serial_config` object with the applied full-table port rows, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful serial config writes include a `serial_config` side effect.
+
 `pid status` returns a `pid` object decoded from `MSP_PID`, `MSP_PIDNAMES`, `MSP_PID_CONTROLLER`, `MSP_RC_TUNING`, and `MSP_PID_ADVANCED`.
 The object includes active PID gain triplets, PID names, controller identity, the active rate profile, advanced PID tuning fields, and source metadata for each MSP message.
 

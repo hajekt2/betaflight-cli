@@ -727,6 +727,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU32(payload, 64|2)
 		payload = append(payload, 5, 4, 0, 0)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetCFSerialConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload)%7 != 0))
 	case msp.MSPOSDConfig:
 		payload := []byte{0x31, 3, 1, 20}
 		payload = appendU16(payload, 1500)

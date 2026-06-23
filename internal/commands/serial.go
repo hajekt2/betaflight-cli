@@ -29,6 +29,14 @@ type SerialPort struct {
 	BlackboxBaudRate   string   `json:"blackbox_baudrate,omitempty"`
 }
 
+type SerialPortConfigSetResult struct {
+	Ports        []SerialPort `json:"ports"`
+	MSPCode      uint16       `json:"msp_code"`
+	MSPName      string       `json:"msp_name"`
+	Acknowledged bool         `json:"acknowledged"`
+	SaveRequired bool         `json:"save_required"`
+}
+
 func ReadSerialPortStatus(ctx context.Context, client *connection.Client) (*SerialPortStatus, []string, error) {
 	frame, err := client.Request(ctx, msp.MSP2CommonSerialConfig, nil)
 	if err == nil {
@@ -48,6 +56,33 @@ func ReadSerialPortStatus(ctx context.Context, client *connection.Client) (*Seri
 		return nil, warnings, fmt.Errorf("legacy serial config decode failed: %w", decodeErr)
 	}
 	return &SerialPortStatus{Source: "MSP_CF_SERIAL_CONFIG", Ports: ports}, warnings, nil
+}
+
+func SetSerialPortConfig(ctx context.Context, client *connection.Client, ports []SerialPort) (*SerialPortConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetCFSerialConfig, EncodeSerialPortConfigV1(ports)); err != nil {
+		return nil, fmt.Errorf("serial port config request failed: %w", err)
+	}
+	copied := make([]SerialPort, len(ports))
+	for i, port := range ports {
+		copied[i] = serialPortWithDecodedNames(port)
+	}
+	return &SerialPortConfigSetResult{
+		Ports:        copied,
+		MSPCode:      msp.MSPSetCFSerialConfig,
+		MSPName:      "MSP_SET_CF_SERIAL_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeSerialPortConfigV1(ports []SerialPort) []byte {
+	payload := make([]byte, 0, len(ports)*7)
+	for _, port := range ports {
+		payload = append(payload, port.Identifier)
+		payload = appendU16Payload(payload, uint16(port.FunctionMask))
+		payload = append(payload, port.MSPBaudRateIndex, port.GPSBaudRateIndex, port.TelemetryBaudIndex, port.BlackboxBaudIndex)
+	}
+	return payload
 }
 
 func DecodeSerialPortConfigV2(payload []byte) ([]SerialPort, error) {
@@ -146,4 +181,14 @@ func readSerialPortBauds(r *msp.PayloadReader, identifier uint8, mask uint32) (S
 		BlackboxBaudIndex:  blackboxBaud,
 		BlackboxBaudRate:   bfserial.BaudRateName(blackboxBaud),
 	}, nil
+}
+
+func serialPortWithDecodedNames(port SerialPort) SerialPort {
+	port.IdentifierName = bfserial.PortIdentifierName(port.Identifier)
+	port.Functions = bfserial.FunctionNames(port.FunctionMask)
+	port.MSPBaudRate = bfserial.BaudRateName(port.MSPBaudRateIndex)
+	port.GPSBaudRate = bfserial.BaudRateName(port.GPSBaudRateIndex)
+	port.TelemetryBaudRate = bfserial.BaudRateName(port.TelemetryBaudIndex)
+	port.BlackboxBaudRate = bfserial.BaudRateName(port.BlackboxBaudIndex)
+	return port
 }

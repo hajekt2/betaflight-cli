@@ -2,6 +2,7 @@ package cli
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -101,8 +102,64 @@ func (a *app) serialCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set)
+	cmd.AddCommand(set, a.serialApplyConfigJSONCommand())
 	return cmd
+}
+
+func (a *app) serialApplyConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "apply-config-json FILE",
+		Short: "Apply a complete serial port table from JSON through MSP_SET_CF_SERIAL_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			ports, err := parseSerialPortConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "serial port configuration changes port settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetSerialPortConfig(cmd.Context(), client, ports)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"serial_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "serial_config",
+					Command: "MSP_SET_CF_SERIAL_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseSerialPortConfigJSON(data []byte) ([]bfcommands.SerialPort, error) {
+	var ports []bfcommands.SerialPort
+	if err := json.Unmarshal(data, &ports); err != nil {
+		var wrapped struct {
+			Ports []bfcommands.SerialPort `json:"ports"`
+		}
+		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
+			return nil, err
+		}
+		ports = wrapped.Ports
+	}
+	if len(ports) == 0 {
+		return nil, fmt.Errorf("serial config must include at least one port")
+	}
+	for i, port := range ports {
+		if port.FunctionMask > 0xffff {
+			return nil, fmt.Errorf("ports[%d].function_mask exceeds legacy MSP_SET_CF_SERIAL_CONFIG maximum 65535", i)
+		}
+	}
+	return ports, nil
 }
 
 func (a *app) modesCommand() *cobra.Command {

@@ -37,3 +37,18 @@ func TestDecodeSerialPortConfigV1(t *testing.T) {
 		t.Fatalf("ports = %+v", ports)
 	}
 }
+
+func TestEncodeSerialPortConfigV1(t *testing.T) {
+	payload := EncodeSerialPortConfigV1([]SerialPort{{
+		Identifier:         51,
+		FunctionMask:       64 | 2,
+		MSPBaudRateIndex:   5,
+		GPSBaudRateIndex:   4,
+		TelemetryBaudIndex: 0,
+		BlackboxBaudIndex:  0,
+	}})
+	want := []byte{51, 66, 0, 5, 4, 0, 0}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

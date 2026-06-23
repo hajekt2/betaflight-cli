@@ -395,6 +395,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if motor3DConfig["operation"] != "write" || motor3DConfig["confirmation"] != "--yes" || motor3DConfig["requires_connection"] != true || motor3DConfig["output_root"] != "motor_3d_config" || motor3DConfig["runnable"] != true {
 		t.Fatalf("motor 3d config capability = %+v", motor3DConfig)
 	}
+	serialConfig := byCommand["betaflight-cli serial apply-config-json"]
+	if serialConfig["operation"] != "write" || serialConfig["confirmation"] != "--yes" || serialConfig["requires_connection"] != true || serialConfig["output_root"] != "serial_config" || serialConfig["runnable"] != true {
+		t.Fatalf("serial config capability = %+v", serialConfig)
+	}
 	modeRange := byCommand["betaflight-cli modes set-range"]
 	if modeRange["operation"] != "write" || modeRange["confirmation"] != "--yes" || modeRange["requires_connection"] != true || modeRange["output_root"] != "mode_range" || modeRange["runnable"] != true {
 		t.Fatalf("mode range capability = %+v", modeRange)
@@ -5123,6 +5127,55 @@ func TestSerialStatusWithFakeFC(t *testing.T) {
 	functions := second["functions"].([]any)
 	if second["identifier_name"] != "UART1" || second["function_mask"] != float64(66) || functions[0] != "GPS" || functions[1] != "RX_SERIAL" {
 		t.Fatalf("second = %+v", second)
+	}
+}
+
+func TestSerialApplyConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"ports":[{"identifier":51,"function_mask":66,"msp_baudrate_index":5,"gps_baudrate_index":4,"telemetry_baudrate_index":0,"blackbox_baudrate_index":0}]}`
+	env, err := runTestCommandWithInput(t, []string{"serial", "apply-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["serial_config"].(map[string]any)
+	ports := result["ports"].([]any)
+	first := ports[0].(map[string]any)
+	if result["save_required"] != true || first["identifier_name"] != "UART1" || first["function_mask"] != float64(66) {
+		t.Fatalf("serial_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_CF_SERIAL_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSerialApplyConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `[{"identifier":51,"function_mask":66,"msp_baudrate_index":5,"gps_baudrate_index":4,"telemetry_baudrate_index":0,"blackbox_baudrate_index":0}]`
+	env, err := runTestCommandWithInput(t, []string{"serial", "apply-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSerialApplyConfigJSONValidationBeforeConnect(t *testing.T) {
+	input := `[{"identifier":51,"function_mask":70000,"msp_baudrate_index":5,"gps_baudrate_index":4,"telemetry_baudrate_index":0,"blackbox_baudrate_index":0}]`
+	env, err := runTestCommandWithInput(t, []string{"serial", "apply-config-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

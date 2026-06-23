@@ -600,6 +600,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 9))
 	case msp.MSPTransponderConfig:
 		f.out.Write(response(frame.Code, []byte{3, 1, 6, 2, 9, 3, 1, 2, 0x12, 0x34, 0x56, 0x78, 0x9a, 0xbc, 0xde, 0xf0, 0x42}, false))
+	case msp.MSPSetTransponderConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) < 1))
 	case msp.MSPPID:
 		f.out.Write(response(frame.Code, []byte{
 			45, 80, 30,

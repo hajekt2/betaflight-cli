@@ -218,6 +218,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
 `beeper set-config` writes beeper and DShot beacon disable masks through `MSP_SET_BEEPER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `transponder config` reads IR transponder provider requirements, active provider, code bytes, hex data, and native CLI commands over MSP.
+`transponder set-config` writes the active transponder provider and data bytes through `MSP_SET_TRANSPONDER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
 `motors set-config` writes max throttle, min command, motor pole count, and DShot telemetry through `MSP_SET_MOTOR_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

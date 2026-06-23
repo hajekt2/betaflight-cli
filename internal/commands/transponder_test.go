@@ -101,3 +101,11 @@ func TestValidateTransponderData(t *testing.T) {
 		t.Fatal("ValidateTransponderData(\"bad\") error = nil, want error")
 	}
 }
+
+func TestEncodeTransponderConfig(t *testing.T) {
+	payload := EncodeTransponderConfig(2, []uint8{0x12, 0x34, 0x56})
+	want := []byte{2, 0x12, 0x34, 0x56}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

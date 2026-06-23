@@ -29,6 +29,14 @@ type TransponderProvider struct {
 	DataLength uint8  `json:"data_length"`
 }
 
+type TransponderConfigSetResult struct {
+	Config       TransponderConfig `json:"config"`
+	MSPCode      uint16            `json:"msp_code"`
+	MSPName      string            `json:"msp_name"`
+	Acknowledged bool              `json:"acknowledged"`
+	SaveRequired bool              `json:"save_required"`
+}
+
 var transponderProviderNames = []string{"NONE", "ILAP", "ARCITIMER", "ERLT"}
 
 // ValidateTransponderProviderName validates and normalizes a transponder provider.
@@ -54,6 +62,36 @@ func ReadTransponderConfig(ctx context.Context, client *connection.Client) (*Tra
 		return nil, fmt.Errorf("transponder config unavailable: %w", err)
 	}
 	return DecodeTransponderConfig(frame.Payload)
+}
+
+func SetTransponderConfig(ctx context.Context, client *connection.Client, provider uint8, data []uint8) (*TransponderConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetTransponderConfig, EncodeTransponderConfig(provider, data)); err != nil {
+		return nil, fmt.Errorf("transponder config request failed: %w", err)
+	}
+	config := TransponderConfig{
+		Source:       "MSP_SET_TRANSPONDER_CONFIG",
+		Available:    true,
+		Provider:     provider,
+		ProviderName: transponderProviderName(provider),
+		Data:         append([]uint8(nil), data...),
+		CLICommands:  []string{fmt.Sprintf("set transponder_provider = %s", transponderCLIProvider(provider))},
+	}
+	if len(data) > 0 {
+		config.DataHex = strings.ToUpper(hex.EncodeToString(data))
+		config.CLICommands = append(config.CLICommands, FormatTransponderData(data))
+	}
+	return &TransponderConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetTransponderConfig,
+		MSPName:      "MSP_SET_TRANSPONDER_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeTransponderConfig(provider uint8, data []uint8) []byte {
+	payload := []byte{provider}
+	return append(payload, data...)
 }
 
 func DecodeTransponderConfig(payload []byte) (*TransponderConfig, error) {

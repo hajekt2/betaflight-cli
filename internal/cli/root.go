@@ -674,8 +674,48 @@ func (a *app) transponderCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(setData, &setDataFlags)
-	cmd.AddCommand(setData)
+	cmd.AddCommand(setData, a.transponderSetConfigCommand())
 	return cmd
+}
+
+func (a *app) transponderSetConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config PROVIDER BYTES",
+		Short: "Set transponder provider and data over MSP",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			provider, err := parseUint8Arg("provider", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			data, err := bfcommands.ValidateTransponderData(args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if provider == 0 && len(data) != 0 {
+				return validationFailureMessage(a, cmd, "provider 0 must not include transponder data")
+			}
+			if provider != 0 && len(data) == 0 {
+				return validationFailureMessage(a, cmd, "non-zero provider requires transponder data")
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "transponder configuration changes transponder settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetTransponderConfig(cmd.Context(), client, provider, data)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"transponder_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "transponder_config",
+					Command: "MSP_SET_TRANSPONDER_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) mixerCommand() *cobra.Command {

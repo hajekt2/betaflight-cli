@@ -177,7 +177,7 @@ Flight mode records include `byte_index` and `bit_index` so modes above bit 31 r
 The object includes raw lines, parsed task rows, optional check-function stats, optional total load, parser warnings, and a `task_stats_reset` side effect because Betaflight resets max task execution statistics after printing them.
 
 `system status` returns a `system` object parsed from Betaflight's CLI `status` command.
-The object includes raw lines, parsed configuration storage usage, detected device counts, selected raw device lines, build key, uptime, runtime rates, voltage summary, arming-disable flags, and unparsed lines for firmware text drift.
+The object includes raw lines, parsed configuration storage usage, detected device counts, MCU clock/voltage/temperature, stack usage, selected raw device lines, build key, uptime, runtime rates, voltage summary, arming-disable flags, and unparsed lines for firmware text drift.
 
 `resources status` returns a `resources` object parsed from Betaflight's CLI `resource show all` command.
 The object includes raw lines, resource assignments, timer alternate-function assignments, DMA assignments, comments, and unparsed lines for firmware text drift.

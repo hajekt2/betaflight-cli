@@ -24,9 +24,13 @@ type TargetSummary struct {
 	BoardName             string `json:"board_name,omitempty"`
 	ManufacturerID        string `json:"manufacturer_id,omitempty"`
 	MCUName               string `json:"mcu_name,omitempty"`
+	MCUClockMHz           *int   `json:"mcu_clock_mhz,omitempty"`
+	MCUCoreTemperatureC   *int   `json:"mcu_core_temperature_c,omitempty"`
+	StackBytes            *int   `json:"stack_bytes,omitempty"`
 	ConfigurationState    string `json:"configuration_state,omitempty"`
 	BuildKey              string `json:"build_key,omitempty"`
 	GyroLine              string `json:"gyro_line,omitempty"`
+	ACCLine               string `json:"acc_line,omitempty"`
 	GPSLine               string `json:"gps_line,omitempty"`
 	OSDLine               string `json:"osd_line,omitempty"`
 	FlashLine             string `json:"flash_line,omitempty"`
@@ -80,10 +84,21 @@ func buildTargetSummary(firmware *FirmwareStatus, system *SystemStatus, resource
 		if system.Config != nil {
 			summary.ConfigurationState = system.Config.State
 		}
+		if system.MCU != nil {
+			if system.MCU.Name != "" {
+				summary.MCUName = system.MCU.Name
+			}
+			summary.MCUClockMHz = system.MCU.ClockMHz
+			summary.MCUCoreTemperatureC = system.MCU.CoreTemperatureC
+		}
+		if system.Stack != nil {
+			summary.StackBytes = &system.Stack.Bytes
+		}
 		if system.BuildKey != nil {
 			summary.BuildKey = system.BuildKey.Key
 		}
 		summary.GyroLine = system.GyroLine
+		summary.ACCLine = system.ACCLine
 		summary.GPSLine = system.GPSLine
 		summary.OSDLine = system.OSDLine
 		summary.FlashLine = system.FlashLine

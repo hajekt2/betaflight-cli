@@ -6,7 +6,10 @@ func TestParseSystemStatus(t *testing.T) {
 	status := ParseSystemStatus([]string{
 		"CONFIG: CONFIGURED (3820b / 16384b)",
 		"DEVICES DETECTED: SPI=2, I2C=1 (0 errors)",
+		"MCU: STM32F40X CLK=168MHz (PLLP-HSE), Vref=3.26V, Core temp=42degC",
+		"STACK: 2048b (0x1000fff0)",
 		"GYRO: (1) BMI270 enabled locked dma",
+		"ACC: ICM42688P",
 		"GPS: connected, UART1 115200 (set to AUTO), configured, version =  M10",
 		"OSD: MSP (53 x 20)",
 		"FLASH: JEDEC ID=0x00abcdef 16M",
@@ -22,6 +25,18 @@ func TestParseSystemStatus(t *testing.T) {
 	if status.Devices == nil || status.Devices.SPI == nil || *status.Devices.SPI != 2 || status.Devices.I2CErrors == nil || *status.Devices.I2CErrors != 0 {
 		t.Fatalf("devices = %+v", status.Devices)
 	}
+	if status.MCU == nil || status.MCU.Name != "STM32F40X" || status.MCU.ClockMHz == nil || *status.MCU.ClockMHz != 168 || status.MCU.ClockSource != "PLLP-HSE" {
+		t.Fatalf("mcu = %+v", status.MCU)
+	}
+	if status.MCU.Vref == nil || *status.MCU.Vref != 3.26 || status.MCU.CoreTemperatureC == nil || *status.MCU.CoreTemperatureC != 42 {
+		t.Fatalf("mcu analog = %+v", status.MCU)
+	}
+	if status.Stack == nil || status.Stack.Bytes != 2048 || status.Stack.TopHex != "0x1000fff0" {
+		t.Fatalf("stack = %+v", status.Stack)
+	}
+	if status.ACCLine != "ACC: ICM42688P" {
+		t.Fatalf("acc = %q", status.ACCLine)
+	}
 	if status.BuildKey == nil || status.BuildKey.Key != "fake-build-key" || status.BuildKey.Release != "2025.12.1" {
 		t.Fatalf("build key = %+v", status.BuildKey)
 	}
@@ -36,5 +51,8 @@ func TestParseSystemStatus(t *testing.T) {
 	}
 	if status.Arming == nil || len(status.Arming.Flags) != 2 || status.Arming.Flags[0] != "RXLOSS" {
 		t.Fatalf("arming = %+v", status.Arming)
+	}
+	if len(status.Unparsed) != 0 {
+		t.Fatalf("unparsed = %+v", status.Unparsed)
 	}
 }

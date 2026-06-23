@@ -14,7 +14,10 @@ type SystemStatus struct {
 	RawLines  []string           `json:"raw_lines"`
 	Config    *SystemConfigLine  `json:"config,omitempty"`
 	Devices   *SystemDevicesLine `json:"devices,omitempty"`
+	MCU       *SystemMCULine     `json:"mcu,omitempty"`
+	Stack     *SystemStackLine   `json:"stack,omitempty"`
 	GyroLine  string             `json:"gyro_line,omitempty"`
+	ACCLine   string             `json:"acc_line,omitempty"`
 	GPSLine   string             `json:"gps_line,omitempty"`
 	OSDLine   string             `json:"osd_line,omitempty"`
 	FlashLine string             `json:"flash_line,omitempty"`
@@ -38,6 +41,21 @@ type SystemDevicesLine struct {
 	I2C       *int   `json:"i2c,omitempty"`
 	I2CErrors *int   `json:"i2c_errors,omitempty"`
 	Raw       string `json:"raw"`
+}
+
+type SystemMCULine struct {
+	Name             string   `json:"name"`
+	ClockMHz         *int     `json:"clock_mhz,omitempty"`
+	ClockSource      string   `json:"clock_source,omitempty"`
+	Vref             *float64 `json:"vref_v,omitempty"`
+	CoreTemperatureC *int     `json:"core_temperature_c,omitempty"`
+	Raw              string   `json:"raw"`
+}
+
+type SystemStackLine struct {
+	Bytes  int    `json:"bytes"`
+	TopHex string `json:"top_hex,omitempty"`
+	Raw    string `json:"raw"`
 }
 
 type BuildKeyLine struct {
@@ -97,8 +115,22 @@ func ParseSystemStatus(lines []string) *SystemStatus {
 			}
 		case strings.HasPrefix(trimmed, "DEVICES DETECTED:"):
 			status.Devices = parseSystemDevicesLine(trimmed)
+		case strings.HasPrefix(trimmed, "MCU:"):
+			if parsed, ok := parseSystemMCULine(trimmed); ok {
+				status.MCU = parsed
+			} else {
+				status.Unparsed = append(status.Unparsed, trimmed)
+			}
+		case strings.HasPrefix(trimmed, "STACK:"):
+			if parsed, ok := parseSystemStackLine(trimmed); ok {
+				status.Stack = parsed
+			} else {
+				status.Unparsed = append(status.Unparsed, trimmed)
+			}
 		case strings.HasPrefix(trimmed, "GYRO:") || strings.HasPrefix(trimmed, "Gyro:"):
 			status.GyroLine = trimmed
+		case strings.HasPrefix(trimmed, "ACC:"):
+			status.ACCLine = trimmed
 		case strings.HasPrefix(trimmed, "GPS:"):
 			status.GPSLine = trimmed
 		case strings.HasPrefix(trimmed, "OSD:"):
@@ -185,6 +217,79 @@ func parseSystemDevicesLine(line string) *SystemDevicesLine {
 		}
 	}
 	return devices
+}
+
+func parseSystemMCULine(line string) (*SystemMCULine, bool) {
+	value := strings.TrimSpace(strings.TrimPrefix(line, "MCU:"))
+	if value == "" {
+		return nil, false
+	}
+	out := &SystemMCULine{Raw: line}
+	nameAndRest := strings.SplitN(value, " ", 2)
+	out.Name = strings.TrimSpace(nameAndRest[0])
+	if out.Name == "" {
+		return nil, false
+	}
+	if len(nameAndRest) < 2 {
+		return out, true
+	}
+	rest := strings.TrimSpace(nameAndRest[1])
+	if strings.HasPrefix(rest, "CLK=") {
+		parts := strings.SplitN(strings.TrimPrefix(rest, "CLK="), ",", 2)
+		clockPart := strings.TrimSpace(parts[0])
+		clockFields := strings.Fields(clockPart)
+		if len(clockFields) > 0 {
+			clockPart = clockFields[0]
+		}
+		if mhz, ok := parseLeadingInt(strings.TrimSuffix(clockPart, "MHz")); ok {
+			out.ClockMHz = &mhz
+		}
+		if open := strings.Index(parts[0], "("); open >= 0 && strings.Contains(parts[0][open:], ")") {
+			out.ClockSource = strings.TrimSuffix(parts[0][open+1:], ")")
+		}
+		if len(parts) > 1 {
+			parseMCUTrailingFields(parts[1], out)
+		}
+		return out, true
+	}
+	parseMCUTrailingFields(rest, out)
+	return out, true
+}
+
+func parseMCUTrailingFields(value string, out *SystemMCULine) {
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		switch {
+		case strings.HasPrefix(part, "Vref="):
+			vrefText := strings.TrimSuffix(strings.TrimPrefix(part, "Vref="), "V")
+			if vref, err := strconv.ParseFloat(strings.TrimSpace(vrefText), 64); err == nil {
+				out.Vref = &vref
+			}
+		case strings.HasPrefix(part, "Core temp="):
+			tempText := strings.TrimSuffix(strings.TrimPrefix(part, "Core temp="), "degC")
+			if temp, ok := parseLeadingInt(tempText); ok {
+				out.CoreTemperatureC = &temp
+			}
+		}
+	}
+}
+
+func parseSystemStackLine(line string) (*SystemStackLine, bool) {
+	value := strings.TrimSpace(strings.TrimPrefix(line, "STACK:"))
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return nil, false
+	}
+	bytesText := strings.TrimSuffix(fields[0], "b")
+	bytes, err := strconv.Atoi(bytesText)
+	if err != nil {
+		return nil, false
+	}
+	out := &SystemStackLine{Bytes: bytes, Raw: line}
+	if len(fields) > 1 {
+		out.TopHex = strings.Trim(fields[1], "()")
+	}
+	return out, true
 }
 
 func parseBuildKeyLine(line string) *BuildKeyLine {

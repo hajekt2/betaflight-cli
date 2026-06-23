@@ -64,6 +64,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
+		cmd.AddCommand(a.gpsSetConfigCommand())
 	}
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
@@ -231,6 +232,75 @@ func (a *app) gpsStatusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) gpsSetConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config PROVIDER SBAS_MODE AUTO_CONFIG AUTO_BAUD HOME_POINT_ONCE UBLOX_USE_GALILEO",
+		Short: "Set GPS provider and auto-configuration through MSP_SET_GPS_CONFIG",
+		Args:  cobra.ExactArgs(6),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			provider, err := parseUint8Arg("provider", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			sbasMode, err := parseUint8Arg("sbas_mode", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			autoConfig, err := parseBoolFlagArg("auto_config", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			autoBaud, err := parseBoolFlagArg("auto_baud", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			homePointOnce, err := parseBoolFlagArg("home_point_once", args[4])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			useGalileo, err := parseBoolFlagArg("ublox_use_galileo", args[5])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "GPS configuration changes flight-controller configuration; pass --yes"))
+			}
+			config := bfcommands.GPSConfig{
+				Provider:        provider,
+				SBASMode:        sbasMode,
+				AutoConfig:      autoConfig,
+				AutoBaud:        autoBaud,
+				HomePointOnce:   &homePointOnce,
+				UBloxUseGalileo: &useGalileo,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetGPSConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"gps_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "gps_config",
+					Command: "MSP_SET_GPS_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseBoolFlagArg(name, value string) (bool, error) {
+	v, err := parseUint8Arg(name, value)
+	if err != nil {
+		return false, err
+	}
+	if v > 1 {
+		return false, fmt.Errorf("%s must be 0 or 1", name)
+	}
+	return v != 0, nil
 }
 
 func (a *app) osdStatusCommand() *cobra.Command {

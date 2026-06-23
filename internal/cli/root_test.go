@@ -351,6 +351,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
 		t.Fatalf("rssi channel capability = %+v", rssiChannel)
 	}
+	gpsConfig := byCommand["betaflight-cli gps set-config"]
+	if gpsConfig["operation"] != "write" || gpsConfig["confirmation"] != "--yes" || gpsConfig["requires_connection"] != true || gpsConfig["output_root"] != "gps_config" || gpsConfig["runnable"] != true {
+		t.Fatalf("gps config capability = %+v", gpsConfig)
+	}
 	ledValues := byCommand["betaflight-cli leds set-values"]
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
 		t.Fatalf("led values capability = %+v", ledValues)
@@ -2973,6 +2977,54 @@ func TestGPSStatusWithFakeFC(t *testing.T) {
 	satellites := gps["satellites"].([]any)
 	if len(satellites) != 2 {
 		t.Fatalf("satellites = %+v", satellites)
+	}
+}
+
+func TestGPSSetConfigRejectsInvalidBoolBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"gps", "set-config", "1", "0", "2", "1", "1", "1", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestGPSSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"gps", "set-config", "1", "0", "1", "1", "1", "1"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestGPSSetConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"gps", "set-config", "1", "0", "1", "1", "1", "1", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["gps_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["provider"] != float64(1) || config["auto_config"] != true || config["ublox_use_galileo"] != true {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_GPS_CONFIG" || result["save_required"] != true {
+		t.Fatalf("gps config result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "gps_config" || env.SideEffects[0].Command != "MSP_SET_GPS_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

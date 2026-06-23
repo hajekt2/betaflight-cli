@@ -1,6 +1,9 @@
 package commands
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
 
 func TestDecodeGPSStatusParts(t *testing.T) {
 	config, err := DecodeGPSConfig([]byte{1, 0, 1, 1, 1, 1})
@@ -38,6 +41,23 @@ func TestDecodeGPSStatusParts(t *testing.T) {
 	}
 	if home.DistanceM != 342 || home.DirectionDeg != 184 || !home.Update {
 		t.Fatalf("home = %+v", home)
+	}
+}
+
+func TestEncodeGPSConfig(t *testing.T) {
+	homePointOnce := true
+	useGalileo := false
+	payload := EncodeGPSConfig(GPSConfig{
+		Provider:        1,
+		SBASMode:        2,
+		AutoConfig:      true,
+		AutoBaud:        false,
+		HomePointOnce:   &homePointOnce,
+		UBloxUseGalileo: &useGalileo,
+	})
+	want := []byte{1, 2, 1, 0, 1, 0}
+	if !bytes.Equal(payload, want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
 	}
 }
 

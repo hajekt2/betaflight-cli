@@ -26,6 +26,14 @@ type GPSConfig struct {
 	UBloxUseGalileo *bool `json:"ublox_use_galileo,omitempty"`
 }
 
+type GPSConfigSetResult struct {
+	Config       GPSConfig `json:"config"`
+	MSPCode      uint16    `json:"msp_code"`
+	MSPName      string    `json:"msp_name"`
+	Acknowledged bool      `json:"acknowledged"`
+	SaveRequired bool      `json:"save_required"`
+}
+
 type GPSPosition struct {
 	Fix              bool    `json:"fix"`
 	Satellites       uint8   `json:"satellites"`
@@ -118,6 +126,37 @@ func ReadGPSStatus(ctx context.Context, client *connection.Client) (*GPSStatus, 
 		warnings = append(warnings, err.Error())
 	}
 	return status, warnings, nil
+}
+
+func SetGPSConfig(ctx context.Context, client *connection.Client, config GPSConfig) (*GPSConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetGPSConfig, EncodeGPSConfig(config)); err != nil {
+		return nil, fmt.Errorf("gps config request failed: %w", err)
+	}
+	return &GPSConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetGPSConfig,
+		MSPName:      "MSP_SET_GPS_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeGPSConfig(config GPSConfig) []byte {
+	payload := []byte{config.Provider, config.SBASMode, boolByte(config.AutoConfig), boolByte(config.AutoBaud)}
+	if config.HomePointOnce != nil {
+		payload = append(payload, boolByte(*config.HomePointOnce))
+	}
+	if config.UBloxUseGalileo != nil {
+		payload = append(payload, boolByte(*config.UBloxUseGalileo))
+	}
+	return payload
+}
+
+func boolByte(v bool) byte {
+	if v {
+		return 1
+	}
+	return 0
 }
 
 func DecodeGPSConfig(payload []byte) (*GPSConfig, error) {

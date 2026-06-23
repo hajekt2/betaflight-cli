@@ -112,6 +112,7 @@ betaflight-cli vtx config --port /dev/tty.usbmodem01
 betaflight-cli osd list --port /dev/tty.usbmodem01
 betaflight-cli gps list --port /dev/tty.usbmodem01
 betaflight-cli gps status --port /dev/tty.usbmodem01
+betaflight-cli gps set-config 1 0 1 1 1 1 --port /dev/tty.usbmodem01 --yes
 betaflight-cli failsafe list --port /dev/tty.usbmodem01
 betaflight-cli failsafe status --port /dev/tty.usbmodem01
 betaflight-cli failsafe set-board-alignment -2 3 90 --port /dev/tty.usbmodem01 --yes
@@ -183,6 +184,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `receiver status` reads receiver configuration, channel map, RSSI channel, RX failsafe rows, and live RC channels over MSP.
 `receiver set-rssi-channel` writes the RSSI channel through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
+`gps set-config` writes provider, SBAS mode, auto-configuration, auto-baud, home-point-once, and u-blox Galileo flags through `MSP_SET_GPS_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery status` reads battery profile thresholds, runtime battery state, and voltage/current meter readings and calibration over MSP.
 `battery set-voltage-meter` writes one voltage meter calibration row through `MSP_SET_VOLTAGE_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery set-current-meter` writes one current meter calibration row through `MSP_SET_CURRENT_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

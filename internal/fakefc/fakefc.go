@@ -490,6 +490,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPGPSConfig:
 		f.out.Write(response(frame.Code, []byte{1, 0, 1, 1, 1, 1}, false))
+	case msp.MSPSetGPSConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 6))
 	case msp.MSPRawGPS:
 		payload := []byte{1, 12}
 		payload = appendS32(payload, 599123456)

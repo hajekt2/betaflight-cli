@@ -271,7 +271,9 @@ It never connects to hardware.
 `leds status` reads LED strip rows, HSV colors, mode colors, and brightness/rainbow values over MSP.
 `leds set-colors-json` writes the full LED HSV color table through `MSP_SET_LED_COLORS`, accepts either an array of colors or an object with `colors`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `leds set-mode-color` writes one LED mode color row through `MSP_SET_LED_STRIP_MODECOLOR`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`leds set-mode-color-json` writes one LED mode color row through `MSP_SET_LED_STRIP_MODECOLOR`, accepts either a mode color object or an object with `led_mode_color`, `mode_color`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `leds set-values` writes LED strip brightness, rainbow delta, and rainbow frequency through `MSP2_SET_LED_STRIP_CONFIG_VALUES`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`leds set-values-json` writes LED strip brightness, rainbow delta, and rainbow frequency through `MSP2_SET_LED_STRIP_CONFIG_VALUES`, accepts either a values object or an object with `led_values`, `values`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `servos set-json` writes servo configuration rows and servo mix rules through typed MSP row commands, accepts either a servo table object or an object with `servo_table` or `servos`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos set-config` writes one servo configuration row through `MSP_SET_SERVO_CONFIGURATION`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

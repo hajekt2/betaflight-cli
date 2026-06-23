@@ -418,8 +418,12 @@ The object includes LED layout rows, decoded CLI row syntax, HSV colors, mode co
 `leds set-colors-json` returns a `led_colors` object with the requested HSV color rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful LED color writes include a `led_colors` side effect.
 `leds set-mode-color` returns a `led_mode_color` object with mode, direction, color, MSP command name/code, acknowledgement flag, and `save_required`.
+`leds set-mode-color-json` accepts either a mode color object or an object with `led_mode_color`, `mode_color`, or `config`.
+It returns the same `led_mode_color` object as `leds set-mode-color`.
 Successful LED mode color writes include a `led_mode_color` side effect.
 `leds set-values` returns a `led_values` object with brightness, rainbow delta, rainbow frequency, MSP command name/code, acknowledgement flag, and `save_required`.
+`leds set-values-json` accepts either a values object or an object with `led_values`, `values`, or `config`.
+It returns the same `led_values` object as `leds set-values`.
 Successful LED value writes include a `led_values` side effect.
 
 `servos status` returns a `servos` object decoded from `MSP_SERVO`, `MSP_SERVO_CONFIGURATIONS`, and `MSP_SERVO_MIX_RULES`.

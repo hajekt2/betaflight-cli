@@ -227,7 +227,7 @@ func (a *app) ledsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.ledValuesCommand(), a.ledColorsJSONCommand(), a.ledModeColorCommand())
+	cmd.AddCommand(set, a.ledValuesCommand(), a.ledValuesJSONCommand(), a.ledColorsJSONCommand(), a.ledModeColorCommand(), a.ledModeColorJSONCommand())
 	return cmd
 }
 
@@ -272,6 +272,64 @@ func (a *app) ledValuesCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) ledValuesJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-values-json FILE",
+		Short: "Set LED strip brightness and rainbow values from JSON over MSP2",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			values, err := parseLEDValuesJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "LED values change configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetLEDConfigValues(cmd.Context(), client, values)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"led_values": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "led_values",
+					Command: "MSP2_SET_LED_STRIP_CONFIG_VALUES",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseLEDValuesJSON(data []byte) (bfcommands.LEDConfigValues, error) {
+	var wrapped struct {
+		LEDValues *bfcommands.LEDConfigValues `json:"led_values"`
+		Values    *bfcommands.LEDConfigValues `json:"values"`
+		Config    *bfcommands.LEDConfigValues `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.LEDConfigValues{}, err
+	}
+	switch {
+	case wrapped.LEDValues != nil:
+		return *wrapped.LEDValues, nil
+	case wrapped.Values != nil:
+		return *wrapped.Values, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var values bfcommands.LEDConfigValues
+	if err := json.Unmarshal(data, &values); err != nil {
+		return bfcommands.LEDConfigValues{}, err
+	}
+	return values, nil
 }
 
 func (a *app) ledColorsJSONCommand() *cobra.Command {
@@ -345,6 +403,64 @@ func (a *app) ledModeColorCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) ledModeColorJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-mode-color-json FILE",
+		Short: "Set one LED mode color row from JSON through MSP_SET_LED_STRIP_MODECOLOR",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			modeColor, err := parseLEDModeColorJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "LED mode color changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetLEDModeColor(cmd.Context(), client, modeColor)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"led_mode_color": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "led_mode_color",
+					Command: "MSP_SET_LED_STRIP_MODECOLOR",
+					Detail:  "LED mode color changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseLEDModeColorJSON(data []byte) (bfcommands.LEDModeColor, error) {
+	var wrapped struct {
+		LEDModeColor *bfcommands.LEDModeColor `json:"led_mode_color"`
+		ModeColor    *bfcommands.LEDModeColor `json:"mode_color"`
+		Config       *bfcommands.LEDModeColor `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.LEDModeColor{}, err
+	}
+	switch {
+	case wrapped.LEDModeColor != nil:
+		return *wrapped.LEDModeColor, nil
+	case wrapped.ModeColor != nil:
+		return *wrapped.ModeColor, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var modeColor bfcommands.LEDModeColor
+	if err := json.Unmarshal(data, &modeColor); err != nil {
+		return bfcommands.LEDModeColor{}, err
+	}
+	return modeColor, nil
 }
 
 func parseLEDColorsJSON(data []byte) ([]bfcommands.LEDColor, error) {

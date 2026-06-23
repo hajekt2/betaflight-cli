@@ -1,6 +1,13 @@
 GO ?= go
 BINARY := betaflight-cli
 BINDIR := dist
+RELEASE_ARTIFACTS := \
+	$(BINARY)-linux-amd64 \
+	$(BINARY)-linux-arm64 \
+	$(BINARY)-darwin-amd64 \
+	$(BINARY)-darwin-arm64 \
+	$(BINARY)-windows-amd64.exe \
+	$(BINARY)-windows-arm64.exe
 
 BETAFLIGHT_VERSION ?= 2025.12.0
 
@@ -12,7 +19,7 @@ build:
 	$(GO) build -o $(BINARY) ./cmd/betaflight-cli
 
 .PHONY: build-release
-build-release: clean-dist build-static checksums
+build-release: clean-dist build-static checksums verify-release-artifacts
 
 .PHONY: clean-dist
 clean-dist:
@@ -48,6 +55,46 @@ checksums:
 		shasum -a 256 $$files > SHA256SUMS; \
 	fi; \
 	echo "wrote $(BINDIR)/SHA256SUMS"
+
+.PHONY: verify-release-artifacts
+verify-release-artifacts:
+	@if [ ! -d "$(BINDIR)" ]; then \
+		echo "error: $(BINDIR) does not exist; run make build-release first"; \
+		exit 1; \
+	fi
+	@set -eu; \
+	for artifact in $(RELEASE_ARTIFACTS); do \
+		if [ ! -f "$(BINDIR)/$$artifact" ]; then \
+			echo "error: missing release artifact $(BINDIR)/$$artifact"; \
+			exit 1; \
+		fi; \
+		case "$$artifact" in \
+			*.exe) ;; \
+			*) \
+				if [ ! -x "$(BINDIR)/$$artifact" ]; then \
+					echo "error: release artifact is not executable: $(BINDIR)/$$artifact"; \
+					exit 1; \
+				fi; \
+				;; \
+		esac; \
+	done; \
+	if [ ! -f "$(BINDIR)/SHA256SUMS" ]; then \
+		echo "error: missing $(BINDIR)/SHA256SUMS"; \
+		exit 1; \
+	fi; \
+	expected_count=$$(printf '%s\n' $(RELEASE_ARTIFACTS) | wc -l | tr -d ' '); \
+	actual_count=$$(wc -l < "$(BINDIR)/SHA256SUMS" | tr -d ' '); \
+	if [ "$$actual_count" != "$$expected_count" ]; then \
+		echo "error: SHA256SUMS has $$actual_count entries, expected $$expected_count"; \
+		exit 1; \
+	fi; \
+	for artifact in $(RELEASE_ARTIFACTS); do \
+		if ! grep -Eq "[[:space:]](\\./)?$$artifact$$" "$(BINDIR)/SHA256SUMS"; then \
+			echo "error: missing checksum entry for $$artifact"; \
+			exit 1; \
+		fi; \
+	done; \
+	echo "verified $(BINDIR) release artifacts"
 
 .PHONY: test
 test:

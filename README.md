@@ -323,6 +323,7 @@ The project uses Go and Cobra and produces a single native binary for each targe
 - `make build` builds one local binary (`betaflight-cli`).
 - `make build-release` builds single-file binaries for Linux, macOS, and Windows targets.
 - `make build-static` uses `CGO_ENABLED=0` for static-friendly releases on Unix-like targets.
+- `make verify-release-artifacts` checks the expected Linux/macOS/Windows amd64/arm64 artifacts and checksum entries in `dist/`.
 
 For AI-agent-first usage, JSON is always the default output format unless `--format text` is explicitly selected.
 
@@ -415,6 +416,7 @@ Tests should include fake transports and a minimal fake Flight Controller for st
 Read-only hardware integration tests can exist, but they are secondary and opt-in.
 Release artifacts should include SHA256 checksums from day one.
 Use `make build-release` to create static release binaries in `dist/` and write `dist/SHA256SUMS`.
+The release target also runs `make verify-release-artifacts` to confirm the expected six-platform matrix and checksum manifest are present.
 Signing and provenance should be planned soon after the initial release process is working.
 The CLI should not collect telemetry or analytics.
 Diagnostics should be explicit user-controlled command output.

@@ -407,6 +407,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if advancedConfig["operation"] != "write" || advancedConfig["confirmation"] != "--yes" || advancedConfig["requires_connection"] != true || advancedConfig["output_root"] != "advanced_config" || advancedConfig["runnable"] != true {
 		t.Fatalf("advanced config capability = %+v", advancedConfig)
 	}
+	filterConfig := byCommand["betaflight-cli filters set-filter-json"]
+	if filterConfig["operation"] != "write" || filterConfig["confirmation"] != "--yes" || filterConfig["requires_connection"] != true || filterConfig["output_root"] != "filter_config" || filterConfig["runnable"] != true {
+		t.Fatalf("filter config capability = %+v", filterConfig)
+	}
 	motorConfig := byCommand["betaflight-cli motors set-config"]
 	if motorConfig["operation"] != "write" || motorConfig["confirmation"] != "--yes" || motorConfig["requires_connection"] != true || motorConfig["output_root"] != "motor_config" || motorConfig["runnable"] != true {
 		t.Fatalf("motor config capability = %+v", motorConfig)
@@ -5845,6 +5849,54 @@ func TestFiltersSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
 	input := `{"advanced_config":{"debug_mode":80,"debug_mode_count":80}}`
 	env, err := runTestCommandWithInput(t, []string{"filters", "set-advanced-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called for invalid advanced config")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestFiltersSetFilterJSONWithFakeFC(t *testing.T) {
+	input := `{"filter_config":{"legacy_gyro_lowpass_hz":90,"gyro_lpf1_static_hz":150,"gyro_lpf2_static_hz":500,"gyro_lpf1_type":0,"gyro_lpf2_type":2,"gyro_hardware_lpf":1,"gyro_32khz_hardware_lpf_deprecated":0,"gyro_soft_notch_hz_1":0,"gyro_soft_notch_cutoff_1":0,"gyro_soft_notch_hz_2":0,"gyro_soft_notch_cutoff_2":0,"dterm_lpf1_static_hz":100,"dterm_lpf2_static_hz":150,"dterm_lpf1_type":0,"dterm_lpf2_type":2,"dterm_notch_hz":0,"dterm_notch_cutoff":0,"yaw_lowpass_hz":0,"dynamic_lowpass":{"gyro_min_hz":100,"gyro_max_hz":400,"dterm_min_hz":80,"dterm_max_hz":200,"dterm_expo":5},"dynamic_notch":{"range_deprecated":0,"width_percent_deprecated":0,"q":300,"min_hz":100,"max_hz":600,"count":3},"rpm_filter":{"harmonics":3,"min_hz":100,"fade_range_hz":50,"q":500,"weights":[100,80,60]}}}`
+	env, err := runTestCommandWithInput(t, []string{"filters", "set-filter-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["filter_config"].(map[string]any)
+	config := result["filter_config"].(map[string]any)
+	if config["gyro_lpf1_static_hz"] != float64(150) || config["dterm_lpf2_type"] != float64(2) || result["save_required"] != true {
+		t.Fatalf("filter_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_FILTER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestFiltersSetFilterJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"filter_config":{"rpm_filter":{"weights":[100,80,60]}}}`
+	env, err := runTestCommandWithInput(t, []string{"filters", "set-filter-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestFiltersSetFilterJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"filter_config":{"rpm_filter":{"fade_range_hz":1001,"weights":[100,80,60]}}}`
+	env, err := runTestCommandWithInput(t, []string{"filters", "set-filter-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid filter config")
 		return nil, connection.TargetInfo{}, nil
 	})
 	if err != nil {

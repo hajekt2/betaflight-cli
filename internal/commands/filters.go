@@ -87,6 +87,14 @@ type FilterConfig struct {
 	TrailingBytesIgnored int            `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type FilterConfigSetResult struct {
+	Config       FilterConfig `json:"filter_config"`
+	MSPCode      uint16       `json:"msp_code"`
+	MSPName      string       `json:"msp_name"`
+	Acknowledged bool         `json:"acknowledged"`
+	SaveRequired bool         `json:"save_required"`
+}
+
 type DynamicLowpass struct {
 	GyroMinHz  uint16 `json:"gyro_min_hz"`
 	GyroMaxHz  uint16 `json:"gyro_max_hz"`
@@ -144,6 +152,43 @@ func SetAdvancedConfig(ctx context.Context, client *connection.Client, config Ad
 	}, nil
 }
 
+func SetFilterConfig(ctx context.Context, client *connection.Client, config FilterConfig) (*FilterConfigSetResult, error) {
+	if err := ValidateFilterConfig(config); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetFilterConfig, EncodeFilterConfig(config)); err != nil {
+		return nil, fmt.Errorf("filter config request failed: %w", err)
+	}
+	return &FilterConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetFilterConfig,
+		MSPName:      "MSP_SET_FILTER_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateFilterConfig(config FilterConfig) error {
+	if config.DynamicNotch.Count > 5 {
+		return fmt.Errorf("dynamic_notch.count must be 0-5")
+	}
+	if config.RPMFilter.FadeRangeHz > 1000 {
+		return fmt.Errorf("rpm_filter.fade_range_hz must be 0-1000")
+	}
+	if config.RPMFilter.Q != 0 && (config.RPMFilter.Q < 250 || config.RPMFilter.Q > 3000) {
+		return fmt.Errorf("rpm_filter.q must be 250-3000 or 0")
+	}
+	if len(config.RPMFilter.Weights) != 0 && len(config.RPMFilter.Weights) != 3 {
+		return fmt.Errorf("rpm_filter.weights must contain exactly 3 entries when provided")
+	}
+	for i, weight := range config.RPMFilter.Weights {
+		if weight < 0 || weight > 100 {
+			return fmt.Errorf("rpm_filter.weights[%d] must be 0-100", i)
+		}
+	}
+	return nil
+}
+
 func EncodeAdvancedConfig(config AdvancedConfig) []byte {
 	payload := []byte{
 		config.GyroSyncDenom,
@@ -163,6 +208,45 @@ func EncodeAdvancedConfig(config AdvancedConfig) []byte {
 	payload = appendU16Payload(payload, config.GyroCalibDuration)
 	payload = appendU16Payload(payload, config.GyroOffsetYaw)
 	payload = append(payload, config.GyroCheckOverflow, config.DebugMode, config.DebugModeCount)
+	return payload
+}
+
+func EncodeFilterConfig(config FilterConfig) []byte {
+	payload := []byte{config.LegacyGyroLowpassHz}
+	payload = appendU16Payload(payload, config.DtermLPF1StaticHz)
+	payload = appendU16Payload(payload, config.YawLowpassHz)
+	payload = appendU16Payload(payload, config.GyroSoftNotchHz1)
+	payload = appendU16Payload(payload, config.GyroSoftNotchCutoff1)
+	payload = appendU16Payload(payload, config.DtermNotchHz)
+	payload = appendU16Payload(payload, config.DtermNotchCutoff)
+	payload = appendU16Payload(payload, config.GyroSoftNotchHz2)
+	payload = appendU16Payload(payload, config.GyroSoftNotchCutoff2)
+	payload = append(payload, config.DtermLPF1Type, config.GyroHardwareLPF, config.Gyro32KHzHardwareLPF)
+	payload = appendU16Payload(payload, config.GyroLPF1StaticHz)
+	payload = appendU16Payload(payload, config.GyroLPF2StaticHz)
+	payload = append(payload, config.GyroLPF1Type, config.GyroLPF2Type)
+	payload = appendU16Payload(payload, config.DtermLPF2StaticHz)
+	payload = append(payload, config.DtermLPF2Type)
+	payload = appendU16Payload(payload, config.DynamicLowpass.GyroMinHz)
+	payload = appendU16Payload(payload, config.DynamicLowpass.GyroMaxHz)
+	payload = appendU16Payload(payload, config.DynamicLowpass.DtermMinHz)
+	payload = appendU16Payload(payload, config.DynamicLowpass.DtermMaxHz)
+	payload = append(payload, config.DynamicNotch.RangeDeprecated, config.DynamicNotch.WidthPercentDeprecated)
+	payload = appendU16Payload(payload, config.DynamicNotch.Q)
+	payload = appendU16Payload(payload, config.DynamicNotch.MinHz)
+	payload = append(payload, config.RPMFilter.Harmonics, config.RPMFilter.MinHz)
+	payload = appendU16Payload(payload, config.DynamicNotch.MaxHz)
+	payload = append(payload, config.DynamicLowpass.DtermExpo, config.DynamicNotch.Count)
+	payload = appendU16Payload(payload, config.RPMFilter.FadeRangeHz)
+	payload = appendU16Payload(payload, config.RPMFilter.Q)
+	weights := config.RPMFilter.Weights
+	for i := 0; i < 3; i++ {
+		weight := uint8(0)
+		if i < len(weights) {
+			weight = uint8(weights[i])
+		}
+		payload = append(payload, weight)
+	}
 	return payload
 }
 

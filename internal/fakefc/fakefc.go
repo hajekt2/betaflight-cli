@@ -635,6 +635,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 20))
 	case msp.MSPFilterConfig:
 		f.out.Write(response(frame.Code, fakeFilterConfigPayload(), false))
+	case msp.MSPSetFilterConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 56))
 	case msp.MSPMotorConfig:
 		payload := appendU16(nil, 0)
 		payload = appendU16(payload, 2000)

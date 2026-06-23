@@ -91,6 +91,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "filters" {
 		cmd.AddCommand(a.filtersStatusCommand())
 		cmd.AddCommand(a.filtersSetAdvancedJSONCommand())
+		cmd.AddCommand(a.filtersSetFilterJSONCommand())
 	}
 	if domain.use == "battery" {
 		cmd.AddCommand(a.batteryStatusCommand())
@@ -1022,6 +1023,40 @@ func (a *app) filtersSetAdvancedJSONCommand() *cobra.Command {
 	}
 }
 
+func (a *app) filtersSetFilterJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-filter-json FILE",
+		Short: "Set gyro, D-term, dynamic notch, and RPM filter config from JSON through MSP_SET_FILTER_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseFilterConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "filter changes affect flight behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetFilterConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"filter_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "filter_config",
+					Command: "MSP_SET_FILTER_CONFIG",
+					Detail:  "filter config changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
 func parseAdvancedConfigJSON(data []byte) (bfcommands.AdvancedConfig, error) {
 	var config bfcommands.AdvancedConfig
 	if err := json.Unmarshal(data, &config); err != nil {
@@ -1035,6 +1070,23 @@ func parseAdvancedConfigJSON(data []byte) (bfcommands.AdvancedConfig, error) {
 	}
 	if config.DebugModeCount != 0 && config.DebugMode >= config.DebugModeCount {
 		return bfcommands.AdvancedConfig{}, fmt.Errorf("debug_mode must be lower than debug_mode_count")
+	}
+	return config, nil
+}
+
+func parseFilterConfigJSON(data []byte) (bfcommands.FilterConfig, error) {
+	var config bfcommands.FilterConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		var wrapped struct {
+			FilterConfig bfcommands.FilterConfig `json:"filter_config"`
+		}
+		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
+			return bfcommands.FilterConfig{}, err
+		}
+		config = wrapped.FilterConfig
+	}
+	if err := bfcommands.ValidateFilterConfig(config); err != nil {
+		return bfcommands.FilterConfig{}, err
 	}
 	return config, nil
 }

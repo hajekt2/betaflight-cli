@@ -46,6 +46,29 @@ func TestDecodeFilterConfig(t *testing.T) {
 	}
 }
 
+func TestEncodeFilterConfig(t *testing.T) {
+	config, err := DecodeFilterConfig(filterConfigTestPayload())
+	if err != nil {
+		t.Fatalf("DecodeFilterConfig() error = %v", err)
+	}
+	payload := EncodeFilterConfig(*config)
+	want := filterConfigTestPayload()
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
+func TestValidateFilterConfigRejectsInvalidRPMWeight(t *testing.T) {
+	config, err := DecodeFilterConfig(filterConfigTestPayload())
+	if err != nil {
+		t.Fatalf("DecodeFilterConfig() error = %v", err)
+	}
+	config.RPMFilter.Weights[1] = 101
+	if err := ValidateFilterConfig(*config); err == nil {
+		t.Fatal("ValidateFilterConfig() error = nil, want invalid weight error")
+	}
+}
+
 func TestDecodeFilterConfigRejectsShortPayload(t *testing.T) {
 	if _, err := DecodeFilterConfig([]byte{1, 2, 3}); err == nil {
 		t.Fatal("DecodeFilterConfig() error = nil, want short payload error")

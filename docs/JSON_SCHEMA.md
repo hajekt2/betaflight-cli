@@ -53,6 +53,9 @@ Agents should not need to scrape stderr for expected failures.
 When `ok` is `false`, the process exits non-zero.
 Agents should use `errors[].code` to distinguish safe refusals from transport, parse, compatibility, or hardware failures.
 
+`doctor --probe` returns `probe_results` entries for serial-port candidates.
+Successful entries include `target`, `support`, and `metadata` objects so agents can decide whether the detected firmware is inside the compiled metadata support range before running domain commands.
+
 ## Side Effects
 
 Commands must report externally visible side effects.

@@ -991,9 +991,25 @@ func (a *app) probePorts(ctx context.Context, ports []connection.PortInfo) []map
 			"candidate": true,
 			"ok":        true,
 			"target":    target,
+			"support":   probeSupport(target),
+			"metadata":  probeMetadata(),
 		})
 	}
 	return results
+}
+
+func probeSupport(target connection.TargetInfo) bfcommands.FirmwareSupport {
+	return bfcommands.EvaluateFirmwareSupport(target.Variant, target.FirmwareVersion, target.MSPAPIVersion)
+}
+
+func probeMetadata() map[string]any {
+	registry := settings.DefaultRegistry
+	return map[string]any{
+		"settings_source_firmware": registry.SourceFirmware,
+		"settings_generated":       registry.Generated,
+		"settings_count":           len(registry.Settings),
+		"settings_source_files":    append([]string(nil), registry.SourceFiles...),
+	}
 }
 
 func toOutputTarget(target connection.TargetInfo) output.Target {

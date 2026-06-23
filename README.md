@@ -162,6 +162,7 @@ Network preset fetching is opt-in and must report source metadata.
 `doctor` should be an early read-only diagnostic command for ports, auto-detection, handshake checks, firmware support status, and platform hints.
 By default, `doctor` lists ports without opening them.
 It should only send `MSP_API_VERSION` probes when `--probe` is passed.
+When probing succeeds, `doctor --probe` returns target identity, firmware support status, and compiled settings metadata details for each responding port.
 
 ## Proposed Project Structure
 

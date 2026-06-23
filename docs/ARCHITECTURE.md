@@ -98,6 +98,7 @@ Examples include `info`, `telemetry snapshot`, `cli exec`, `settings get`, `sett
 `doctor` should be an early command because connection and platform diagnostics are core to the user experience.
 By default, `doctor` should list ports without opening them.
 `doctor --probe` may open candidates and send `MSP_API_VERSION` to test handshakes.
+Successful probe results should include the same firmware support policy and metadata baseline used by `firmware status`.
 
 Commands should operate through interfaces instead of direct serial access.
 This keeps hardware access testable and allows captured-frame tests.

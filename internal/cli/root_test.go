@@ -342,6 +342,25 @@ func TestFirmwareStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestProbeSupportAndMetadata(t *testing.T) {
+	support := probeSupport(connection.TargetInfo{
+		Variant:         "BTFL",
+		FirmwareVersion: "2025.12.1",
+		MSPAPIVersion:   "1.48",
+	})
+	if !support.Supported || support.Reason != "firmware is inside the supported metadata range" {
+		t.Fatalf("support = %+v", support)
+	}
+	metadata := probeMetadata()
+	if metadata["settings_source_firmware"] != "2025.12.0" || metadata["settings_count"].(int) < 100 {
+		t.Fatalf("metadata = %+v", metadata)
+	}
+	files := metadata["settings_source_files"].([]string)
+	if len(files) == 0 || files[0] != "src/main/cli/settings.c" {
+		t.Fatalf("settings_source_files = %+v", files)
+	}
+}
+
 func TestTextStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"text", "status"}, nil)
 	if err != nil {

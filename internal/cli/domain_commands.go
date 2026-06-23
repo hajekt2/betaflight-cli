@@ -1234,7 +1234,7 @@ func (a *app) planOrApplyCLIWithOperation(cmd *cobra.Command, lines []string, ki
 		plan["command_preview"] = lines[0]
 	}
 	if !flags.apply {
-		return a.render(output.Success(commandPath(cmd), nil, plan))
+		return a.render(output.Success(commandPath(cmd), nil, withChangePlanRoot(plan)))
 	}
 	if !a.opts.yes {
 		return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "apply requires --yes"))
@@ -1256,7 +1256,7 @@ func (a *app) planOrApplyCLIWithOperation(cmd *cobra.Command, lines []string, ki
 		}
 		plan["applied"] = true
 		plan["response_lines"] = responses
-		env := output.Success(commandPath(cmd), &target, plan)
+		env := output.Success(commandPath(cmd), &target, withChangePlanRoot(plan))
 		for _, line := range lines {
 			env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
 		}
@@ -1267,10 +1267,22 @@ func (a *app) planOrApplyCLIWithOperation(cmd *cobra.Command, lines []string, ki
 			}
 			plan["saved"] = true
 			plan["save_response_lines"] = saveLines
+			env.Data = withChangePlanRoot(plan)
 			env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
 		}
 		return env
 	})
+}
+
+func withChangePlanRoot(plan map[string]any) map[string]any {
+	out := make(map[string]any, len(plan)+1)
+	changePlan := make(map[string]any, len(plan))
+	for key, value := range plan {
+		out[key] = value
+		changePlan[key] = value
+	}
+	out["change_plan"] = changePlan
+	return out
 }
 
 func requireInts(values []string) error {

@@ -51,7 +51,7 @@ func (a *app) settingsSetJSONCommand() *cobra.Command {
 				"saved":     false,
 			}
 			if !flags.apply {
-				return a.render(output.Success(commandPath(cmd), nil, plan))
+				return a.render(output.Success(commandPath(cmd), nil, withChangePlanRoot(plan)))
 			}
 			if !a.opts.yes {
 				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "apply requires --yes"))
@@ -71,7 +71,7 @@ func (a *app) settingsSetJSONCommand() *cobra.Command {
 				}
 				plan["applied"] = true
 				plan["response_lines"] = responses
-				env := output.Success(commandPath(cmd), &target, plan)
+				env := output.Success(commandPath(cmd), &target, withChangePlanRoot(plan))
 				for _, line := range lines {
 					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
 				}
@@ -82,6 +82,7 @@ func (a *app) settingsSetJSONCommand() *cobra.Command {
 					}
 					plan["saved"] = true
 					plan["save_response_lines"] = saveLines
+					env.Data = withChangePlanRoot(plan)
 					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
 				}
 				return env

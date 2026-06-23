@@ -1078,6 +1078,48 @@ func TestReadOnlyCommandOutputRootsMatchCapabilities(t *testing.T) {
 	}
 }
 
+func TestPlanOnlyCommandOutputRootsMatchCapabilities(t *testing.T) {
+	cases := []struct {
+		command string
+		args    []string
+		input   string
+	}{
+		{command: "betaflight-cli features enable", args: []string{"features", "enable", "GPS"}},
+		{command: "betaflight-cli features set-json", args: []string{"features", "set-json", "-"}, input: `{"enable":["GPS"],"disable":["AIRMODE"]}`},
+		{command: "betaflight-cli beeper set-json", args: []string{"beeper", "set-json", "-"}, input: `{"enable":["ARMING"],"disable":["RX_LOST"]}`},
+		{command: "betaflight-cli transponder set-json", args: []string{"transponder", "set-json", "-"}, input: `{"provider":"ILAP","data":[1,2,3,4]}`},
+		{command: "betaflight-cli settings set-json", args: []string{"settings", "set-json", "-"}, input: `{"gyro_lpf1_static_hz":0}`},
+	}
+
+	roots := capabilityOutputRoots(t)
+	for _, tt := range cases {
+		t.Run(tt.command, func(t *testing.T) {
+			want := roots[tt.command]
+			if want == "" {
+				t.Fatalf("missing capability output root for %q", tt.command)
+			}
+			called := false
+			env, err := runTestCommandWithInput(t, tt.args, tt.input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+				called = true
+				return nil, connection.TargetInfo{}, nil
+			})
+			if err != nil {
+				t.Fatalf("command error = %v", err)
+			}
+			if called {
+				t.Fatalf("%s unexpectedly connected in plan-only mode", tt.command)
+			}
+			if !env.OK {
+				t.Fatalf("env.OK = false: %+v", env.Errors)
+			}
+			data := env.Data.(map[string]any)
+			if _, ok := data[want]; !ok {
+				t.Fatalf("%s data missing advertised output root %q: %+v", tt.command, want, data)
+			}
+		})
+	}
+}
+
 func TestMSPListDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"msp", "list"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

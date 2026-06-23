@@ -3002,7 +3002,7 @@ func (a *app) settingsCommand() *cobra.Command {
 				plan["metadata"] = setting
 			}
 			if !apply {
-				env := output.Success(commandPath(cmd), nil, plan)
+				env := output.Success(commandPath(cmd), nil, withChangePlanRoot(plan))
 				if !known {
 					env.Warnings = append(env.Warnings, output.Warning{Code: "metadata_missing", Message: fmt.Sprintf("no compiled metadata for %q; validation skipped", name)})
 				}
@@ -3021,7 +3021,7 @@ func (a *app) settingsCommand() *cobra.Command {
 				}
 				plan["applied"] = true
 				plan["response_lines"] = lines
-				env := output.Success(commandPath(cmd), &target, plan)
+				env := output.Success(commandPath(cmd), &target, withChangePlanRoot(plan))
 				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
 				if save {
 					saveLines, err := client.ExecCLI(cmd.Context(), "save")
@@ -3030,6 +3030,7 @@ func (a *app) settingsCommand() *cobra.Command {
 					}
 					plan["saved"] = true
 					plan["save_response_lines"] = saveLines
+					env.Data = withChangePlanRoot(plan)
 					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
 				}
 				return env

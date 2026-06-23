@@ -477,6 +477,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli rateprofiles list",
 		"betaflight-cli vtxtable list",
 		"betaflight-cli vtx config",
+		"betaflight-cli vtx list",
 		"betaflight-cli leds list",
 		"betaflight-cli leds status",
 		"betaflight-cli servos list",

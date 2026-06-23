@@ -463,7 +463,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli batch plan":                      writePlan,
 		"betaflight-cli restore plan":                    writePlan,
 		"betaflight-cli presets plan":                    writePlan,
-		"betaflight-cli presets fetch":                   writePlan,
+		"betaflight-cli presets fetch":                   {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "change_plan", Input: "remote preset URL", Tags: []string{"presets", "plan", "offline"}},
 		"betaflight-cli batch apply":                     writeApply,
 		"betaflight-cli restore apply":                   writeApply,
 		"betaflight-cli presets apply":                   writeApply,

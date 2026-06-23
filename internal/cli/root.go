@@ -79,6 +79,9 @@ func (a *app) rootCommand() *cobra.Command {
 		SilenceUsage:  true,
 		SilenceErrors: true,
 	}
+	root.SetFlagErrorFunc(func(cmd *cobra.Command, err error) error {
+		return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+	})
 	root.PersistentFlags().StringVar(&a.opts.port, "port", "", "USB serial port, such as COM3 or /dev/tty.usbmodem01")
 	root.PersistentFlags().BoolVar(&a.opts.autoPort, "auto-port", true, "auto-select a single compatible USB serial port when --port is omitted")
 	root.PersistentFlags().BoolVar(&a.opts.allowUnsupported, "allow-unsupported", false, "allow domain commands outside supported firmware metadata")

@@ -140,6 +140,30 @@ func TestRTCStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	status := data["status"].(map[string]any)
+	runtime := status["runtime"].(map[string]any)
+	if runtime["source"] != "MSP_STATUS_EX" || runtime["cycle_time_us"] != float64(250) || runtime["active_sensors"] != float64(33) {
+		t.Fatalf("runtime = %+v", runtime)
+	}
+	activeNames := status["active_sensor_names"].([]any)
+	if len(activeNames) != 2 || activeNames[0] != "accelerometer" || activeNames[1] != "gyro" {
+		t.Fatalf("active_sensor_names = %+v", activeNames)
+	}
+	arming := status["arming"].(map[string]any)
+	if arming["source"] != "MSP_STATUS_EX" {
+		t.Fatalf("arming = %+v", arming)
+	}
+}
+
 func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"info"}, nil)
 	if err != nil {

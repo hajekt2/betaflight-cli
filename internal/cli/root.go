@@ -89,6 +89,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.doctorCommand())
 	root.AddCommand(a.infoCommand())
 	root.AddCommand(a.textCommand())
+	root.AddCommand(a.statusCommand())
 	root.AddCommand(a.telemetryCommand())
 	root.AddCommand(a.debugCommand())
 	root.AddCommand(a.environmentCommand())
@@ -413,6 +414,24 @@ func (a *app) textCommand() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func (a *app) statusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "status",
+		Short: "Read compact runtime status over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				status, err := bfcommands.ReadRuntimeStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"status": status,
+				})
+			})
+		},
+	}
 }
 
 func (a *app) telemetryCommand() *cobra.Command {

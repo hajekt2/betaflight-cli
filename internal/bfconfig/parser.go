@@ -31,9 +31,9 @@ type Document struct {
 	Beeper    []Command           `json:"beeper"`
 	Beacon    []Command           `json:"beacon"`
 	Board     []Command           `json:"board"`
-	Mixer     []Command           `json:"mixer"`
-	MMix      []Command           `json:"mmix"`
-	RCMap     []Command           `json:"map"`
+	Mixer     []Mixer             `json:"mixer"`
+	MMix      []MotorMix          `json:"mmix"`
+	RCMap     []RCMap             `json:"map"`
 	Batch     []Command           `json:"batch"`
 	Defaults  []Command           `json:"defaults"`
 	Save      []Command           `json:"save"`
@@ -133,6 +133,33 @@ type DMAAssignment struct {
 	None   bool   `json:"none"`
 	Raw    string `json:"raw"`
 	Line   string `json:"line"`
+}
+
+type Mixer struct {
+	Name string   `json:"name,omitempty"`
+	Args []string `json:"args,omitempty"`
+	Raw  string   `json:"raw"`
+	Line string   `json:"line"`
+}
+
+type MotorMix struct {
+	Reset    bool     `json:"reset,omitempty"`
+	Index    *int     `json:"index,omitempty"`
+	Throttle *float64 `json:"throttle,omitempty"`
+	Roll     *float64 `json:"roll,omitempty"`
+	Pitch    *float64 `json:"pitch,omitempty"`
+	Yaw      *float64 `json:"yaw,omitempty"`
+	Args     []string `json:"args,omitempty"`
+	Raw      string   `json:"raw"`
+	Line     string   `json:"line"`
+}
+
+type RCMap struct {
+	Order    string   `json:"order,omitempty"`
+	Channels []string `json:"channels,omitempty"`
+	Args     []string `json:"args,omitempty"`
+	Raw      string   `json:"raw"`
+	Line     string   `json:"line"`
 }
 
 type Profile struct {
@@ -319,13 +346,13 @@ func classify(doc *Document, line string, fields []string, registry settings.Reg
 		doc.Board = append(doc.Board, Command{Kind: fields[0], Line: line, Args: fields[1:]})
 	case fields[0] == "mixer":
 		doc.Sections["mixer"] = append(doc.Sections["mixer"], line)
-		doc.Mixer = append(doc.Mixer, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+		doc.Mixer = append(doc.Mixer, parseMixer(line, fields))
 	case fields[0] == "mmix":
 		doc.Sections["mmix"] = append(doc.Sections["mmix"], line)
-		doc.MMix = append(doc.MMix, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+		doc.MMix = append(doc.MMix, parseMotorMix(line, fields))
 	case fields[0] == "map":
 		doc.Sections["map"] = append(doc.Sections["map"], line)
-		doc.RCMap = append(doc.RCMap, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+		doc.RCMap = append(doc.RCMap, parseRCMap(line, fields))
 	case fields[0] == "batch":
 		doc.Sections["batch"] = append(doc.Sections["batch"], line)
 		doc.Batch = append(doc.Batch, Command{Kind: fields[0], Line: line, Args: fields[1:]})
@@ -464,6 +491,58 @@ func parseDMAAssignment(line string, fields []string) DMAAssignment {
 	return assignment
 }
 
+func parseMixer(line string, fields []string) Mixer {
+	mixer := Mixer{Raw: line, Line: line}
+	if len(fields) > 1 {
+		mixer.Name = fields[1]
+		mixer.Args = fields[1:]
+	}
+	return mixer
+}
+
+func parseMotorMix(line string, fields []string) MotorMix {
+	mix := MotorMix{Raw: line, Line: line}
+	if len(fields) > 1 {
+		mix.Args = fields[1:]
+		mix.Reset = fields[1] == "reset"
+	}
+	if mix.Reset {
+		return mix
+	}
+	values := parseFloatFields(fields[1:], 5)
+	if len(fields) > 1 {
+		if n, err := strconv.Atoi(fields[1]); err == nil {
+			value := n
+			mix.Index = &value
+		}
+	}
+	if len(values) > 1 {
+		mix.Throttle = values[1]
+	}
+	if len(values) > 2 {
+		mix.Roll = values[2]
+	}
+	if len(values) > 3 {
+		mix.Pitch = values[3]
+	}
+	if len(values) > 4 {
+		mix.Yaw = values[4]
+	}
+	return mix
+}
+
+func parseRCMap(line string, fields []string) RCMap {
+	out := RCMap{Raw: line, Line: line}
+	if len(fields) > 1 {
+		out.Order = fields[1]
+		out.Args = fields[1:]
+		for _, ch := range fields[1] {
+			out.Channels = append(out.Channels, string(ch))
+		}
+	}
+	return out
+}
+
 func parseIndexedCommand(line string, fields []string) IndexedCommand {
 	out := IndexedCommand{Line: line}
 	if len(fields) > 1 {
@@ -530,6 +609,17 @@ func parseIntFields(fields []string, count int) []*int {
 	parsed := make([]*int, count)
 	for i := 0; i < len(fields) && i < len(parsed); i++ {
 		if n, err := strconv.Atoi(fields[i]); err == nil {
+			value := n
+			parsed[i] = &value
+		}
+	}
+	return parsed
+}
+
+func parseFloatFields(fields []string, count int) []*float64 {
+	parsed := make([]*float64, count)
+	for i := 0; i < len(fields) && i < len(parsed); i++ {
+		if n, err := strconv.ParseFloat(fields[i], 64); err == nil {
 			value := n
 			parsed[i] = &value
 		}

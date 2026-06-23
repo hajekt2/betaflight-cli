@@ -31,6 +31,7 @@ func TestParseDocument(t *testing.T) {
 		"dma pin B00 0",
 		"mixer QUADX",
 		"mmix reset",
+		"mmix 0 1.000 -1.000 1.000 -1.000",
 		"map AETR1234",
 		"vtxtable bands 5",
 		"vtxtable channels 8",
@@ -87,8 +88,14 @@ func TestParseDocument(t *testing.T) {
 	if len(doc.DMA) != 3 || doc.DMA[0].Scope != "ADC" || doc.DMA[0].Device != "1" || doc.DMA[0].Index != "" || doc.DMA[0].Option != "0" || doc.DMA[0].Raw != "dma ADC 1 0" || doc.DMA[1].Scope != "SPI_TX" || doc.DMA[1].Index != "" || !doc.DMA[1].None || doc.DMA[2].Scope != "pin" || doc.DMA[2].Device != "B00" || doc.DMA[2].Index != "" || doc.DMA[2].Option != "0" {
 		t.Fatalf("dma = %+v", doc.DMA)
 	}
-	if len(doc.Mixer) != 1 || len(doc.MMix) != 1 || len(doc.RCMap) != 1 {
+	if len(doc.Mixer) != 1 || doc.Mixer[0].Name != "QUADX" || doc.Mixer[0].Raw != "mixer QUADX" {
 		t.Fatalf("mixer/mmix/map = %+v/%+v/%+v", doc.Mixer, doc.MMix, doc.RCMap)
+	}
+	if len(doc.MMix) != 2 || !doc.MMix[0].Reset || doc.MMix[1].Index == nil || *doc.MMix[1].Index != 0 || doc.MMix[1].Throttle == nil || *doc.MMix[1].Throttle != 1 || doc.MMix[1].Roll == nil || *doc.MMix[1].Roll != -1 {
+		t.Fatalf("mmix = %+v", doc.MMix)
+	}
+	if len(doc.RCMap) != 1 || doc.RCMap[0].Order != "AETR1234" || len(doc.RCMap[0].Channels) != 8 || doc.RCMap[0].Channels[0] != "A" || doc.RCMap[0].Channels[7] != "4" {
+		t.Fatalf("map = %+v", doc.RCMap)
 	}
 	if len(doc.Profiles) != 2 {
 		t.Fatalf("profiles = %+v", doc.Profiles)

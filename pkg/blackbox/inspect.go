@@ -152,8 +152,9 @@ func Inspect(r io.Reader) (Inspection, error) {
 	out.DataBytes = int64(len(data) - headerEnd)
 	out.FrameMarkerCountsApprox = countFrameMarkers(data[headerEnd:])
 	out.FrameSummaryApprox = summarizeFrameCandidates(data[headerEnd:], int64(headerEnd), 200)
-	out.DecodedFrames = decodeFrames(data[headerEnd:], int64(headerEnd), out.Headers, out.FieldDefinitions, out.FrameSummaryApprox, 50)
-	out.Events = decodeEvents(data[headerEnd:], int64(headerEnd), out.FrameSummaryApprox, 50)
+	decodedCandidates := scanDecodedCandidates(data[headerEnd:], int64(headerEnd), out.Headers, out.FieldDefinitions, 256, 400)
+	out.DecodedFrames = decodeFrames(data[headerEnd:], int64(headerEnd), out.Headers, out.FieldDefinitions, decodedCandidates, 50)
+	out.Events = decodeEvents(data[headerEnd:], int64(headerEnd), decodedCandidates, 50)
 	out.Warnings = validationWarnings(out)
 	return out, nil
 }
@@ -321,6 +322,104 @@ func summarizeFrameCandidates(data []byte, headerBytes int64, maxIndex int) Fram
 		previousIndex = i
 	}
 	return summary
+}
+
+func scanDecodedCandidates(data []byte, headerBytes int64, headers map[string]string, definitions map[string]FieldDefinition, maxFrameLength int, maxIndex int) FrameSummary {
+	summary := FrameSummary{
+		ByType: map[string]FrameStat{},
+	}
+	if maxFrameLength <= 0 {
+		maxFrameLength = 256
+	}
+	ctx := newDecodeContext(headers, definitions)
+	for pos := 0; pos < len(data); {
+		candidate, nextPos, nextCtx, ok := findNextDecodedCandidate(data, pos, headerBytes, definitions, ctx, maxFrameLength)
+		if !ok {
+			pos++
+			continue
+		}
+		summary.CandidateCount++
+		if len(summary.Candidates) < maxIndex {
+			summary.Candidates = append(summary.Candidates, candidate)
+			summary.IndexedCount = len(summary.Candidates)
+		} else {
+			summary.Truncated = true
+		}
+		stat := summary.ByType[candidate.Type]
+		if stat.Count == 0 {
+			stat.FirstOffset = candidate.Offset
+		}
+		stat.Count++
+		stat.LastOffset = candidate.Offset
+		if candidate.BytesToNext > 0 {
+			if stat.MinSpan == 0 || candidate.BytesToNext < stat.MinSpan {
+				stat.MinSpan = candidate.BytesToNext
+			}
+			if candidate.BytesToNext > stat.MaxSpan {
+				stat.MaxSpan = candidate.BytesToNext
+			}
+		}
+		summary.ByType[candidate.Type] = stat
+		ctx = nextCtx
+		pos = nextPos
+	}
+	return summary
+}
+
+func findNextDecodedCandidate(data []byte, pos int, headerBytes int64, definitions map[string]FieldDefinition, ctx decodeContext, maxFrameLength int) (FrameCandidate, int, decodeContext, bool) {
+	if pos < 0 || pos >= len(data) {
+		return FrameCandidate{}, pos, ctx, false
+	}
+	frameType := string(data[pos])
+	if !isRecognizedFrameType(frameType) {
+		return FrameCandidate{}, pos, ctx, false
+	}
+	if frameType != "E" {
+		if _, ok := definitionForFrame(frameType, definitions); !ok {
+			return FrameCandidate{}, pos, ctx, false
+		}
+	}
+	maxEnd := pos + maxFrameLength + 1
+	if maxEnd > len(data) {
+		maxEnd = len(data)
+	}
+	for end := pos + 1; end <= maxEnd; end++ {
+		if end < len(data) && !isRecognizedFrameType(string(data[end])) {
+			continue
+		}
+		candidate := FrameCandidate{
+			Type:       frameType,
+			Offset:     headerBytes + int64(pos),
+			DataOffset: int64(pos),
+		}
+		if end < len(data) {
+			candidate.BytesToNext = int64(end - pos)
+		} else {
+			candidate.BytesToNext = int64(len(data) - pos)
+		}
+		payload := data[pos+1 : end]
+		nextCtx := ctx.clone()
+		if frameType == "E" {
+			if _, err := decodeEventPayload(candidate, payload); err == nil {
+				return candidate, end, nextCtx, true
+			}
+			continue
+		}
+		def, _ := definitionForFrame(frameType, definitions)
+		if _, err := decodeFramePayload(&nextCtx, frameType, candidate, payload, def); err == nil {
+			return candidate, end, nextCtx, true
+		}
+	}
+	return FrameCandidate{}, pos, ctx, false
+}
+
+func isRecognizedFrameType(frameType string) bool {
+	switch frameType {
+	case "I", "P", "G", "H", "S", "E":
+		return true
+	default:
+		return false
+	}
 }
 
 func decodeFrames(data []byte, headerBytes int64, headers map[string]string, definitions map[string]FieldDefinition, candidates FrameSummary, maxSamples int) DecodedFrameSummary {

@@ -48,6 +48,29 @@ type decodeContext struct {
 	homeHistoryValid  bool
 }
 
+func (ctx decodeContext) clone() decodeContext {
+	out := ctx
+	out.lastMain = append([]int(nil), ctx.lastMain...)
+	out.lastMain2 = append([]int(nil), ctx.lastMain2...)
+	out.lastGPSHome = append([]int(nil), ctx.lastGPSHome...)
+	out.lastSlow = append([]int(nil), ctx.lastSlow...)
+	out.lastGPS = append([]int(nil), ctx.lastGPS...)
+	out.mainNameToIndex = cloneStringIntMap(ctx.mainNameToIndex)
+	out.homeNameToIndex = cloneStringIntMap(ctx.homeNameToIndex)
+	return out
+}
+
+func cloneStringIntMap(in map[string]int) map[string]int {
+	if in == nil {
+		return nil
+	}
+	out := make(map[string]int, len(in))
+	for key, value := range in {
+		out[key] = value
+	}
+	return out
+}
+
 func newDecodeContext(headers map[string]string, definitions map[string]FieldDefinition) decodeContext {
 	return decodeContext{
 		dataVersion:     parseHeaderInt(headers, "Data version", 2),

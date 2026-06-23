@@ -125,6 +125,7 @@ All reboot commands require global `--yes` and use the dangerous operation class
 When called as `blackbox inspect --log-index N`, the response also includes `log_index`, `blackbox`, and `storage` alongside `inspection`.
 The object includes file sizes, header metadata, ordered header names, parsed field definitions, warnings, `frame_marker_counts_approx`, `frame_summary_approx`, `decoded_frames`, and `events`.
 `frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.
+The `decoded_frames` and `events` sections use a stricter decode-validated scan instead of trusting every approximate frame-marker candidate.
 `decoded_frames` is a capped best-effort sample decoder that applies common Betaflight predictors and common field encodings and reports unsupported encodings or frame types instead of guessing.
 It also includes `streams`, a per-frame-field summary with count, first, last, min, max, delta, monotonicity, and last byte offset for decoded samples.
 `decoded_frames.groups` classifies recognized stream names into typed buckets such as timing, gyro, accelerometer, motors, RC command, setpoint, PID, attitude, battery, and radio link.

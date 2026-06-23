@@ -350,6 +350,14 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 			t.Fatalf("unexpected motor-testing gap remains: %+v", gap)
 		}
 	}
+	seen := map[string]int{}
+	for _, item := range gaps {
+		gap := item.(map[string]any)
+		seen[gap["domain"].(string)]++
+	}
+	if seen["firmware-flashing"] != 1 {
+		t.Fatalf("unexpected firmware-flashing gap count: %d", seen["firmware-flashing"])
+	}
 }
 
 func TestTelemetrySnapshotWithFakeFC(t *testing.T) {

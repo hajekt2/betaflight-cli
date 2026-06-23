@@ -574,6 +574,7 @@ func (a *app) configurationCommand() *cobra.Command {
 					"raw":               strings.Join(lines, "\n"),
 					"sections":          doc.Sections,
 					"configuration":      doc,
+					"inventory":         bfconfig.BuildInventory(doc),
 					"raw_authoritative": true,
 				})
 			})
@@ -1080,15 +1081,15 @@ func (a *app) settingsCommand() *cobra.Command {
 					return a.failure(commandPath(cmd), &target, err)
 				}
 				doc := bfconfig.Parse(lines, settings.DefaultRegistry)
-				envData := map[string]any{
-					"command":          "diff all",
-					"lines":            lines,
-					"raw":              strings.Join(lines, "\n"),
-					"sections":         doc.Sections,
-					"configuration":    doc,
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"command":           "diff all",
+					"lines":             lines,
+					"raw":               strings.Join(lines, "\n"),
+					"sections":          doc.Sections,
+					"configuration":      doc,
+					"inventory":         bfconfig.BuildInventory(doc),
 					"raw_authoritative": true,
-				}
-				return output.Success(commandPath(cmd), &target, envData)
+				})
 			})
 		},
 	})

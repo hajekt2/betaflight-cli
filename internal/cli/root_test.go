@@ -921,6 +921,10 @@ func TestSettingsDiffIncludesConfiguration(t *testing.T) {
 	if len(configuration["settings"].([]any)) != 1 {
 		t.Fatalf("configuration = %+v", configuration)
 	}
+	inventory := data["inventory"].(map[string]any)
+	if inventory["settings"].(float64) != 1 {
+		t.Fatalf("inventory = %+v", inventory)
+	}
 }
 
 func TestBackupCreateIncludesConfiguration(t *testing.T) {
@@ -961,6 +965,10 @@ func TestConfigurationDiffCommandIncludesParsedSettings(t *testing.T) {
 	configuration := data["configuration"].(map[string]any)
 	if len(configuration["settings"].([]any)) < 1 {
 		t.Fatalf("configuration = %+v", configuration)
+	}
+	inventory := data["inventory"].(map[string]any)
+	if inventory["settings"].(float64) < 1 {
+		t.Fatalf("inventory = %+v", inventory)
 	}
 }
 

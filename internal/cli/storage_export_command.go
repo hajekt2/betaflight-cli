@@ -46,6 +46,7 @@ type dataflashExportOptions struct {
 type blackboxExport struct {
 	Kind          string                  `json:"kind"`
 	Path          string                  `json:"path"`
+	LogIndex      *int                    `json:"log_index,omitempty"`
 	ExportedBytes uint32                  `json:"exported_bytes"`
 	Completed     bool                    `json:"completed"`
 	Inspection    *pkgblackbox.Inspection `json:"inspection,omitempty"`
@@ -115,6 +116,7 @@ func (a *app) blackboxExportCommand() *cobra.Command {
 	opts := dataflashExportOptions{
 		BlockSize: defaultDataflashBlockSize,
 	}
+	var logIndex int
 	cmd := &cobra.Command{
 		Use:   "export FILE",
 		Short: "Export onboard Blackbox data to a local file and inspect it",
@@ -129,7 +131,7 @@ func (a *app) blackboxExportCommand() *cobra.Command {
 				if err != nil {
 					return a.failure(commandPath(cmd), &target, err)
 				}
-				export, warnings, exportEnv := a.performDataflashExport(cmd, client, &target, opts)
+				export, warnings, exportEnv := a.performBlackboxExport(cmd, client, &target, config, opts, logIndex)
 				if exportEnv != nil {
 					return *exportEnv
 				}
@@ -150,6 +152,9 @@ func (a *app) blackboxExportCommand() *cobra.Command {
 					Inspection:    &inspection,
 					Dataflash:     export,
 				}
+				if logIndex >= 0 {
+					result.LogIndex = &logIndex
+				}
 				env := output.Success(commandPath(cmd), &target, map[string]any{
 					"blackbox_export": result,
 					"blackbox":        config,
@@ -169,6 +174,7 @@ func (a *app) blackboxExportCommand() *cobra.Command {
 	cmd.Flags().Uint32Var(&opts.Size, "size", 0, "number of bytes to export, defaulting to used bytes from offset")
 	cmd.Flags().Uint16Var(&opts.BlockSize, "block-size", defaultDataflashBlockSize, "requested MSP_DATAFLASH_READ block size")
 	cmd.Flags().BoolVar(&opts.Force, "force", false, "overwrite the output file if it already exists")
+	cmd.Flags().IntVar(&logIndex, "log-index", -1, "export one detected onboard Blackbox log by zero-based index")
 	return cmd
 }
 
@@ -267,6 +273,36 @@ func (a *app) performDataflashExport(cmd *cobra.Command, client *connection.Clie
 	if env != nil {
 		return dataflashExport{}, nil, env
 	}
+	return a.writeDataflashExport(cmd, target, opts, storage, warnings, data)
+}
+
+func (a *app) performBlackboxExport(cmd *cobra.Command, client *connection.Client, target *output.Target, _ *bfcommands.BlackboxConfig, opts dataflashExportOptions, logIndex int) (dataflashExport, []string, *output.Envelope) {
+	data, storage, warnings, env := a.readDataflashBytes(cmd, client, target, opts)
+	if env != nil {
+		return dataflashExport{}, nil, env
+	}
+	if logIndex < 0 {
+		return a.writeDataflashExport(cmd, target, opts, storage, warnings, data)
+	}
+	logs, err := pkgblackbox.ListLogs(bytes.NewReader(data))
+	if err != nil {
+		failure := output.Failure(commandPath(cmd), target, "blackbox_parse_error", err.Error())
+		return dataflashExport{}, nil, &failure
+	}
+	if logIndex >= len(logs) {
+		failure := output.Failure(commandPath(cmd), target, "validation_error", fmt.Sprintf("--log-index %d is out of range for %d detected log(s)", logIndex, len(logs)))
+		return dataflashExport{}, nil, &failure
+	}
+	selected := logs[logIndex]
+	start := int(selected.OffsetBytes)
+	end := start + int(selected.SizeBytes)
+	exportOpts := opts
+	exportOpts.Offset = opts.Offset + uint32(start)
+	exportOpts.Size = uint32(selected.SizeBytes)
+	return a.writeDataflashExport(cmd, target, exportOpts, storage, warnings, data[start:end])
+}
+
+func (a *app) writeDataflashExport(cmd *cobra.Command, target *output.Target, opts dataflashExportOptions, storage *bfcommands.StorageStatus, warnings []string, data []byte) (dataflashExport, []string, *output.Envelope) {
 	export := dataflashExport{
 		Kind:      "dataflash_export",
 		Path:      opts.Path,

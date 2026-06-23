@@ -145,7 +145,7 @@ The `legacy_name` field is decoded from deprecated `MSP_NAME` for compatibility 
 `blackbox config` returns a `blackbox` object decoded from `MSP_BLACKBOX_CONFIG`.
 The object includes support status, device index and name, rate fields, optional sample-rate metadata, and optional enabled or disabled Blackbox field selections when the firmware supplies the mask.
 `blackbox list` returns a `blackbox_logs` object with scan bounds, byte count, storage snapshot, Blackbox config, detected log count, and per-log inspection summaries.
-`blackbox export FILE` returns a `blackbox_export` object with the local path, exported byte count, completion state, nested `dataflash_export` metadata, and parsed `inspection` output for the written log.
+`blackbox export FILE` returns a `blackbox_export` object with the local path, optional `log_index`, exported byte count, completion state, nested `dataflash_export` metadata, and parsed `inspection` output for the written log.
 
 `storage status` returns a `storage` object decoded from `MSP_DATAFLASH_SUMMARY` and `MSP_SDCARD_SUMMARY`.
 The object includes Dataflash support and readiness flags, sector count, total/used/free byte counts, SD card support, state ID/name, last filesystem error, and free/total kilobytes.

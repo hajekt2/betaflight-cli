@@ -1049,6 +1049,44 @@ func TestBlackboxExportWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestBlackboxExportByLogIndexWithFakeFC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "selected.bbl")
+	env, err := runTestCommand(t, []string{"blackbox", "export", path, "--size", "512", "--log-index", "0"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	export := data["blackbox_export"].(map[string]any)
+	if export["log_index"] != float64(0) || export["exported_bytes"].(float64) == 0 {
+		t.Fatalf("export = %+v", export)
+	}
+	inspection := data["inspection"].(map[string]any)
+	if inspection["product"] == "" {
+		t.Fatalf("inspection = %+v", inspection)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if !strings.HasPrefix(string(content), "H Product:Blackbox") {
+		t.Fatalf("content = %q", string(content))
+	}
+}
+
+func TestBlackboxExportRejectsOutOfRangeLogIndex(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing.bbl")
+	env, err := runTestCommand(t, []string{"blackbox", "export", path, "--size", "512", "--log-index", "99"}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestBlackboxExportRequiresForceToOverwrite(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "exported.bbl")
 	if err := os.WriteFile(path, []byte("existing"), 0o600); err != nil {

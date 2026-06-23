@@ -58,6 +58,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "vtx" {
 		cmd.AddCommand(a.vtxConfigCommand())
 		cmd.AddCommand(a.vtxSetConfigCommand())
+		cmd.AddCommand(a.vtxSetConfigJSONCommand())
 	}
 	if domain.use == "receiver" {
 		cmd.AddCommand(a.receiverStatusCommand())
@@ -363,6 +364,64 @@ func (a *app) vtxSetConfigCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) vtxSetConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set VTX band, channel, power, pit mode, and frequencies from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseVTXConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "VTX configuration can change RF output; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVTXConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtx_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "vtx_config",
+					Command: "MSP_SET_VTX_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseVTXConfigJSON(data []byte) (bfcommands.VTXConfigSetConfig, error) {
+	var wrapped struct {
+		VTXConfig *bfcommands.VTXConfigSetConfig `json:"vtx_config"`
+		VTX       *bfcommands.VTXConfigSetConfig `json:"vtx"`
+		Config    *bfcommands.VTXConfigSetConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.VTXConfigSetConfig{}, err
+	}
+	switch {
+	case wrapped.VTXConfig != nil:
+		return *wrapped.VTXConfig, nil
+	case wrapped.VTX != nil:
+		return *wrapped.VTX, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.VTXConfigSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.VTXConfigSetConfig{}, err
+	}
+	return config, nil
 }
 
 func vtxSettingMatch() func(settings.Metadata) bool {

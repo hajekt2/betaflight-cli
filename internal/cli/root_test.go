@@ -611,6 +611,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if vtxConfig["operation"] != "write" || vtxConfig["confirmation"] != "--yes" || vtxConfig["requires_connection"] != true || vtxConfig["output_root"] != "vtx_config" || vtxConfig["runnable"] != true {
 		t.Fatalf("vtx config capability = %+v", vtxConfig)
 	}
+	vtxConfigJSON := byCommand["betaflight-cli vtx set-config-json"]
+	if vtxConfigJSON["operation"] != "write" || vtxConfigJSON["confirmation"] != "--yes" || vtxConfigJSON["requires_connection"] != true || vtxConfigJSON["output_root"] != "vtx_config" || vtxConfigJSON["input"] == "" || vtxConfigJSON["runnable"] != true {
+		t.Fatalf("vtx config json capability = %+v", vtxConfigJSON)
+	}
 	osdCanvas := byCommand["betaflight-cli osd set-canvas"]
 	if osdCanvas["operation"] != "write" || osdCanvas["confirmation"] != "--yes" || osdCanvas["requires_connection"] != true || osdCanvas["output_root"] != "osd_canvas" || osdCanvas["runnable"] != true {
 		t.Fatalf("osd canvas capability = %+v", osdCanvas)
@@ -3130,8 +3134,42 @@ func TestVTXSetConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestVTXSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"vtx_config":{"band":5,"channel":8,"power":2,"pit_mode":true,"frequency_mhz":5861,"low_power_disarm":2,"pit_mode_frequency_mhz":5662}}`
+	env, err := runTestCommandWithInput(t, []string{"vtx", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["vtx_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["band"] != float64(5) || config["pit_mode"] != true || config["frequency_mhz"] != float64(5861) || result["save_required"] != true {
+		t.Fatalf("vtx_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "vtx_config" || env.SideEffects[0].Command != "MSP_SET_VTX_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestVTXSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtx", "set-config", "5", "8", "2", "true", "5861", "2", "5662"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestVTXSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"config":{"band":5,"channel":8,"power":2,"pit_mode":true,"frequency_mhz":5861,"low_power_disarm":2,"pit_mode_frequency_mhz":5662}}`
+	env, err := runTestCommandWithInput(t, []string{"vtx", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})

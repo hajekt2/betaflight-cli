@@ -20,12 +20,28 @@ func TestEvaluateFirmwareSupport(t *testing.T) {
 			reason:    "firmware is inside the supported metadata range",
 		},
 		{
+			name:      "supported 2025.12 release candidate",
+			variant:   "BTFL",
+			version:   "2025.12.0-rc.1",
+			api:       "1.48",
+			supported: true,
+			reason:    "firmware is inside the supported metadata range",
+		},
+		{
 			name:      "supported later calver",
 			variant:   "BTFL",
 			version:   "2026.1.0",
 			api:       "1.49",
 			supported: true,
 			reason:    "firmware is inside the supported metadata range",
+		},
+		{
+			name:      "unsupported old calver",
+			variant:   "BTFL",
+			version:   "2025.11.3",
+			api:       "1.47",
+			supported: false,
+			reason:    "firmware is outside the supported metadata range",
 		},
 		{
 			name:    "old firmware",

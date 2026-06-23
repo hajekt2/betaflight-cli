@@ -2,8 +2,10 @@ package commands
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
@@ -169,17 +171,36 @@ func EvaluateFirmwareSupport(variant, firmwareVersion, apiVersion string) Firmwa
 }
 
 func isSupportedFirmwareVersion(version string) bool {
-	if strings.HasPrefix(version, "2025.12.") {
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	year, err := parseLeadingInt(parts[0])
+	if err != nil || year < 2025 {
+		return false
+	}
+	if year > 2025 {
 		return true
 	}
-	year, ok := leadingYear(version)
-	return ok && year >= 2026
+	month, err := parseLeadingInt(parts[1])
+	return err == nil && month >= 12
 }
 
-func leadingYear(version string) (int, bool) {
-	if len(version) < 4 {
-		return 0, false
+func parseLeadingInt(raw string) (int, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return 0, fmt.Errorf("empty version component")
 	}
-	year, err := strconv.Atoi(version[:4])
-	return year, err == nil
+	digits := make([]rune, 0, len(raw))
+	for _, ch := range raw {
+		if unicode.IsDigit(ch) {
+			digits = append(digits, ch)
+			continue
+		}
+		break
+	}
+	if len(digits) == 0 {
+		return 0, fmt.Errorf("no digits in %q", raw)
+	}
+	return strconv.Atoi(string(digits))
 }

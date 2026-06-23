@@ -45,6 +45,22 @@ func TestClassifyCLI(t *testing.T) {
 	}
 }
 
+func TestIsKnownCLICommand(t *testing.T) {
+	tests := map[string]bool{
+		"set foo = 1":        true,
+		"resource serialrx 1": true,
+		"help":               true,
+		"impossible line":    false,
+		"":                   false,
+		"   ":                false,
+	}
+	for line, want := range tests {
+		if got := isKnownCLICommand(line); got != want {
+			t.Fatalf("isKnownCLICommand(%q) = %v, want %v", line, got, want)
+		}
+	}
+}
+
 func TestIsBatchAllowed(t *testing.T) {
 	tests := map[string]bool{
 		"set foo = 1":        true,
@@ -3104,6 +3120,16 @@ func TestBatchPlanRejectsDangerousLine(t *testing.T) {
 		t.Fatal("command error = nil, want non-zero exit")
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "dangerous_action_blocked" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
+func TestBatchPlanRejectsUnknownWriteLine(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"batch", "plan"}, "impossible 1 2 3\n", nil)
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("unexpected envelope: %+v", env)
 	}
 }

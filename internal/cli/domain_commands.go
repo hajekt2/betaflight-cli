@@ -373,6 +373,9 @@ func (a *app) validateChangePlan(cmd *cobra.Command, plan batch.Plan, opts planV
 			continue
 		}
 		class := classifyCLI(line)
+		if !isKnownCLICommand(line) {
+			return output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("%q is unknown and cannot be planned", line)), false
+		}
 		if class == cliReadOnly {
 			return output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("%q is read-only and does not belong in a change batch", line)), false
 		}

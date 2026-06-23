@@ -76,6 +76,19 @@ func classifyCLI(command string) cliClass {
 	return cliWrite
 }
 
+func isKnownCLICommand(command string) bool {
+	fields := tokenizeCLI(command)
+	if len(fields) == 0 {
+		return false
+	}
+	first := fields[0]
+	if first == "resource" {
+		return true
+	}
+	_, ok := cliCommandPolicies[first]
+	return ok
+}
+
 func isBatchAllowed(line string) bool {
 	fields := tokenizeCLI(line)
 	if len(fields) == 0 {

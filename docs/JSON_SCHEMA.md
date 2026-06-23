@@ -58,6 +58,7 @@ Successful entries include `target`, `support`, and `metadata` objects so agents
 `schema` returns a stable machine-readable contract object with:
 
 - the shared envelope fields and envelope version
+- a draft 2020-12 JSON Schema object in `envelope_json_schema` for validating the top-level response envelope
 - command-contract metadata, including total/runnable/connection-using command counts, operation count map, and operation catalog
 - the canonical output roots exposed by current commands
 - a curated coverage summary with implemented / partial domain counts and next parity gaps.

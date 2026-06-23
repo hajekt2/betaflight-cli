@@ -802,6 +802,21 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 	if schemaVersion["envelope"] != output.SchemaVersion {
 		t.Fatalf("schema_version = %+v", schemaVersion)
 	}
+	envelopeJSONSchema := data["envelope_json_schema"].(map[string]any)
+	if envelopeJSONSchema["$schema"] != "https://json-schema.org/draft/2020-12/schema" {
+		t.Fatalf("envelope_json_schema = %+v", envelopeJSONSchema)
+	}
+	properties := envelopeJSONSchema["properties"].(map[string]any)
+	schemaVersionProperty := properties["schema_version"].(map[string]any)
+	if schemaVersionProperty["const"] != output.SchemaVersion {
+		t.Fatalf("envelope_json_schema schema_version = %+v", schemaVersionProperty)
+	}
+	required := envelopeJSONSchema["required"].([]any)
+	for _, field := range []string{"schema_version", "ok", "command", "data", "warnings", "errors", "side_effects"} {
+		if !containsAnyString(required, field) {
+			t.Fatalf("envelope_json_schema required = %+v, missing %q", required, field)
+		}
+	}
 	contract := data["command_contracts"].(map[string]any)
 	if contract["total_commands"] == nil {
 		t.Fatalf("command_contracts = %+v", contract)

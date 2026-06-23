@@ -3,6 +3,7 @@ package batch
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"strings"
 )
 
@@ -27,42 +28,131 @@ func ImportCLI(data []byte, opts ImportOptions) (ImportResult, error) {
 	if len(trimmed) == 0 {
 		return ImportResult{}, errEmptyPlan()
 	}
+	if trimmed[0] == '{' {
+		var raw map[string]any
+		if err := json.Unmarshal(trimmed, &raw); err == nil {
+			if v, ok := raw["kind"].(string); ok && opts.Kind == "" {
+				opts.Kind = v
+			}
+			if v, ok := raw["source_format"].(string); ok && opts.SourceFormat == "" {
+				opts.SourceFormat = v
+			}
+		}
+	}
 	if opts.Kind == "" {
 		opts.Kind = "cli_import"
 	}
 	if opts.SourceFormat == "" {
 		opts.SourceFormat = "cli_text"
 	}
-	var lines []string
-	var skipped []SkippedLine
-	scanner := bufio.NewScanner(bytes.NewReader(trimmed))
-	for scanner.Scan() {
-		raw := strings.TrimSpace(scanner.Text())
-		if raw == "" {
-			continue
-		}
-		line, ok, reason := normalizeImportLine(raw, opts.IncludeDefaults)
-		if !ok {
-			skipped = append(skipped, SkippedLine{Line: raw, Reason: reason})
-			continue
-		}
-		lines = append(lines, line)
-	}
-	if err := scanner.Err(); err != nil {
+	rawLines, sourceFormat := splitImportLines(trimmed)
+	lines, skipped := normalizeImportLines(rawLines, opts.IncludeDefaults)
+	if err := checkPlanHasLines(lines); err != nil {
 		return ImportResult{}, err
-	}
-	if len(lines) == 0 {
-		return ImportResult{}, errNoLines()
 	}
 	return ImportResult{
 		Plan: Plan{
 			SchemaVersion: SchemaVersion,
 			Kind:          opts.Kind,
 			CLILines:      lines,
-			SourceFormat:  opts.SourceFormat,
+			SourceFormat:  sourceOrDefault(opts.SourceFormat, sourceFormat),
 		},
 		Skipped: skipped,
 	}, nil
+}
+
+func splitImportLines(raw []byte) ([]string, string) {
+	trimmed := bytes.TrimSpace(raw)
+	if len(trimmed) > 0 && trimmed[0] == '{' {
+		if lines := importLinesFromJSON(trimmed); len(lines) > 0 {
+			return lines, "json"
+		}
+	}
+	scanner := bufio.NewScanner(bytes.NewReader(trimmed))
+	var out []string
+	for scanner.Scan() {
+		rawLine := strings.TrimSpace(scanner.Text())
+		if rawLine == "" {
+			continue
+		}
+		out = append(out, rawLine)
+	}
+	return out, "cli_text"
+}
+
+func importLinesFromJSON(raw []byte) []string {
+	var rawMap map[string]any
+	if err := json.Unmarshal(raw, &rawMap); err != nil {
+		return nil
+	}
+	if lines, ok := normalizedLinesFromJSONMap(rawMap); ok {
+		return lines
+	}
+	if nested, ok := rawMap["data"].(map[string]any); ok {
+		if lines, ok := normalizedLinesFromJSONMap(nested); ok {
+			return lines
+		}
+	}
+	return nil
+}
+
+func normalizedLinesFromJSONMap(payload map[string]any) ([]string, bool) {
+	if lines, ok := payload["cli_lines"].([]any); ok {
+		return stringSliceOrEmpty(lines)
+	}
+	if lines, ok := payload["lines"].([]any); ok {
+		return stringSliceOrEmpty(lines)
+	}
+	if raw, ok := payload["raw"].(string); ok {
+		return cleanRawJSONLines(raw), true
+	}
+	return nil, false
+}
+
+func stringSliceOrEmpty(lines []any) ([]string, bool) {
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if text, ok := line.(string); ok {
+			out = append(out, strings.TrimSpace(text))
+		}
+	}
+	return out, len(out) > 0
+}
+
+func cleanRawJSONLines(raw string) []string {
+	parts := strings.Split(strings.TrimSpace(raw), "\n")
+	out := make([]string, 0, len(parts))
+	for _, part := range parts {
+		line := strings.TrimSpace(part)
+		if line != "" {
+			out = append(out, line)
+		}
+	}
+	return out
+}
+
+func normalizeImportLines(rawLines []string, includeDefaults bool) ([]string, []SkippedLine) {
+	var lines []string
+	var skipped []SkippedLine
+	for _, raw := range rawLines {
+		if raw == "" {
+			continue
+		}
+		line, ok, reason := normalizeImportLine(raw, includeDefaults)
+		if !ok {
+			skipped = append(skipped, SkippedLine{Line: raw, Reason: reason})
+			continue
+		}
+		lines = append(lines, line)
+	}
+	return lines, skipped
+}
+
+func checkPlanHasLines(lines []string) error {
+	if len(lines) == 0 {
+		return errNoLines()
+	}
+	return nil
 }
 
 func normalizeImportLine(line string, includeDefaults bool) (string, bool, string) {
@@ -113,4 +203,10 @@ type parseError struct {
 
 func (e *parseError) Error() string {
 	return e.message
+}
+func sourceOrDefault(explicit, detected string) string {
+	if explicit != "" {
+		return explicit
+	}
+	return detected
 }

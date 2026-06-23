@@ -457,6 +457,24 @@ func TestConfigurationPlanWithoutConnection(t *testing.T) {
 	}
 }
 
+func TestConfigurationPlanAcceptsJSON(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"configuration", "plan", "--file", "-"}, `{"data":{"lines":["feature GPS","set gyro_lpf1_static_hz = 0"]}}`, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["source_format"] != "json" || data["kind"] != "configuration" {
+		t.Fatalf("plan = %+v", data)
+	}
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "feature GPS" || lines[1] != "set gyro_lpf1_static_hz = 0" {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
 func TestConfigurationPlanSkipsUnsupportedLines(t *testing.T) {
 	env, err := runTestCommandWithInput(t, []string{"configuration", "plan", "--include-defaults"}, "# version\nbatch start\ndefaults nosave\nfeature GPS\nset gyro_lpf1_static_hz = 0\nsave\nbatch end\n", nil)
 	if err != nil {
@@ -2989,6 +3007,28 @@ func TestRestorePlanCanIncludeDefaultsNoSave(t *testing.T) {
 	data := env.Data.(map[string]any)
 	lines := data["cli_lines"].([]any)
 	if len(lines) != 2 || lines[0] != "defaults nosave" || data["include_defaults"] != true {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
+func TestRestorePlanAcceptsJSONNoConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"restore", "plan"}, `{"data":{"raw":"# version\nbatch start\ndefaults nosave\nfeature GPS\nsave\nbatch end\n"}}`, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for restore plan")
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if len(lines) != 1 || lines[0] != "feature GPS" {
 		t.Fatalf("plan = %+v", data)
 	}
 }

@@ -468,6 +468,29 @@ func TestBeeperConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestTransponderConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"transponder", "config"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	transponder := data["transponder"].(map[string]any)
+	if transponder["source"] != "MSP_TRANSPONDER_CONFIG" || transponder["provider_name"] != "ARCITIMER" || transponder["data_hex"] != "123456789ABCDEF042" {
+		t.Fatalf("transponder = %+v", transponder)
+	}
+	providers := transponder["providers"].([]any)
+	if len(providers) != 3 || providers[1].(map[string]any)["data_length"] != float64(9) {
+		t.Fatalf("providers = %+v", providers)
+	}
+	commands := transponder["cli_commands"].([]any)
+	if len(commands) != 2 || commands[0] != "set transponder_provider = ARCITIMER" {
+		t.Fatalf("cli_commands = %+v", commands)
+	}
+}
+
 func TestMixerStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"mixer", "status"}, nil)
 	if err != nil {

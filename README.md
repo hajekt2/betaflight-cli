@@ -137,6 +137,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `filters status` reads loop timing, motor protocol, gyro, D-term, dynamic notch, and RPM filter configuration over MSP.
 `sensors status` reads configured sensor hardware, active sensor hardware, active gyro hardware, raw IMU data, sensor alignment, active sensor flags, and compass declination over MSP.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
+`transponder config` reads IR transponder provider requirements, active provider, code bytes, hex data, and native CLI commands over MSP.
 `mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.

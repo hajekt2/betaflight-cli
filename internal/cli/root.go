@@ -97,6 +97,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.blackboxCommand())
 	root.AddCommand(a.sensorsCommand())
 	root.AddCommand(a.beeperCommand())
+	root.AddCommand(a.transponderCommand())
 	root.AddCommand(a.mixerCommand())
 	root.AddCommand(a.motorsCommand())
 	root.AddCommand(a.settingsCommand())
@@ -228,6 +229,26 @@ func (a *app) beeperCommand() *cobra.Command {
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"beeper": beeper,
+				})
+			})
+		},
+	})
+	return cmd
+}
+
+func (a *app) transponderCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "transponder", Short: "Inspect IR transponder configuration"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "config",
+		Short: "Read transponder provider and code data over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				transponder, err := bfcommands.ReadTransponderConfig(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"transponder": transponder,
 				})
 			})
 		},

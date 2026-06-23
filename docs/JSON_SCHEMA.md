@@ -166,6 +166,9 @@ The object includes configured hardware IDs, active hardware IDs, active gyro ha
 `beeper config` returns a `beeper` object decoded from `MSP_BEEPER_CONFIG`.
 The object includes raw disable masks, decoded disabled beeper condition names, DShot beacon tone, and decoded DShot beacon disabled condition names.
 
+`transponder config` returns a `transponder` object decoded from `MSP_TRANSPONDER_CONFIG`.
+The object includes provider requirements, the active provider ID and name, configured code bytes, uppercase hex data, native CLI commands, and decode warnings for unexpected disabled-provider data.
+
 `mixer status` returns a `mixer` object decoded from `MSP_MIXER_CONFIG`.
 The object includes the mixer mode ID, CLI mixer name, display name, expected motor count, servo usage, motor direction reversal state, native CLI commands for the same values, and a mixer catalog.
 

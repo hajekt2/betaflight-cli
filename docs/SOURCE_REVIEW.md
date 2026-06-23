@@ -81,6 +81,9 @@ The firmware CLI keeps authoritative mixer names in `mixerNames`, while Configur
 `MSP2_GYRO_SENSOR_ACTIVE` returns the gyro count followed by one hardware ID per detected gyro.
 The names should be kept in sync with firmware `lookupTableGyroHardware`, because older Configurator sensor tables can lag enum changes.
 
+`MSP_TRANSPONDER_CONFIG` returns a provider count, one provider/data-length pair for each supported IR transponder provider, the active provider, and the active provider's data bytes.
+The provider enum is `NONE`, `ILAP`, `ARCITIMER`, and `ERLT`.
+
 ## Betaflight MCP Reference
 
 The Python reference uses a small MSP protocol layer and a higher-level command layer.

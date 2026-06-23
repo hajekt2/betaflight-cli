@@ -427,6 +427,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if blackboxConfig["operation"] != "write" || blackboxConfig["confirmation"] != "--yes" || blackboxConfig["requires_connection"] != true || blackboxConfig["output_root"] != "blackbox_config" || blackboxConfig["runnable"] != true {
 		t.Fatalf("blackbox config capability = %+v", blackboxConfig)
 	}
+	mixerConfig := byCommand["betaflight-cli mixer set-config-json"]
+	if mixerConfig["operation"] != "write" || mixerConfig["confirmation"] != "--yes" || mixerConfig["requires_connection"] != true || mixerConfig["output_root"] != "mixer_config" || mixerConfig["runnable"] != true {
+		t.Fatalf("mixer config capability = %+v", mixerConfig)
+	}
 	motorConfig := byCommand["betaflight-cli motors set-config"]
 	if motorConfig["operation"] != "write" || motorConfig["confirmation"] != "--yes" || motorConfig["requires_connection"] != true || motorConfig["output_root"] != "motor_config" || motorConfig["runnable"] != true {
 		t.Fatalf("motor config capability = %+v", motorConfig)
@@ -4164,6 +4168,45 @@ func TestMixerStatusWithFakeFC(t *testing.T) {
 	commands := mixer["cli_commands"].([]any)
 	if len(commands) != 2 || commands[0] != "mixer QUADX" || commands[1] != "set yaw_motors_reversed = ON" {
 		t.Fatalf("commands = %+v", commands)
+	}
+}
+
+func TestMixerSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"mixer_config":{"mode":3,"yaw_motors_reversed":true}}`
+	env, err := runTestCommandWithInput(t, []string{"mixer", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["mixer_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	mode := result["mode"].(map[string]any)
+	if config["mode"] != float64(3) || config["yaw_motors_reversed"] != true || mode["cli_name"] != "QUADX" || result["save_required"] != true {
+		t.Fatalf("mixer_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "mixer_config" || env.SideEffects[0].Command != "MSP_SET_MIXER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestMixerSetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"mixer_config":{"mode":3,"yaw_motors_reversed":true}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"mixer", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after mixer config confirmation failure")
 	}
 }
 

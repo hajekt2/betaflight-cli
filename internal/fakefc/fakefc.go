@@ -689,6 +689,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 6))
 	case msp.MSPMixerConfig:
 		f.out.Write(response(frame.Code, []byte{3, 1}, false))
+	case msp.MSPSetMixerConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 2))
 	case msp.MSP2MotorOutputReordering:
 		f.out.Write(response(frame.Code, []byte{4, 0, 1, 2, 3}, false))
 	case msp.MSPServo:

@@ -41,6 +41,14 @@ func TestDecodeMixerStatusReportsUnknownMode(t *testing.T) {
 	}
 }
 
+func TestEncodeMixerConfig(t *testing.T) {
+	payload := EncodeMixerConfig(MixerConfig{Mode: 3, YawMotorsReversed: true})
+	want := []byte{3, 1}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodeMixerStatusRejectsEmptyPayload(t *testing.T) {
 	if _, err := DecodeMixerStatus(nil); err == nil {
 		t.Fatal("DecodeMixerStatus() error = nil, want short payload error")

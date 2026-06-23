@@ -791,7 +791,70 @@ func (a *app) mixerCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set mixer mode and motor direction from JSON through MSP_SET_MIXER_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseMixerConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "mixer config changes affect motor output; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetMixerConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"mixer_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "mixer_config",
+					Command: "MSP_SET_MIXER_CONFIG",
+					Detail:  "mixer config changed but not saved",
+				})
+				return env
+			})
+		},
+	})
 	return cmd
+}
+
+func parseMixerConfigJSON(data []byte) (bfcommands.MixerConfig, error) {
+	var wrapped struct {
+		MixerConfig *bfcommands.MixerConfig `json:"mixer_config"`
+		Config      *bfcommands.MixerConfig `json:"config"`
+		Mixer       *struct {
+			Mode              *bfcommands.MixerMode `json:"mixer"`
+			YawMotorsReversed *bool                 `json:"yaw_motors_reversed"`
+		} `json:"mixer"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.MixerConfig{}, err
+	}
+	if wrapped.MixerConfig != nil {
+		return *wrapped.MixerConfig, nil
+	}
+	if wrapped.Config != nil {
+		return *wrapped.Config, nil
+	}
+	if wrapped.Mixer != nil && wrapped.Mixer.Mode != nil {
+		config := bfcommands.MixerConfig{Mode: wrapped.Mixer.Mode.ID}
+		if wrapped.Mixer.YawMotorsReversed != nil {
+			config.YawMotorsReversed = *wrapped.Mixer.YawMotorsReversed
+		}
+		return config, nil
+	}
+	var config bfcommands.MixerConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.MixerConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) motorsCommand() *cobra.Command {

@@ -27,6 +27,20 @@ type MixerMode struct {
 	Known       bool   `json:"known"`
 }
 
+type MixerConfig struct {
+	Mode              uint8 `json:"mode"`
+	YawMotorsReversed bool  `json:"yaw_motors_reversed"`
+}
+
+type MixerConfigSetResult struct {
+	Config       MixerConfig `json:"config"`
+	Mode         MixerMode   `json:"mode"`
+	MSPCode      uint16      `json:"msp_code"`
+	MSPName      string      `json:"msp_name"`
+	Acknowledged bool        `json:"acknowledged"`
+	SaveRequired bool        `json:"save_required"`
+}
+
 func ReadMixerStatus(ctx context.Context, client *connection.Client) (*MixerStatus, error) {
 	frame, err := client.Request(ctx, msp.MSPMixerConfig, nil)
 	if err != nil {
@@ -38,6 +52,28 @@ func ReadMixerStatus(ctx context.Context, client *connection.Client) (*MixerStat
 	}
 	status.Source = "MSP_MIXER_CONFIG"
 	return status, nil
+}
+
+func SetMixerConfig(ctx context.Context, client *connection.Client, config MixerConfig) (*MixerConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetMixerConfig, EncodeMixerConfig(config)); err != nil {
+		return nil, fmt.Errorf("mixer config request failed: %w", err)
+	}
+	return &MixerConfigSetResult{
+		Config:       config,
+		Mode:         lookupMixerMode(config.Mode),
+		MSPCode:      msp.MSPSetMixerConfig,
+		MSPName:      "MSP_SET_MIXER_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeMixerConfig(config MixerConfig) []byte {
+	yaw := uint8(0)
+	if config.YawMotorsReversed {
+		yaw = 1
+	}
+	return []byte{config.Mode, yaw}
 }
 
 func DecodeMixerStatus(payload []byte) (*MixerStatus, error) {

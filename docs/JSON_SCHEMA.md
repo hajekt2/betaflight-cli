@@ -347,6 +347,8 @@ Successful transponder config writes include a `transponder_config` side effect.
 
 `mixer status` returns a `mixer` object decoded from `MSP_MIXER_CONFIG`.
 The object includes the mixer mode ID, CLI mixer name, display name, expected motor count, servo usage, motor direction reversal state, native CLI commands for the same values, and a mixer catalog.
+`mixer set-config-json` returns a `mixer_config` object with the requested mixer config, decoded mixer mode, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful mixer config writes include a `mixer_config` side effect.
 
 `motors status` returns a `motors` object decoded from `MSP_MOTOR_CONFIG`, `MSP_MOTOR`, `MSP_MOTOR_TELEMETRY`, `MSP_MOTOR_3D_CONFIG`, and `MSP2_MOTOR_OUTPUT_REORDERING`.
 The object includes motor configuration, current motor outputs, telemetry values with raw and scaled units, 3D motor config, and output reordering.

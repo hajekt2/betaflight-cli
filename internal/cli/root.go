@@ -914,27 +914,31 @@ func (a *app) backupCommand() *cobra.Command {
 
 func (a *app) backupCreateCommand() *cobra.Command {
 	var redact bool
+	var rawCLI bool
 	returnCmd := &cobra.Command{
 		Use:   "create",
 		Short: "Create restore-oriented backup",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return a.runBackupCommand(cmd, "dump all", redact)
+			return a.runBackupCommand(cmd, "dump all", redact, rawCLI)
 		},
 	}
 	returnCmd.Flags().BoolVar(&redact, "redact", false, "redact sensitive values for sharing")
+	returnCmd.Flags().BoolVar(&rawCLI, "raw-cli", false, "emit raw CLI text as the command data")
 	return returnCmd
 }
 
 func (a *app) backupDiffCommand() *cobra.Command {
 	var redact bool
+	var rawCLI bool
 	returnCmd := &cobra.Command{
 		Use:   "diff",
 		Short: "Create compact diff output",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return a.runBackupCommand(cmd, "diff all", redact)
+			return a.runBackupCommand(cmd, "diff all", redact, rawCLI)
 		},
 	}
 	returnCmd.Flags().BoolVar(&redact, "redact", false, "redact sensitive values for sharing")
+	returnCmd.Flags().BoolVar(&rawCLI, "raw-cli", false, "emit raw CLI text as the command data")
 	return returnCmd
 }
 
@@ -1143,7 +1147,7 @@ func (a *app) mspCommand() *cobra.Command {
 	return cmd
 }
 
-func (a *app) runBackupCommand(cmd *cobra.Command, cliLine string, redact bool) error {
+func (a *app) runBackupCommand(cmd *cobra.Command, cliLine string, redact bool, rawCLI bool) error {
 	return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
 		lines, err := client.ExecCLI(cmd.Context(), cliLine)
 		if err != nil {
@@ -1155,6 +1159,9 @@ func (a *app) runBackupCommand(cmd *cobra.Command, cliLine string, redact bool) 
 		if redact {
 			redactedLines, redacted = redactLines(lines)
 			raw = strings.Join(redactedLines, "\n")
+		}
+		if rawCLI {
+			return output.Success(commandPath(cmd), &target, raw)
 		}
 		doc := bfconfig.Parse(redactedLines, settings.DefaultRegistry)
 		env := output.Success(commandPath(cmd), &target, map[string]any{

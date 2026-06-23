@@ -308,6 +308,39 @@ func TestConfigurationValidateAcceptsJSONLines(t *testing.T) {
 	}
 }
 
+func TestConfigurationValidateAcceptsFullDumpFamilies(t *testing.T) {
+	input := strings.Join([]string{
+		"# version",
+		"batch start",
+		"board_name FAKEF405",
+		"manufacturer_id FAKE",
+		"timer A00 AF1",
+		"dma pin A00 1",
+		"mixer QUADX",
+		"mmix reset",
+		"map AETR1234",
+		"beeper -BAT_LOW",
+		"beacon RX_SET",
+		"save",
+	}, "\n")
+	env, err := runTestCommandWithInput(t, []string{"configuration", "validate"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	validation := env.Data.(map[string]any)["configuration_validation"].(map[string]any)
+	result := validation["validation"].(map[string]any)
+	if result["valid"] != true {
+		t.Fatalf("validation = %+v", result)
+	}
+	skipped := validation["skipped_lines"].([]any)
+	if len(skipped) != 5 {
+		t.Fatalf("skipped = %+v", skipped)
+	}
+}
+
 func TestConfigurationCompareWithFakeFC(t *testing.T) {
 	reference := "# version\nbatch start\nfeature GPS\nset gyro_lpf1_static_hz = 0\nset p_roll = 46\nsave\n"
 	env, err := runTestCommandWithInput(t, []string{"configuration", "compare"}, reference, nil)
@@ -687,6 +720,37 @@ func TestBackupCreateIncludesConfiguration(t *testing.T) {
 	}
 	if data["raw_authoritative"] != true {
 		t.Fatalf("raw_authoritative = %+v", data["raw_authoritative"])
+	}
+}
+
+func TestBackupCreateRawCLI(t *testing.T) {
+	env, err := runTestCommand(t, []string{"backup", "create", "--raw-cli"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	raw, ok := env.Data.(string)
+	if !ok {
+		t.Fatalf("data = %+v", env.Data)
+	}
+	if !strings.Contains(raw, "batch start") || !strings.Contains(raw, "set gyro_lpf1_static_hz = 0") {
+		t.Fatalf("raw = %q", raw)
+	}
+}
+
+func TestBackupCreateRawCLISupportsRedact(t *testing.T) {
+	env, err := runTestCommand(t, []string{"backup", "create", "--raw-cli", "--redact"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	raw := env.Data.(string)
+	if !strings.Contains(raw, "batch start") {
+		t.Fatalf("raw = %q", raw)
 	}
 }
 

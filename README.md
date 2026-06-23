@@ -52,6 +52,7 @@ betaflight-cli text status --port /dev/tty.usbmodem01
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01
 betaflight-cli backup create --redact --port /dev/tty.usbmodem01
+betaflight-cli backup create --raw-cli --format text --port /dev/tty.usbmodem01 > backup.cli
 betaflight-cli backup diff --port /dev/tty.usbmodem01
 betaflight-cli cli interactive --port /dev/tty.usbmodem01
 betaflight-cli restore plan --file backup.txt

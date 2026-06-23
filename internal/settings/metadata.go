@@ -119,6 +119,12 @@ func (r Registry) Filter(match func(Metadata) bool) []Metadata {
 }
 
 func (m Metadata) Validate(value string) error {
+	if m.Mode == "array" {
+		return nil
+	}
+	if m.Mode == "bitset" && (strings.EqualFold(value, "ON") || strings.EqualFold(value, "OFF")) {
+		return nil
+	}
 	switch m.Type {
 	case TypeString:
 		if value == "" {
@@ -133,6 +139,9 @@ func (m Metadata) Validate(value string) error {
 		}
 		return nil
 	case TypeLookup:
+		if len(m.Lookup) == 0 {
+			return nil
+		}
 		for _, allowed := range m.Lookup {
 			if strings.EqualFold(value, allowed) {
 				return nil

@@ -77,6 +77,7 @@ Faithful backups should make `redacted: false` clear.
 Redacted backups should list the fields, commands, or line classes that were removed or masked.
 Backup and diff commands should include raw CLI text and parsed sections.
 Raw text is authoritative when parsed sections are partial.
+With `--raw-cli`, backup and diff commands return the raw CLI text as command data for direct `.cli` artifact creation.
 
 ## Parsed Configuration
 

@@ -37,6 +37,8 @@ func TestImportCLISkipsBackupWrappers(t *testing.T) {
 # version
 batch start
 defaults nosave
+board_name FAKEF405
+manufacturer_id FAKE
 feature GPS
 set small_angle = 25
 save
@@ -51,7 +53,7 @@ batch end
 	if len(result.Plan.CLILines) != 2 || result.Plan.CLILines[0] != "feature GPS" || result.Plan.CLILines[1] != "set small_angle = 25" {
 		t.Fatalf("lines = %+v", result.Plan.CLILines)
 	}
-	if len(result.Skipped) != 5 {
+	if len(result.Skipped) != 7 {
 		t.Fatalf("skipped = %+v", result.Skipped)
 	}
 }

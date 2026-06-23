@@ -366,18 +366,18 @@ func (a *app) validateChangePlan(cmd *cobra.Command, plan batch.Plan, opts planV
 		if opts.allowDefaultsNoSave && isDefaultsNoSave(line) {
 			continue
 		}
+		if isBatchAllowed(line) {
+			if err := validateSetLine(line); err != nil {
+				return output.Failure(commandPath(cmd), nil, "validation_error", err.Error()), false
+			}
+			continue
+		}
 		class := classifyCLI(line)
 		if class == cliReadOnly {
 			return output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("%q is read-only and does not belong in a change batch", line)), false
 		}
 		if class == cliDangerous {
 			return output.Failure(commandPath(cmd), nil, "dangerous_action_blocked", fmt.Sprintf("%q is dangerous and cannot be run through batch apply", line)), false
-		}
-		if !isBatchAllowed(line) {
-			return output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("%q is not a supported batch configuration command", line)), false
-		}
-		if err := validateSetLine(line); err != nil {
-			return output.Failure(commandPath(cmd), nil, "validation_error", err.Error()), false
 		}
 	}
 	return output.Envelope{}, true
@@ -389,7 +389,7 @@ func isBatchAllowed(line string) bool {
 		return false
 	}
 	switch fields[0] {
-	case "set", "feature", "serial", "aux", "resource", "profile", "rateprofile", "battery_profile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail":
+	case "set", "feature", "serial", "aux", "resource", "timer", "dma", "profile", "rateprofile", "battery_profile", "vtxtable", "mode_color", "color", "led", "servo", "smix", "adjrange", "rxrange", "rxfail", "beeper", "beacon", "mixer", "mmix", "map":
 		return true
 	default:
 		return false

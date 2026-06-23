@@ -74,6 +74,8 @@ func normalizeImportLine(line string, includeDefaults bool) (string, bool, strin
 		return "", false, "batch_marker"
 	case lower == "save":
 		return "", false, "save_is_explicit"
+	case isTargetIdentityLine(lower):
+		return "", false, "target_identity_metadata"
 	case strings.HasPrefix(lower, "defaults"):
 		if includeDefaults {
 			return line, true, ""
@@ -81,6 +83,19 @@ func normalizeImportLine(line string, includeDefaults bool) (string, bool, strin
 		return "", false, "defaults_require_include_defaults"
 	default:
 		return line, true, ""
+	}
+}
+
+func isTargetIdentityLine(lower string) bool {
+	fields := strings.Fields(lower)
+	if len(fields) == 0 {
+		return false
+	}
+	switch fields[0] {
+	case "board_name", "manufacturer_id", "mcu_id", "signature":
+		return true
+	default:
+		return false
 	}
 }
 

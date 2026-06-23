@@ -73,6 +73,19 @@ type RXFailChannelSetResult struct {
 	SaveRequired bool          `json:"save_required"`
 }
 
+type RXFailTableSetConfig struct {
+	Channels []RXFailChannel `json:"channels"`
+}
+
+type RXFailTableSetResult struct {
+	Channels     []RXFailChannel `json:"channels"`
+	ChannelCount int             `json:"channel_count"`
+	MSPCode      uint16          `json:"msp_code"`
+	MSPName      string          `json:"msp_name"`
+	Acknowledged bool            `json:"acknowledged"`
+	SaveRequired bool            `json:"save_required"`
+}
+
 type RSSIChannelSetResult struct {
 	Channel      uint8  `json:"channel"`
 	MSPCode      uint16 `json:"msp_code"`
@@ -246,6 +259,58 @@ func SetRXFailChannel(ctx context.Context, client *connection.Client, channel RX
 		Acknowledged: true,
 		SaveRequired: true,
 	}, nil
+}
+
+func SetRXFailTable(ctx context.Context, client *connection.Client, config RXFailTableSetConfig) (*RXFailTableSetResult, error) {
+	if err := ValidateRXFailTable(config); err != nil {
+		return nil, err
+	}
+	channels := make([]RXFailChannel, 0, len(config.Channels))
+	for _, channel := range config.Channels {
+		result, err := SetRXFailChannel(ctx, client, channel)
+		if err != nil {
+			return nil, fmt.Errorf("channel %d: %w", channel.Index, err)
+		}
+		channels = append(channels, result.Channel)
+	}
+	return &RXFailTableSetResult{
+		Channels:     channels,
+		ChannelCount: len(channels),
+		MSPCode:      msp.MSPSetRxfailConfig,
+		MSPName:      "MSP_SET_RXFAIL_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateRXFailTable(config RXFailTableSetConfig) error {
+	if len(config.Channels) == 0 {
+		return fmt.Errorf("channels must contain at least one receiver failsafe row")
+	}
+	seen := map[int]bool{}
+	for _, channel := range config.Channels {
+		if err := ValidateRXFailChannel(channel); err != nil {
+			return err
+		}
+		if seen[channel.Index] {
+			return fmt.Errorf("duplicate channel index %d", channel.Index)
+		}
+		seen[channel.Index] = true
+	}
+	return nil
+}
+
+func ValidateRXFailChannel(channel RXFailChannel) error {
+	if channel.Index < 0 || channel.Index >= 18 {
+		return fmt.Errorf("index must be in [0..17]")
+	}
+	if channel.Mode > 2 {
+		return fmt.Errorf("mode must be 0, 1, or 2")
+	}
+	if channel.Index >= 4 && channel.Mode == 0 {
+		return fmt.Errorf("mode 0 is only valid for flight channels 0..3")
+	}
+	return nil
 }
 
 func EncodeRXFailChannel(channel RXFailChannel) []byte {

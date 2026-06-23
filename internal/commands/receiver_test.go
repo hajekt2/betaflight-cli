@@ -166,6 +166,33 @@ func TestEncodeRXFailChannel(t *testing.T) {
 	}
 }
 
+func TestValidateRXFailTable(t *testing.T) {
+	config := RXFailTableSetConfig{Channels: []RXFailChannel{
+		{Index: 0, Mode: 0, Value: 1000},
+		{Index: 4, Mode: 1, Value: 1500},
+		{Index: 5, Mode: 2, Value: 1100},
+	}}
+	if err := ValidateRXFailTable(config); err != nil {
+		t.Fatalf("ValidateRXFailTable() error = %v", err)
+	}
+}
+
+func TestValidateRXFailTableRejectsDuplicateIndex(t *testing.T) {
+	config := RXFailTableSetConfig{Channels: []RXFailChannel{
+		{Index: 2, Mode: 2, Value: 1100},
+		{Index: 2, Mode: 1, Value: 1500},
+	}}
+	if err := ValidateRXFailTable(config); err == nil {
+		t.Fatal("ValidateRXFailTable() error = nil, want duplicate index error")
+	}
+}
+
+func TestValidateRXFailChannelRejectsAutoOnAux(t *testing.T) {
+	if err := ValidateRXFailChannel(RXFailChannel{Index: 4, Mode: 0, Value: 1000}); err == nil {
+		t.Fatal("ValidateRXFailChannel() error = nil, want AUX auto-mode error")
+	}
+}
+
 func TestDecodeRXFailConfigRejectsPartialRow(t *testing.T) {
 	if _, err := DecodeRXFailConfig([]byte{0, 1}); err == nil {
 		t.Fatal("DecodeRXFailConfig() error = nil, want partial row error")

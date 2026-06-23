@@ -306,6 +306,9 @@ Successful receiver config writes include a `receiver_config` side effect.
 Successful RSSI channel writes include an `rssi_channel` side effect.
 `receiver set-rxfail` returns an `rx_fail` object with the written receiver failsafe channel, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful receiver failsafe writes include an `rx_fail` side effect.
+`receiver set-rxfail-json` accepts either a JSON array of receiver failsafe channel rows or an object with `rx_fail_table`, `channels`, `rx_fail`, `failsafe`, or `receiver.failsafe`.
+It returns an `rx_fail_table` object with normalized channel rows, channel count, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful receiver failsafe table writes include an `rx_fail` side effect.
 `receiver set-map` returns an `rc_map` object with numeric channel map indexes, decoded channel names, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful receiver map writes include an `rc_map` side effect.
 `receiver set-deadband` returns an `rc_deadband` object with deadband, yaw deadband, position-hold deadband, 3D throttle deadband, MSP command name/code, acknowledgement flag, and `save_required`.

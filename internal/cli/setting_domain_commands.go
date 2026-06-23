@@ -64,6 +64,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.receiverSetConfigJSONCommand())
 		cmd.AddCommand(a.receiverRXFailCommand())
 		cmd.AddCommand(a.receiverSetRXFailCommand())
+		cmd.AddCommand(a.receiverSetRXFailJSONCommand())
 		cmd.AddCommand(a.receiverRSSIChannelCommand())
 		cmd.AddCommand(a.receiverMapCommand())
 		cmd.AddCommand(a.receiverDeadbandCommand())
@@ -221,6 +222,79 @@ func parseReceiverConfigJSON(data []byte) (bfcommands.ReceiverConfig, error) {
 	return config, nil
 }
 
+func (a *app) receiverSetRXFailJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rxfail-json FILE",
+		Short: "Set receiver failsafe channel rows from JSON through MSP_SET_RXFAIL_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseRXFailTableJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if err := bfcommands.ValidateRXFailTable(config); err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver failsafe changes receiver configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRXFailTable(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rx_fail_table": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rx_fail",
+					Command: "MSP_SET_RXFAIL_CONFIG",
+					Detail:  "receiver failsafe changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseRXFailTableJSON(data []byte) (bfcommands.RXFailTableSetConfig, error) {
+	var wrapped struct {
+		RXFailTable *bfcommands.RXFailTableSetConfig `json:"rx_fail_table"`
+		RXFail      []bfcommands.RXFailChannel       `json:"rx_fail"`
+		Failsafe    []bfcommands.RXFailChannel       `json:"failsafe"`
+		Channels    []bfcommands.RXFailChannel       `json:"channels"`
+		Receiver    *struct {
+			Failsafe []bfcommands.RXFailChannel `json:"failsafe"`
+		} `json:"receiver"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.RXFailTableSetConfig{}, err
+	}
+	switch {
+	case wrapped.RXFailTable != nil:
+		return *wrapped.RXFailTable, nil
+	case wrapped.RXFail != nil:
+		return bfcommands.RXFailTableSetConfig{Channels: wrapped.RXFail}, nil
+	case wrapped.Failsafe != nil:
+		return bfcommands.RXFailTableSetConfig{Channels: wrapped.Failsafe}, nil
+	case wrapped.Channels != nil:
+		return bfcommands.RXFailTableSetConfig{Channels: wrapped.Channels}, nil
+	case wrapped.Receiver != nil && wrapped.Receiver.Failsafe != nil:
+		return bfcommands.RXFailTableSetConfig{Channels: wrapped.Receiver.Failsafe}, nil
+	}
+	var channels []bfcommands.RXFailChannel
+	if err := json.Unmarshal(data, &channels); err == nil {
+		return bfcommands.RXFailTableSetConfig{Channels: channels}, nil
+	}
+	var config bfcommands.RXFailTableSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.RXFailTableSetConfig{}, err
+	}
+	return config, nil
+}
+
 func (a *app) vtxSetConfigCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-config BAND CHANNEL POWER PIT_MODE FREQUENCY_MHZ LOW_POWER_DISARM PIT_MODE_FREQUENCY_MHZ",
@@ -335,13 +409,16 @@ func (a *app) receiverSetRXFailCommand() *cobra.Command {
 			if err != nil {
 				return validationFailure(a, cmd, err)
 			}
-			if !a.opts.yes {
-				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver failsafe changes receiver configuration; pass --yes"))
-			}
 			channel := bfcommands.RXFailChannel{
 				Index: int(index),
 				Mode:  mode,
 				Value: value,
+			}
+			if err := bfcommands.ValidateRXFailChannel(channel); err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver failsafe changes receiver configuration; pass --yes"))
 			}
 			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
 				result, err := bfcommands.SetRXFailChannel(cmd.Context(), client, channel)

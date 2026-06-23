@@ -22,6 +22,7 @@ type importCommandOptions struct {
 	file            string
 	includeDefaults bool
 	save            bool
+	source          *presetFetchMetadata
 }
 
 func (a *app) restoreCommand() *cobra.Command {
@@ -68,22 +69,36 @@ func (a *app) presetsFetchCommand() *cobra.Command {
 			opts.file = args[0]
 			imported, metadata, err := a.fetchImportPlan(cmd.Context(), opts, "preset")
 			if err != nil {
-				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+				env := output.Failure(commandPath(cmd), nil, "validation_error", err.Error())
+				if metadata.URL != "" {
+					env.Data = map[string]any{"source": metadata}
+				}
+				if metadata.HTTPStatus != 0 || metadata.ChecksumSHA256 != "" {
+					addPresetFetchSideEffect(&env, metadata)
+				}
+				return a.render(env)
 			}
 			env, ok := a.validateChangePlan(cmd, imported.Plan, planValidationOptions{allowDefaultsNoSave: opts.includeDefaults})
 			if !ok {
+				env.Data = map[string]any{"source": metadata}
+				addPresetFetchSideEffect(&env, metadata)
 				return a.render(env)
 			}
 			if !opts.apply {
-				return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+				env := output.Success(commandPath(cmd), nil, map[string]any{
 					"source":  metadata,
 					"plan":    importPlanData(imported, importCommandOptions{includeDefaults: opts.includeDefaults, save: opts.save}, false),
 					"kind":    imported.Plan.Kind,
 					"applied": false,
-				}))
+				})
+				addPresetFetchSideEffect(&env, metadata)
+				return a.render(env)
 			}
 			if !a.opts.yes {
-				return a.render(importApplyConfirmationFailure(cmd, opts.save))
+				env := importApplyConfirmationFailure(cmd, opts.save)
+				env.Data = map[string]any{"source": metadata}
+				addPresetFetchSideEffect(&env, metadata)
+				return a.render(env)
 			}
 			op := connection.Write
 			if opts.includeDefaults {
@@ -92,6 +107,7 @@ func (a *app) presetsFetchCommand() *cobra.Command {
 			return a.applyImportPlan(cmd, imported, importCommandOptions{
 				includeDefaults: opts.includeDefaults,
 				save:            opts.save,
+				source:          &metadata,
 			}, op)
 		},
 	}
@@ -200,15 +216,7 @@ func (a *app) fetchImportPlan(ctx context.Context, opts presetFetchOptions, kind
 		return batch.ImportResult{}, presetFetchMetadata{URL: rawURL}, err
 	}
 	hash := sha256.Sum256(data)
-	imported, err := batch.ImportCLI(data, batch.ImportOptions{
-		Kind:            kind,
-		SourceFormat:    "preset_text",
-		IncludeDefaults: opts.includeDefaults,
-	})
-	if err != nil {
-		return batch.ImportResult{}, presetFetchMetadata{}, err
-	}
-	return imported, presetFetchMetadata{
+	metadata := presetFetchMetadata{
 		URL:            rawURL,
 		HTTPStatus:     response.StatusCode,
 		ContentType:    response.Header.Get("Content-Type"),
@@ -217,7 +225,16 @@ func (a *app) fetchImportPlan(ctx context.Context, opts presetFetchOptions, kind
 		FetchedAt:      time.Now().UTC().Format(time.RFC3339),
 		ETag:           response.Header.Get("ETag"),
 		LastModified:   response.Header.Get("Last-Modified"),
-	}, nil
+	}
+	imported, err := batch.ImportCLI(data, batch.ImportOptions{
+		Kind:            kind,
+		SourceFormat:    "preset_text",
+		IncludeDefaults: opts.includeDefaults,
+	})
+	if err != nil {
+		return batch.ImportResult{}, metadata, err
+	}
+	return imported, metadata, nil
 }
 
 func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, opts importCommandOptions, op connection.OperationClass) error {
@@ -251,6 +268,9 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 	}
 	data["response_lines"] = responses
 	env := output.Success(commandPath(cmd), &target, data)
+	if opts.source != nil {
+		addPresetFetchSideEffect(&env, *opts.source)
+	}
 	for _, line := range imported.Plan.CLILines {
 		env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
 	}
@@ -266,6 +286,21 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 	return a.render(env)
 }
 
+func addPresetFetchSideEffect(env *output.Envelope, metadata presetFetchMetadata) {
+	if env == nil || metadata.URL == "" {
+		return
+	}
+	detail := fmt.Sprintf("remote preset fetched with HTTP status %d and SHA256 %s", metadata.HTTPStatus, metadata.ChecksumSHA256)
+	if metadata.ChecksumSHA256 == "" {
+		detail = fmt.Sprintf("remote preset fetch returned HTTP status %d", metadata.HTTPStatus)
+	}
+	env.SideEffects = append(env.SideEffects, output.SideEffect{
+		Type:    "network_fetch",
+		Command: metadata.URL,
+		Detail:  detail,
+	})
+}
+
 func importApplyConfirmationFailure(cmd *cobra.Command, save bool) output.Envelope {
 	message := "apply requires --yes"
 	if save {
@@ -275,7 +310,7 @@ func importApplyConfirmationFailure(cmd *cobra.Command, save bool) output.Envelo
 }
 
 func importPlanData(imported batch.ImportResult, opts importCommandOptions, applied bool) map[string]any {
-	return map[string]any{
+	data := map[string]any{
 		"schema_version":    imported.Plan.SchemaVersion,
 		"kind":              imported.Plan.Kind,
 		"cli_lines":         imported.Plan.CLILines,
@@ -287,4 +322,8 @@ func importPlanData(imported batch.ImportResult, opts importCommandOptions, appl
 		"skipped_lines":     imported.Skipped,
 		"raw_authoritative": true,
 	}
+	if opts.source != nil {
+		data["source"] = *opts.source
+	}
+	return data
 }

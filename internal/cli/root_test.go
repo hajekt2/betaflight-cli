@@ -7384,6 +7384,9 @@ func TestPresetsFetchPlanWithoutApply(t *testing.T) {
 	if source["content_length"].(float64) != float64(len(presetBody)) {
 		t.Fatalf("source = %+v", source)
 	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "network_fetch" || env.SideEffects[0].Command != server.URL {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
 }
 
 func TestPresetsFetchRejectsBadURLScheme(t *testing.T) {
@@ -7423,8 +7426,48 @@ func TestPresetsFetchHTTPError(t *testing.T) {
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("unexpected envelope: %+v", env)
 	}
+	source := env.Data.(map[string]any)["source"].(map[string]any)
+	if source["url"] != server.URL || source["http_status"].(float64) != float64(http.StatusBadGateway) {
+		t.Fatalf("source = %+v", source)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "network_fetch" || env.SideEffects[0].Command != server.URL {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
 	if called {
 		t.Fatal("connector was called for failed preset fetch")
+	}
+}
+
+func TestPresetsFetchValidationErrorIncludesSource(t *testing.T) {
+	presetBody := "save\n"
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		if _, err := w.Write([]byte(presetBody)); err != nil {
+			t.Fatalf("write response = %v", err)
+		}
+	}))
+	defer server.Close()
+
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"presets", "fetch", server.URL}, "", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	source := env.Data.(map[string]any)["source"].(map[string]any)
+	if source["url"] != server.URL || source["checksum_sha256"] == "" {
+		t.Fatalf("source = %+v", source)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "network_fetch" || env.SideEffects[0].Command != server.URL {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+	if called {
+		t.Fatal("connector was called after fetched preset validation error")
 	}
 }
 
@@ -7461,8 +7504,16 @@ func TestPresetsFetchApplyUsesConnection(t *testing.T) {
 	if op != connection.Write {
 		t.Fatalf("operation = %v, want Write", op)
 	}
-	if env.Data.(map[string]any)["applied"] != true {
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
 		t.Fatalf("data = %+v", env.Data)
+	}
+	source := data["source"].(map[string]any)
+	if source["url"] != server.URL || source["checksum_sha256"] == "" {
+		t.Fatalf("source = %+v", source)
+	}
+	if len(env.SideEffects) != 3 || env.SideEffects[0].Type != "network_fetch" || env.SideEffects[1].Type != "cli_command" || env.SideEffects[2].Type != "cli_command" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 
@@ -7486,6 +7537,13 @@ func TestPresetsFetchApplyRequiresYesDoesNotConnect(t *testing.T) {
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
 		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	source := env.Data.(map[string]any)["source"].(map[string]any)
+	if source["url"] != server.URL || source["checksum_sha256"] == "" {
+		t.Fatalf("source = %+v", source)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "network_fetch" || env.SideEffects[0].Command != server.URL {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 	if called {
 		t.Fatal("connector was called after preset fetch confirmation failure")

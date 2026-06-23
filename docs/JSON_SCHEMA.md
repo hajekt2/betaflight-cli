@@ -125,6 +125,9 @@ Dangerous commands such as `save`, `defaults`, motor output, reboot, bootloader,
 Restore and local preset commands emit the same change-plan fields plus `skipped_lines`.
 `skipped_lines` records ignored import wrappers such as comments, `batch start`, `batch end`, `save`, and skipped `defaults nosave`.
 When `include_defaults` is true, exact `defaults nosave` lines are included in `cli_lines`; applying such a plan requires global `--yes`.
+`presets fetch URL` emits a `source` object with URL, HTTP status, content type, byte count, SHA256, fetch time, ETag, and Last-Modified when available.
+Successful fetch preview responses and fetched apply responses include a `network_fetch` side effect before any CLI command side effects.
+If `--apply` is requested without `--yes`, the refusal still includes `source` metadata and a `network_fetch` side effect because the remote preset has already been fetched and validated.
 
 `reboot` commands return a `reboot` object with the requested or acknowledged `mode`, `mode_name`, `msp_code`, `acknowledged`, and optional `msc_ready` fields.
 Successful reboot commands include a `side_effects` item because the Flight Controller may reboot, disconnect, or change USB mode.

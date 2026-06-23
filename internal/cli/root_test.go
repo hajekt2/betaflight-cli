@@ -38,6 +38,47 @@ func TestClassifyCLI(t *testing.T) {
 	}
 }
 
+func TestCLIExecWriteRequiresYes(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"cli", "exec", "set gyro_lpf1_static_hz = 0"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("cli exec was allowed without --yes")
+	}
+	env, err := runTestCommand(t, []string{"cli", "exec", "set gyro_lpf1_static_hz = 0", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("expected OK with --yes, got errors: %+v", env.Errors)
+	}
+}
+
+func TestCLIInteractiveRequiresYes(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"cli", "interactive"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("cli interactive was allowed without --yes")
+	}
+}
+
 func TestParseCLISections(t *testing.T) {
 	sections := parseCLISections([]string{
 		"# comment",

@@ -1031,7 +1031,11 @@ func (a *app) cliCommand() *cobra.Command {
 	runCLIRaw := func(cmd *cobra.Command, raw string) error {
 		class := classifyCLI(raw)
 		if class != cliReadOnly && !a.opts.yes {
-			env := output.Failure(commandPath(cmd), nil, "confirmation_required", fmt.Sprintf("%q is not classified as read-only; pass --yes or use a safer domain command", raw))
+			reason := fmt.Sprintf("%q is classified as writable; pass --yes or use safer domain-specific commands", raw)
+			if class == cliDangerous {
+				reason = fmt.Sprintf("%q is classified as dangerous; pass --yes or use safer domain-specific commands", raw)
+			}
+			env := output.Failure(commandPath(cmd), nil, "confirmation_required", reason)
 			return a.render(env)
 		}
 		op := connection.ReadOnly
@@ -1090,6 +1094,9 @@ func (a *app) cliCommand() *cobra.Command {
 		Use:   "interactive",
 		Short: "Enter interactive Betaflight CLI mode using #",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "interactive CLI mode allows writes and requires --yes"))
+			}
 			client, _, err := connection.Connect(cmd.Context(), a.connectionConfig(), connection.Dangerous)
 			if err != nil {
 				return a.render(a.failure(commandPath(cmd), nil, err))

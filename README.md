@@ -96,6 +96,7 @@ betaflight-cli profiles list --port /dev/tty.usbmodem01
 betaflight-cli profiles status --port /dev/tty.usbmodem01
 betaflight-cli profiles battery-select 1 --port /dev/tty.usbmodem01
 betaflight-cli profiles copy pid 0 1 --port /dev/tty.usbmodem01 --yes
+betaflight-cli profiles copy-json profile-copy.json --port /dev/tty.usbmodem01 --yes
 betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
 betaflight-cli vtxtable list --port /dev/tty.usbmodem01
 betaflight-cli leds list --port /dev/tty.usbmodem01
@@ -170,6 +171,7 @@ It defaults to dry-run planning and requires `--yes` when applying or saving.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 `profiles select-json` accepts `profile`/`pid_profile`, `rate_profile`/`rateprofile`, and `battery_profile` indexes, returns a native CLI `change_plan`, and can apply all requested selector changes together with `--apply --yes`.
 `profiles copy` copies PID or rate profiles through `MSP_COPY_PROFILE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`profiles copy-json` accepts `kind`, `source`, and `destination`, either directly or under `profile_copy`, `copy`, or `request`, and performs the same confirmed `MSP_COPY_PROFILE` write.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `text set` writes pilot, craft, PID profile, rate profile, or battery profile names through `MSP2_SET_TEXT`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `text set-json` accepts a JSON object with `field` or `key` plus `value`, or an object with `text`, `set`, or `request`, writes through `MSP2_SET_TEXT`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

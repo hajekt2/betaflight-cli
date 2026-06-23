@@ -6464,6 +6464,57 @@ func TestProfilesSelectJSONApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestProfilesCopyJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"profile_copy":{"kind":"pid","source":0,"destination":1}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"profiles", "copy-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called before --yes confirmation")
+	}
+}
+
+func TestProfilesCopyJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"copy":{"kind":"battery","source":0,"dest":1}}`
+	env, err := runTestCommandWithInput(t, []string{"profiles", "copy-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for unsupported copy kind")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestProfilesCopyJSONWithFakeFC(t *testing.T) {
+	input := `{"kind":"rate","source_index":0,"destination_index":1}`
+	env, err := runTestCommandWithInput(t, []string{"profiles", "copy-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	copyResult := data["profile_copy"].(map[string]any)
+	if copyResult["acknowledged"] != true || copyResult["save_required"] != true {
+		t.Fatalf("profile_copy = %+v", copyResult)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_COPY_PROFILE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestProfilesCopyRejectsUnsupportedKindDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"profiles", "copy", "battery", "0", "1", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

@@ -691,7 +691,42 @@ func (a *app) profilesCommand() *cobra.Command {
 			})
 		},
 	}
-	cmd.AddCommand(profile, rate, battery, a.profileSelectJSONCommand(), copyProfile)
+	cmd.AddCommand(profile, rate, battery, a.profileSelectJSONCommand(), a.profileCopyJSONCommand(), copyProfile)
+	return cmd
+}
+
+func (a *app) profileCopyJSONCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "copy-json FILE",
+		Short: "Copy PID or rate profiles from JSON using MSP_COPY_PROFILE",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			request, err := parseProfileCopyJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "profile copy changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.CopyProfile(cmd.Context(), client, request)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"profile_copy": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "profile_copy",
+					Command: "MSP_COPY_PROFILE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 	return cmd
 }
 
@@ -767,6 +802,63 @@ func parseProfileSelectionJSON(data []byte) ([]string, error) {
 	return lines, nil
 }
 
+func parseProfileCopyJSON(data []byte) (bfcommands.ProfileCopyRequest, error) {
+	type profileCopyInput struct {
+		Kind             string `json:"kind"`
+		Type             string `json:"type"`
+		Source           *int   `json:"source"`
+		SourceIndex      *int   `json:"source_index"`
+		Destination      *int   `json:"destination"`
+		DestinationIndex *int   `json:"destination_index"`
+		Dest             *int   `json:"dest"`
+	}
+	var wrapped struct {
+		Copy        *profileCopyInput `json:"copy"`
+		ProfileCopy *profileCopyInput `json:"profile_copy"`
+		Request     *profileCopyInput `json:"request"`
+		profileCopyInput
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.ProfileCopyRequest{}, err
+	}
+	input := wrapped.profileCopyInput
+	for _, candidate := range []*profileCopyInput{wrapped.ProfileCopy, wrapped.Copy, wrapped.Request} {
+		if candidate != nil {
+			input = *candidate
+			break
+		}
+	}
+	kindText := firstString(input.Kind, input.Type)
+	if kindText == "" {
+		return bfcommands.ProfileCopyRequest{}, fmt.Errorf("kind is required")
+	}
+	kind, err := parseProfileCopyKind(kindText)
+	if err != nil {
+		return bfcommands.ProfileCopyRequest{}, err
+	}
+	sourceValue := firstIntPtr(input.Source, input.SourceIndex)
+	if sourceValue == nil {
+		return bfcommands.ProfileCopyRequest{}, fmt.Errorf("source is required")
+	}
+	destinationValue := firstIntPtr(input.Destination, input.DestinationIndex, input.Dest)
+	if destinationValue == nil {
+		return bfcommands.ProfileCopyRequest{}, fmt.Errorf("destination is required")
+	}
+	source, err := parseUint8Arg("source", strconv.Itoa(*sourceValue))
+	if err != nil {
+		return bfcommands.ProfileCopyRequest{}, err
+	}
+	destination, err := parseUint8Arg("destination", strconv.Itoa(*destinationValue))
+	if err != nil {
+		return bfcommands.ProfileCopyRequest{}, err
+	}
+	return bfcommands.ProfileCopyRequest{
+		Kind:        kind,
+		Source:      source,
+		Destination: destination,
+	}, nil
+}
+
 func firstIntPtr(values ...*int) *int {
 	for _, value := range values {
 		if value != nil {
@@ -774,6 +866,15 @@ func firstIntPtr(values ...*int) *int {
 		}
 	}
 	return nil
+}
+
+func firstString(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (a *app) rateprofilesCommand() *cobra.Command {

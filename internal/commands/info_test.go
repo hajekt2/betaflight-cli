@@ -27,6 +27,22 @@ func TestDecodeBuildInfo(t *testing.T) {
 	}
 }
 
+func TestDecodeMCUInfo(t *testing.T) {
+	info, err := DecodeMCUInfo([]byte{254, 9, 'S', 'T', 'M', '3', '2', 'F', '4', '0', '5'})
+	if err != nil {
+		t.Fatalf("DecodeMCUInfo() error = %v", err)
+	}
+	if info.Source != "MSP2_MCU_INFO" || info.ID != 254 || info.Name != "STM32F405" {
+		t.Fatalf("info = %+v", info)
+	}
+}
+
+func TestDecodeMCUInfoRejectsTrailingBytes(t *testing.T) {
+	if _, err := DecodeMCUInfo([]byte{254, 0, 1}); err == nil {
+		t.Fatal("DecodeMCUInfo() error = nil, want trailing byte error")
+	}
+}
+
 func TestDecodeBuildInfoRejectsShortPayload(t *testing.T) {
 	if _, err := DecodeBuildInfo([]byte("too short")); err == nil {
 		t.Fatal("DecodeBuildInfo() error = nil, want short payload error")

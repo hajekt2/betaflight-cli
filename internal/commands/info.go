@@ -15,6 +15,7 @@ type Info struct {
 	MSPAPIVersion   string     `json:"msp_api_version"`
 	MSPProtocol     uint8      `json:"msp_protocol_version"`
 	Board           *BoardInfo `json:"board,omitempty"`
+	MCU             *MCUInfo   `json:"mcu,omitempty"`
 	Build           *BuildInfo `json:"build,omitempty"`
 	LegacyName      string     `json:"legacy_name,omitempty"`
 }
@@ -27,6 +28,12 @@ type BoardInfo struct {
 	TargetName         string `json:"target_name,omitempty"`
 	BoardName          string `json:"board_name,omitempty"`
 	ManufacturerID     string `json:"manufacturer_id,omitempty"`
+}
+
+type MCUInfo struct {
+	Source string `json:"source"`
+	ID     uint8  `json:"id"`
+	Name   string `json:"name"`
 }
 
 type BuildInfo struct {
@@ -78,6 +85,16 @@ func ReadInfo(ctx context.Context, client *connection.Client) (Info, []string) {
 	} else {
 		warnings = append(warnings, fmt.Sprintf("MSP_BUILD_INFO unavailable: %v", err))
 	}
+	if frame, err := client.Request(ctx, msp.MSP2McuInfo, nil); err == nil {
+		mcu, err := DecodeMCUInfo(frame.Payload)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("MSP2_MCU_INFO decode failed: %v", err))
+		} else {
+			info.MCU = mcu
+		}
+	} else {
+		warnings = append(warnings, fmt.Sprintf("MSP2_MCU_INFO unavailable: %v", err))
+	}
 	if frame, err := client.Request(ctx, msp.MSPName, nil); err == nil {
 		info.LegacyName = DecodeName(frame.Payload)
 	} else {
@@ -126,6 +143,26 @@ func DecodeBoardInfo(payload []byte) (*BoardInfo, error) {
 		}
 	}
 	return info, nil
+}
+
+func DecodeMCUInfo(payload []byte) (*MCUInfo, error) {
+	r := msp.NewPayloadReader(payload)
+	id, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "MCU type ID")
+	}
+	name, err := r.PString()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "MCU name")
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP2_MCU_INFO returned %d trailing byte(s)", r.Remaining())
+	}
+	return &MCUInfo{
+		Source: "MSP2_MCU_INFO",
+		ID:     id,
+		Name:   name,
+	}, nil
 }
 
 func DecodeBuildInfo(payload []byte) (*BuildInfo, error) {

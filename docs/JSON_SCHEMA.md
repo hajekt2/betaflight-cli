@@ -113,7 +113,8 @@ The object includes file sizes, header metadata, ordered header names, parsed fi
 `frame_summary_approx` includes per-marker candidate counts and a capped candidate index with byte offsets.
 The marker counts and candidate frame index are approximate until full binary frame decoding is implemented.
 
-`info` returns flight-controller identity from the initial handshake plus optional `board`, `build`, and `legacy_name` fields.
+`info` returns flight-controller identity from the initial handshake plus optional `board`, `mcu`, `build`, and `legacy_name` fields.
+The `mcu` object is decoded from `MSP2_MCU_INFO` and includes the firmware-reported MCU type ID and MCU name.
 The `build` object is decoded from `MSP_BUILD_INFO` and includes fixed build date, build time, short git revision, raw build option codes, decoded option names, and unknown option codes.
 The `legacy_name` field is decoded from deprecated `MSP_NAME` for compatibility with Configurator and older identity flows.
 

@@ -553,6 +553,126 @@ func (a *app) firmwareCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(a.firmwareFlashCommand())
+	return cmd
+}
+
+func (a *app) firmwareFlashCommand() *cobra.Command {
+	var imagePath string
+	var tool string
+	var toolArgs []string
+	var rebootFirst bool
+	var execute bool
+	cmd := &cobra.Command{
+		Use:   "flash",
+		Short: "Flash a firmware image using an external tool (dangerous)",
+		Args:  cobra.ExactArgs(0),
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			plan, err := bfcommands.PlanFirmwareFlash(bfcommands.FirmwareFlashOptions{
+				ImagePath:          imagePath,
+				Tool:               tool,
+				ToolArgs:           toolArgs,
+				RebootToBootloader: rebootFirst,
+			})
+			if err != nil {
+				return a.render(a.failure(commandPath(cmd), nil, err))
+			}
+			if !execute {
+				return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+					"firmware_flash": map[string]any{
+						"action":    "plan",
+						"plan":      plan,
+						"executed":  false,
+						"requires":  "--yes and --execute to run",
+						"note":      "this command does not touch hardware in plan mode",
+					},
+				}))
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "firmware flash is dangerous; pass --yes"))
+			}
+			run := func(cmd *cobra.Command, target output.Target, preflight *bfcommands.RebootResult) output.Envelope {
+				if preflight != nil {
+					result, err := bfcommands.ExecuteFirmwareFlash(cmd.Context(), *plan)
+					if err != nil {
+						env := output.Failure(commandPath(cmd), &target, err)
+						env.SideEffects = append(env.SideEffects, output.SideEffect{
+							Type:    "firmware_reboot",
+							Command: commandPath(cmd),
+							Detail:  "bootloader reboot requested before flashing",
+						})
+						env.Data = map[string]any{
+							"firmware_flash": map[string]any{
+								"plan":       plan,
+								"reboot":     preflight,
+								"executed":   true,
+								"successful": false,
+							},
+						}
+						return env
+					}
+					env := output.Success(commandPath(cmd), &target, map[string]any{
+						"firmware_flash": map[string]any{
+							"plan":       plan,
+							"reboot":     preflight,
+							"result":     result,
+							"executed":   true,
+							"successful": true,
+						},
+					})
+					env.SideEffects = append(env.SideEffects, output.SideEffect{
+						Type:    "firmware_flash",
+						Command: strings.Join(result.Plan.EstimatedCommand, " "),
+						Detail:  "external flash tool executed",
+					})
+					return env
+				}
+				result, err := bfcommands.ExecuteFirmwareFlash(cmd.Context(), *plan)
+				if err != nil {
+					env := output.Failure(commandPath(cmd), &target, err)
+					env.Data = map[string]any{
+						"firmware_flash": map[string]any{
+							"plan":       plan,
+							"executed":   true,
+							"successful": false,
+						},
+					}
+					return env
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"firmware_flash": map[string]any{
+						"plan":       plan,
+						"result":     result,
+						"executed":   true,
+						"successful": true,
+					},
+				})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "firmware_flash",
+					Command: strings.Join(result.Plan.EstimatedCommand, " "),
+					Detail:  "external flash tool executed",
+				})
+				return env
+			}
+			if rebootFirst {
+				return a.withClient(cmd.Context(), commandPath(cmd), connection.Dangerous, func(client *connection.Client, target output.Target) output.Envelope {
+					reboot, err := bfcommands.SendReboot(cmd.Context(), client, bfcommands.RebootBootloaderFlash)
+					if err != nil {
+						return a.failure(commandPath(cmd), &target, err)
+					}
+					return run(cmd, target, reboot)
+				})
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Dangerous, func(client *connection.Client, target output.Target) output.Envelope {
+				return run(cmd, target, nil)
+			})
+		},
+	}
+	cmd.Flags().StringVar(&imagePath, "image", "", "firmware image path (.hex, .bin, .img)")
+	cmd.Flags().StringVar(&tool, "tool", "dfu-util", "external flash tool executable")
+	cmd.Flags().StringSliceVar(&toolArgs, "tool-arg", nil, "repeated args for flash tool (repeatable)")
+	cmd.Flags().BoolVar(&rebootFirst, "reboot-first", false, "reboot into bootloader before executing flash tool")
+	cmd.Flags().BoolVar(&execute, "execute", false, "run flash tool immediately after planning")
 	return cmd
 }
 

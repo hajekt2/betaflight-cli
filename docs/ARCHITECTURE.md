@@ -284,13 +284,13 @@ The likely implementation order is:
 3. Typed configuration domains such as ports, receiver, modes, PID, rates, filters, VTX, OSD, failsafe, GPS, and blackbox.
 4. High-risk operational commands such as motors and DShot tools.
 5. Blackbox extraction and analysis.
-6. Firmware maintenance and DFU flashing.
+6. Firmware maintenance and external firmware flashing workflows.
 
 This order keeps the first usable versions safe while preserving the full parity target.
 
-Firmware flashing and DFU support are in eventual scope, but they should not be part of the first implementation slice.
-They use different transports, create higher recovery risk, and need a separate safety model from MSP and CLI operations against already-running firmware.
-The USB serial transport decision for the first slice does not include USB DFU flashing.
+Firmware flashing is now implemented as a dangerous, explicit external-tool workflow (`firmware flash`) rather than a native DFU transport.
+The command keeps plan mode mandatory by default and requires `--execute --yes` to run, with optional bootloader reboot preflight.
+It still inherits the higher-risk safety model used for reboot, save, and erase operations.
 
 ## Testing Strategy
 

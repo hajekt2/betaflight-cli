@@ -60,6 +60,7 @@ betaflight-cli backup diff --port /dev/tty.usbmodem01
 betaflight-cli cli interactive --port /dev/tty.usbmodem01
 betaflight-cli restore plan --file backup.txt
 betaflight-cli restore apply --file backup.txt --port /dev/tty.usbmodem01
+betaflight-cli firmware flash --image /path/to/betaflight.bin --tool dfu-util --tool-arg -a --tool-arg 0 --tool-arg -s --tool-arg 0x08000000:leave --tool-arg /path/to/betaflight.bin --execute --yes
 betaflight-cli presets plan --file preset.cli
 betaflight-cli presets apply --file preset.cli --port /dev/tty.usbmodem01
 betaflight-cli blackbox config --port /dev/tty.usbmodem01

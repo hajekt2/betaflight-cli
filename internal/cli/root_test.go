@@ -298,6 +298,48 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestFirmwareFlashPlanModeWorksOffline(t *testing.T) {
+	tmp := t.TempDir()
+	image := filepath.Join(tmp, "firmware.bin")
+	if err := os.WriteFile(image, []byte{0xaa, 0xbb}, 0o600); err != nil {
+		t.Fatalf("write image: %v", err)
+	}
+	env, err := runTestCommand(t, []string{
+		"firmware", "flash", "--image", image, "--tool", "dfu-util", "--tool-arg", "-a", "0", "--tool-arg", "-s", "0x08000000:leave",
+	}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	flash := data["firmware_flash"].(map[string]any)
+	if flash["executed"].(bool) {
+		t.Fatalf("plan mode must not execute: %+v", flash)
+	}
+	if flash["action"].(string) != "plan" {
+		t.Fatalf("plan action = %v", flash["action"])
+	}
+}
+
+func TestFirmwareFlashExecuteRequiresYes(t *testing.T) {
+	tmp := t.TempDir()
+	image := filepath.Join(tmp, "firmware.bin")
+	if err := os.WriteFile(image, []byte{0x11, 0x22}, 0o600); err != nil {
+		t.Fatalf("write image: %v", err)
+	}
+	env, err := runTestCommand(t, []string{
+		"firmware", "flash", "--image", image, "--tool", "dfu-util", "--execute",
+	}, nil)
+	if err == nil {
+		t.Fatalf("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
 func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"capabilities", "coverage"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
@@ -332,6 +374,10 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	if maintenance["status"] != "implemented" || len(maintenance["dangerous_commands"].([]any)) == 0 {
 		t.Fatalf("maintenance domain = %+v", maintenance)
 	}
+	flashing := byDomain["firmware-flashing"]
+	if flashing["status"] != "implemented" || len(flashing["dangerous_commands"].([]any)) == 0 {
+		t.Fatalf("firmware-flashing domain = %+v", flashing)
+	}
 	motors := byDomain["motors-servos-mixer"]
 	if motors["status"] != "implemented" {
 		t.Fatalf("motors domain = %+v", motors)
@@ -350,13 +396,8 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 			t.Fatalf("unexpected motor-testing gap remains: %+v", gap)
 		}
 	}
-	seen := map[string]int{}
-	for _, item := range gaps {
-		gap := item.(map[string]any)
-		seen[gap["domain"].(string)]++
-	}
-	if seen["firmware-flashing"] != 1 {
-		t.Fatalf("unexpected firmware-flashing gap count: %d", seen["firmware-flashing"])
+	if _, ok := byDomain["firmware-flashing"]; !ok {
+		t.Fatalf("missing firmware-flashing domain in coverage")
 	}
 }
 

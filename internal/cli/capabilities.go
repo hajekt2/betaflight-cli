@@ -258,6 +258,7 @@ func inferCapabilityMetadata(path string, runnable bool, meta capabilityMetadata
 
 func coverageDomains(commandSet map[string]bool) []coverageDomain {
 	domains := []coverageDomain{
+		implementedDomain("firmware-flashing", commandSet, []string{"betaflight-cli firmware flash"}, nil, []string{"betaflight-cli firmware flash"}, []string{"firmware_flashing"}, "External firmware flashing is supported with explicit confirmation and a preflight plan."),
 		implementedDomain("identity", commandSet, []string{"betaflight-cli info", "betaflight-cli firmware status", "betaflight-cli target status", "betaflight-cli text status"}, nil, nil, []string{"info", "firmware", "target", "text"}, "MSP identity, board, MCU, UID, build, support policy, and text metadata are typed."),
 		implementedDomain("connection-diagnostics", commandSet, []string{"betaflight-cli ports list", "betaflight-cli ports diagnose", "betaflight-cli doctor"}, nil, nil, []string{"ports", "diagnostics"}, "USB serial discovery is implemented; non-USB transports remain intentionally out of scope."),
 		implementedDomain("configuration-backup", commandSet, []string{
@@ -285,7 +286,7 @@ func coverageDomains(commandSet map[string]bool) []coverageDomain {
 		implementedDomain("storage-blackbox", commandSet, []string{"betaflight-cli storage status", "betaflight-cli storage export", "betaflight-cli blackbox config", "betaflight-cli blackbox inspect", "betaflight-cli blackbox list", "betaflight-cli blackbox export"}, nil, []string{"betaflight-cli storage erase"}, []string{"storage", "dataflash_export", "storage_erase", "blackbox", "blackbox_logs", "blackbox_export", "inspection"}, "Storage summaries, Dataflash export, Dataflash erase, Blackbox configuration, Blackbox log listing, Blackbox export, and offline log inspection are implemented."),
 		implementedDomain("beeper-transponder", commandSet, []string{"betaflight-cli beeper config", "betaflight-cli transponder config"}, []string{"betaflight-cli beeper enable", "betaflight-cli beeper disable", "betaflight-cli transponder set-provider", "betaflight-cli transponder set-data"}, nil, []string{"beeper", "transponder"}, "Beeper and transponder configuration reads are covered, and beeper/IR transponder writes are available through CLI-backed plan/apply."),
 		implementedDomain("raw-protocol-access", commandSet, []string{"betaflight-cli cli exec"}, nil, []string{"betaflight-cli cli interactive", "betaflight-cli msp request"}, []string{"cli", "msp"}, "Raw CLI and raw MSP access exist for unsupported gaps with safety gates."),
-		implementedDomain("firmware-maintenance", commandSet, nil, nil, []string{"betaflight-cli reboot firmware", "betaflight-cli reboot bootloader", "betaflight-cli reboot bootloader-flash", "betaflight-cli reboot msc", "betaflight-cli reboot msc-utc"}, []string{"reboot"}, "Reboot flows are implemented; firmware flashing remains outside this CLI for now."),
+		implementedDomain("firmware-maintenance", commandSet, nil, nil, []string{"betaflight-cli reboot firmware", "betaflight-cli reboot bootloader", "betaflight-cli reboot bootloader-flash", "betaflight-cli reboot msc", "betaflight-cli reboot msc-utc"}, []string{"reboot"}, "Maintenance includes reboot flows and dangerous firmware flashing."),
 	}
 	sort.Slice(domains, func(i, j int) bool {
 		return domains[i].Domain < domains[j].Domain
@@ -336,12 +337,6 @@ func missingCommands(commandSet map[string]bool, commands []string) []string {
 
 func coverageGaps(domains []coverageDomain) []coverageGap {
 	gaps := []coverageGap{
-		{
-			Domain:     "firmware-flashing",
-			Reason:     "Reboot-to-bootloader flows exist, but firmware flashing is intentionally out of scope for this release.",
-			NextSteps:  []string{"decide whether flashing belongs in this CLI", "if accepted, add target validation and image provenance checks", "require explicit dangerous confirmation"},
-			SafetyNote: "Firmware flashing can brick hardware when misused.",
-		},
 	}
 	for _, domain := range domains {
 		if domain.Status == "partial" {
@@ -426,6 +421,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		},
 		"betaflight-cli cli exec":               {RequiresConnection: true, Operation: "read_only_or_write_or_dangerous", Confirmation: "--yes for writes and dangerous CLI lines", OutputRoot: "cli", Input: "one Betaflight CLI command line", Tags: []string{"cli", "passthrough"}},
 		"betaflight-cli cli interactive":        dangerous,
+		"betaflight-cli firmware flash":         {RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes and --execute", OutputRoot: "firmware_flash", Tags: []string{"firmware", "maintenance", "dangerous"}},
 		"betaflight-cli settings set": {
 			RequiresConnection: true,
 			Operation:          "write_when_apply_is_set",

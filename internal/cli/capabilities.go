@@ -270,7 +270,7 @@ func inferCapabilityMetadata(path string, runnable bool, meta capabilityMetadata
 
 func coverageDomains(commandSet map[string]bool) []coverageDomain {
 	domains := []coverageDomain{
-		implementedDomain("firmware-flashing", commandSet, []string{"betaflight-cli firmware flash"}, nil, []string{"betaflight-cli firmware flash"}, []string{"firmware_flashing"}, "External firmware flashing is supported with explicit confirmation and a preflight plan."),
+		implementedDomain("firmware-flashing", commandSet, []string{"betaflight-cli firmware flash"}, nil, []string{"betaflight-cli firmware flash"}, []string{"firmware_flash"}, "External firmware flashing is supported with explicit confirmation and a preflight plan."),
 		implementedDomain("identity", commandSet, []string{"betaflight-cli info", "betaflight-cli firmware status", "betaflight-cli target status", "betaflight-cli text status"}, []string{"betaflight-cli text set", "betaflight-cli text set-json"}, nil, []string{"info", "firmware", "target", "text"}, "MSP identity, board, MCU, UID, build, support policy, and text metadata are typed; writable text fields can be changed through confirmed MSP2 with positional or JSON input."),
 		implementedDomain("connection-diagnostics", commandSet, []string{"betaflight-cli ports list", "betaflight-cli ports diagnose", "betaflight-cli doctor"}, nil, nil, []string{"ports", "diagnostics"}, "USB serial discovery is implemented; non-USB transports remain intentionally out of scope."),
 		implementedDomain("configuration-backup", commandSet, []string{

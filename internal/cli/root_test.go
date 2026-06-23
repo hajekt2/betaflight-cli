@@ -1156,7 +1156,7 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 		t.Fatalf("maintenance domain = %+v", maintenance)
 	}
 	flashing := byDomain["firmware-flashing"]
-	if flashing["status"] != "implemented" || len(flashing["dangerous_commands"].([]any)) == 0 {
+	if flashing["status"] != "implemented" || len(flashing["dangerous_commands"].([]any)) == 0 || !containsAnyString(flashing["output_roots"].([]any), "firmware_flash") {
 		t.Fatalf("firmware-flashing domain = %+v", flashing)
 	}
 	motors := byDomain["motors-servos-mixer"]

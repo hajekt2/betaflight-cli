@@ -63,3 +63,23 @@ func TestEncodeAdjustmentRange(t *testing.T) {
 		t.Fatalf("payload = %v, want %v", payload, want)
 	}
 }
+
+func TestValidateAdjustmentTable(t *testing.T) {
+	err := ValidateAdjustmentTable(AdjustmentTableSetConfig{Ranges: []AdjustmentRange{{
+		Index:                 1,
+		SlotIndex:             0,
+		AuxChannelIndex:       2,
+		RangeStartStep:        4,
+		RangeEndStep:          8,
+		AdjustmentFunction:    33,
+		AuxSwitchChannelIndex: 3,
+		AdjustmentCenter:      1600,
+		AdjustmentScale:       50,
+	}}})
+	if err != nil {
+		t.Fatalf("ValidateAdjustmentTable() error = %v", err)
+	}
+	if err := ValidateAdjustmentTable(AdjustmentTableSetConfig{}); err == nil {
+		t.Fatal("ValidateAdjustmentTable() error = nil")
+	}
+}

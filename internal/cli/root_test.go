@@ -491,6 +491,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if adjustmentRange["operation"] != "write" || adjustmentRange["confirmation"] != "--yes" || adjustmentRange["requires_connection"] != true || adjustmentRange["output_root"] != "adjustment_range" || adjustmentRange["runnable"] != true {
 		t.Fatalf("adjustment range capability = %+v", adjustmentRange)
 	}
+	adjustmentTable := byCommand["betaflight-cli adjustments set-json"]
+	if adjustmentTable["operation"] != "write" || adjustmentTable["confirmation"] != "--yes" || adjustmentTable["requires_connection"] != true || adjustmentTable["output_root"] != "adjustment_table" || adjustmentTable["runnable"] != true {
+		t.Fatalf("adjustment table capability = %+v", adjustmentTable)
+	}
 	batteryConfig := byCommand["betaflight-cli battery set-config-json"]
 	if batteryConfig["operation"] != "write" || batteryConfig["confirmation"] != "--yes" || batteryConfig["requires_connection"] != true || batteryConfig["output_root"] != "battery_config" || batteryConfig["runnable"] != true {
 		t.Fatalf("battery config capability = %+v", batteryConfig)
@@ -5749,6 +5753,55 @@ func TestAdjustmentsSetRangeWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_ADJUSTMENT_RANGE" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestAdjustmentsSetJSONWithFakeFC(t *testing.T) {
+	input := `{"adjustment_table":{"ranges":[{"index":1,"slot_index":0,"aux_channel_index":2,"range_start_step":4,"range_end_step":8,"adjustment_function":33,"aux_switch_channel_index":3,"adjustment_center":1600,"adjustment_scale":50}]}}`
+	env, err := runTestCommandWithInput(t, []string{"adjustments", "set-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["adjustment_table"].(map[string]any)
+	ranges := result["ranges"].([]any)
+	row := ranges[0].(map[string]any)
+	if result["range_count"] != float64(1) || row["adjustment_function_name"] != "BATTERY_PROFILE" || result["save_required"] != true {
+		t.Fatalf("adjustment_table = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_ADJUSTMENT_RANGE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestAdjustmentsSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `[{"index":1,"slot_index":0,"aux_channel_index":2,"range_start_step":4,"range_end_step":8,"adjustment_function":33,"aux_switch_channel_index":3,"adjustment_center":1600,"adjustment_scale":50}]`
+	env, err := runTestCommandWithInput(t, []string{"adjustments", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestAdjustmentsSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `[{"index":1,"slot_index":0,"aux_channel_index":2,"range_start_step":8,"range_end_step":4,"adjustment_function":33,"aux_switch_channel_index":3,"adjustment_center":1600,"adjustment_scale":50}]`
+	env, err := runTestCommandWithInput(t, []string{"adjustments", "set-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

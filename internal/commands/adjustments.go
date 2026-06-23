@@ -82,6 +82,18 @@ type AdjustmentRangeSetResult struct {
 	SaveRequired bool            `json:"save_required"`
 }
 
+type AdjustmentTableSetConfig struct {
+	Ranges []AdjustmentRange `json:"ranges"`
+}
+
+type AdjustmentTableSetResult struct {
+	Ranges       []AdjustmentRange `json:"ranges"`
+	RangeCount   int               `json:"range_count"`
+	MSPName      string            `json:"msp_name"`
+	Acknowledged bool              `json:"acknowledged"`
+	SaveRequired bool              `json:"save_required"`
+}
+
 func ReadAdjustmentStatus(ctx context.Context, client *connection.Client) (*AdjustmentStatus, error) {
 	frame, err := client.Request(ctx, msp.MSPAdjustmentRanges, nil)
 	if err != nil {
@@ -95,6 +107,9 @@ func ReadAdjustmentStatus(ctx context.Context, client *connection.Client) (*Adju
 }
 
 func SetAdjustmentRange(ctx context.Context, client *connection.Client, row AdjustmentRange) (*AdjustmentRangeSetResult, error) {
+	if err := ValidateAdjustmentRange(row); err != nil {
+		return nil, err
+	}
 	if _, err := client.Request(ctx, msp.MSPSetAdjustmentRange, EncodeAdjustmentRange(row)); err != nil {
 		return nil, fmt.Errorf("adjustment range request failed: %w", err)
 	}
@@ -121,6 +136,49 @@ func EncodeAdjustmentRange(row AdjustmentRange) []byte {
 	payload = appendU16Payload(payload, row.AdjustmentCenter)
 	payload = appendU16Payload(payload, row.AdjustmentScale)
 	return payload
+}
+
+func SetAdjustmentTable(ctx context.Context, client *connection.Client, config AdjustmentTableSetConfig) (*AdjustmentTableSetResult, error) {
+	if err := ValidateAdjustmentTable(config); err != nil {
+		return nil, err
+	}
+	ranges := make([]AdjustmentRange, 0, len(config.Ranges))
+	for _, row := range config.Ranges {
+		result, err := SetAdjustmentRange(ctx, client, row)
+		if err != nil {
+			return nil, err
+		}
+		ranges = append(ranges, result.Range)
+	}
+	return &AdjustmentTableSetResult{
+		Ranges:       ranges,
+		RangeCount:   len(ranges),
+		MSPName:      "MSP_SET_ADJUSTMENT_RANGE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateAdjustmentTable(config AdjustmentTableSetConfig) error {
+	if len(config.Ranges) == 0 {
+		return fmt.Errorf("at least one adjustment range is required")
+	}
+	for i, row := range config.Ranges {
+		if err := ValidateAdjustmentRange(row); err != nil {
+			return fmt.Errorf("ranges[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func ValidateAdjustmentRange(row AdjustmentRange) error {
+	if row.Index < 0 || row.Index > 255 {
+		return fmt.Errorf("index must be 0..255")
+	}
+	if row.RangeStartStep > row.RangeEndStep {
+		return fmt.Errorf("range_start_step must be less than or equal to range_end_step")
+	}
+	return nil
 }
 
 func DecodeAdjustmentRanges(payload []byte) ([]AdjustmentRange, error) {

@@ -658,8 +658,74 @@ func (a *app) adjustmentsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.adjustmentSetRangeCommand())
+	cmd.AddCommand(set, a.adjustmentSetJSONCommand(), a.adjustmentSetRangeCommand())
 	return cmd
+}
+
+func (a *app) adjustmentSetJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Set adjustment range rows from JSON through MSP_SET_ADJUSTMENT_RANGE",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseAdjustmentTableJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "adjustment range changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetAdjustmentTable(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"adjustment_table": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "adjustment_table",
+					Command: "MSP_SET_ADJUSTMENT_RANGE",
+					Detail:  "adjustment range rows changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseAdjustmentTableJSON(data []byte) (bfcommands.AdjustmentTableSetConfig, error) {
+	var wrapped struct {
+		AdjustmentTable *bfcommands.AdjustmentTableSetConfig `json:"adjustment_table"`
+		Adjustments     *bfcommands.AdjustmentTableSetConfig `json:"adjustments"`
+		Ranges          []bfcommands.AdjustmentRange         `json:"ranges"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.AdjustmentTableSetConfig{}, err
+	}
+	if wrapped.AdjustmentTable != nil {
+		return validateAdjustmentTableConfig(*wrapped.AdjustmentTable)
+	}
+	if wrapped.Adjustments != nil {
+		return validateAdjustmentTableConfig(*wrapped.Adjustments)
+	}
+	if wrapped.Ranges != nil {
+		return validateAdjustmentTableConfig(bfcommands.AdjustmentTableSetConfig{Ranges: wrapped.Ranges})
+	}
+	var ranges []bfcommands.AdjustmentRange
+	if err := json.Unmarshal(data, &ranges); err != nil {
+		return bfcommands.AdjustmentTableSetConfig{}, err
+	}
+	return validateAdjustmentTableConfig(bfcommands.AdjustmentTableSetConfig{Ranges: ranges})
+}
+
+func validateAdjustmentTableConfig(config bfcommands.AdjustmentTableSetConfig) (bfcommands.AdjustmentTableSetConfig, error) {
+	if err := bfcommands.ValidateAdjustmentTable(config); err != nil {
+		return bfcommands.AdjustmentTableSetConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) adjustmentSetRangeCommand() *cobra.Command {

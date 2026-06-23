@@ -47,6 +47,15 @@ func TestEncodeBoardAlignment(t *testing.T) {
 	}
 }
 
+func TestEncodeArmingConfig(t *testing.T) {
+	gyroCal := true
+	got := EncodeArmingConfig(ArmingConfig{AutoDisarmDelayS: 5, SmallAngleDegrees: 25, GyroCalOnFirstArm: &gyroCal})
+	want := []byte{5, 0, 25, 1}
+	if string(got) != string(want) {
+		t.Fatalf("EncodeArmingConfig() = %v, want %v", got, want)
+	}
+}
+
 func TestEncodeFailsafeConfig(t *testing.T) {
 	got := EncodeFailsafeConfig(FailsafeConfig{
 		DelayTenthsS:            15,

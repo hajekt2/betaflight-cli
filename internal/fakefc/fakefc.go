@@ -383,6 +383,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 5))
 	case msp.MSPArmingConfig:
 		f.out.Write(response(frame.Code, []byte{5, 0, 25, 1}, false))
+	case msp.MSPSetArmingConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 4))
 	case msp.MSPFailsafeConfig:
 		payload := []byte{15, 60}
 		payload = appendU16(payload, 1000)

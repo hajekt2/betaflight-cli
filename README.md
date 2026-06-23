@@ -218,6 +218,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `battery set-voltage-meter` writes one voltage meter calibration row through `MSP_SET_VOLTAGE_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery set-current-meter` writes one current meter calibration row through `MSP_SET_CURRENT_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `failsafe status` reads failsafe configuration, arming configuration, board alignment, and active arming-disable flags over MSP.
+`failsafe set-arming-json` writes auto-disarm delay, small-angle limit, and gyro-calibration-on-first-arm through `MSP_SET_ARMING_CONFIG`, accepts either an arming config object or an object with `arming_config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `failsafe set-config-json` writes failsafe delay, landing time, throttle, switch mode, throttle-low delay, and procedure through `MSP_SET_FAILSAFE_CONFIG`, accepts either a failsafe config object or an object with `failsafe_config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `failsafe set-board-alignment` writes roll, pitch, and yaw board alignment through `MSP_SET_BOARD_ALIGNMENT_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `pid status` reads active PID gain triplets, rate profile data, and advanced PID tuning over MSP.

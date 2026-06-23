@@ -399,6 +399,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if gpsRescuePIDs["operation"] != "write" || gpsRescuePIDs["confirmation"] != "--yes" || gpsRescuePIDs["requires_connection"] != true || gpsRescuePIDs["output_root"] != "gps_rescue_pids" || gpsRescuePIDs["runnable"] != true {
 		t.Fatalf("gps rescue pids capability = %+v", gpsRescuePIDs)
 	}
+	armingConfig := byCommand["betaflight-cli failsafe set-arming-json"]
+	if armingConfig["operation"] != "write" || armingConfig["confirmation"] != "--yes" || armingConfig["requires_connection"] != true || armingConfig["output_root"] != "arming_config" || armingConfig["runnable"] != true {
+		t.Fatalf("arming config capability = %+v", armingConfig)
+	}
 	failsafeConfig := byCommand["betaflight-cli failsafe set-config-json"]
 	if failsafeConfig["operation"] != "write" || failsafeConfig["confirmation"] != "--yes" || failsafeConfig["requires_connection"] != true || failsafeConfig["output_root"] != "failsafe_config" || failsafeConfig["runnable"] != true {
 		t.Fatalf("failsafe config capability = %+v", failsafeConfig)
@@ -6327,6 +6331,44 @@ func TestFailsafeSetBoardAlignmentRequiresValidInt16(t *testing.T) {
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
+func TestFailsafeSetArmingJSONWithFakeFC(t *testing.T) {
+	input := `{"arming_config":{"auto_disarm_delay_s":5,"small_angle_degrees":25,"gyro_cal_on_first_arm":true}}`
+	env, err := runTestCommandWithInput(t, []string{"failsafe", "set-arming-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["arming_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["auto_disarm_delay_s"] != float64(5) || config["small_angle_degrees"] != float64(25) || config["gyro_cal_on_first_arm"] != true || result["save_required"] != true {
+		t.Fatalf("arming_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "arming_config" || env.SideEffects[0].Command != "MSP_SET_ARMING_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestFailsafeSetArmingJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"arming_config":{"auto_disarm_delay_s":5,"small_angle_degrees":25,"gyro_cal_on_first_arm":true}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"failsafe", "set-arming-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after arming config confirmation failure")
 	}
 }
 

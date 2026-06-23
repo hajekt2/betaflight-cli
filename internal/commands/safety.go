@@ -66,6 +66,14 @@ type ArmingConfig struct {
 	TrailingBytesIgnored int   `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type ArmingConfigSetResult struct {
+	Config       ArmingConfig `json:"config"`
+	MSPCode      uint16       `json:"msp_code"`
+	MSPName      string       `json:"msp_name"`
+	Acknowledged bool         `json:"acknowledged"`
+	SaveRequired bool         `json:"save_required"`
+}
+
 type FailsafeConfig struct {
 	DelayTenthsS            uint8  `json:"delay_tenths_s"`
 	LandingTimeS            uint8  `json:"landing_time_s"`
@@ -254,6 +262,27 @@ func DecodeBoardAlignment(payload []byte) (*BoardAlignment, error) {
 		YawDegrees:           yaw,
 		TrailingBytesIgnored: r.Remaining(),
 	}, nil
+}
+
+func SetArmingConfig(ctx context.Context, client *connection.Client, config ArmingConfig) (*ArmingConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetArmingConfig, EncodeArmingConfig(config)); err != nil {
+		return nil, fmt.Errorf("arming config request failed: %w", err)
+	}
+	return &ArmingConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetArmingConfig,
+		MSPName:      "MSP_SET_ARMING_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeArmingConfig(config ArmingConfig) []byte {
+	gyroCal := uint8(0)
+	if config.GyroCalOnFirstArm != nil && *config.GyroCalOnFirstArm {
+		gyroCal = 1
+	}
+	return []byte{config.AutoDisarmDelayS, 0, config.SmallAngleDegrees, gyroCal}
 }
 
 func SetFailsafeConfig(ctx context.Context, client *connection.Client, config FailsafeConfig) (*FailsafeConfigSetResult, error) {

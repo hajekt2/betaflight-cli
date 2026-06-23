@@ -103,6 +103,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "failsafe" {
 		cmd.AddCommand(a.failsafeStatusCommand())
+		cmd.AddCommand(a.failsafeSetArmingJSONCommand())
 		cmd.AddCommand(a.failsafeSetConfigJSONCommand())
 		cmd.AddCommand(a.failsafeBoardAlignmentCommand())
 	}
@@ -1405,6 +1406,67 @@ func (a *app) failsafeStatusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) failsafeSetArmingJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-arming-json FILE",
+		Short: "Set arming configuration from JSON through MSP_SET_ARMING_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseArmingConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "arming changes affect safety behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetArmingConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"arming_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "arming_config",
+					Command: "MSP_SET_ARMING_CONFIG",
+					Detail:  "arming config changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseArmingConfigJSON(data []byte) (bfcommands.ArmingConfig, error) {
+	var wrapped struct {
+		ArmingConfig *bfcommands.ArmingConfig `json:"arming_config"`
+		Config       *bfcommands.ArmingConfig `json:"config"`
+		Failsafe     *struct {
+			ArmingConfig *bfcommands.ArmingConfig `json:"arming_config"`
+		} `json:"failsafe"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.ArmingConfig{}, err
+	}
+	if wrapped.ArmingConfig != nil {
+		return *wrapped.ArmingConfig, nil
+	}
+	if wrapped.Config != nil {
+		return *wrapped.Config, nil
+	}
+	if wrapped.Failsafe != nil && wrapped.Failsafe.ArmingConfig != nil {
+		return *wrapped.Failsafe.ArmingConfig, nil
+	}
+	var config bfcommands.ArmingConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.ArmingConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) failsafeBoardAlignmentCommand() *cobra.Command {

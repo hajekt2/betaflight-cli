@@ -87,8 +87,11 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.osdSetCanvasCommand())
 		cmd.AddCommand(a.osdSetVideoSystemCommand())
 		cmd.AddCommand(a.osdSetPositionCommand())
+		cmd.AddCommand(a.osdSetPositionJSONCommand())
 		cmd.AddCommand(a.osdSetStatCommand())
+		cmd.AddCommand(a.osdSetStatJSONCommand())
 		cmd.AddCommand(a.osdSetTimerCommand())
+		cmd.AddCommand(a.osdSetTimerJSONCommand())
 	}
 	if domain.use == "pid" {
 		cmd.AddCommand(a.pidStatusCommand())
@@ -1367,6 +1370,60 @@ func (a *app) osdSetPositionCommand() *cobra.Command {
 	}
 }
 
+func (a *app) osdSetPositionJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-position-json FILE",
+		Short: "Set one OSD element position from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseOSDPositionJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD element position changes require --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDPosition(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_position": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "osd_position", Command: "MSP_SET_OSD_CONFIG", Detail: "OSD element position changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func parseOSDPositionJSON(data []byte) (bfcommands.OSDPositionSetConfig, error) {
+	var wrapped struct {
+		OSDPosition *bfcommands.OSDPositionSetConfig `json:"osd_position"`
+		Position    *bfcommands.OSDPositionSetConfig `json:"position"`
+		Config      *bfcommands.OSDPositionSetConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.OSDPositionSetConfig{}, err
+	}
+	switch {
+	case wrapped.OSDPosition != nil:
+		return *wrapped.OSDPosition, nil
+	case wrapped.Position != nil:
+		return *wrapped.Position, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.OSDPositionSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.OSDPositionSetConfig{}, err
+	}
+	return config, nil
+}
+
 func (a *app) osdSetStatCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-stat INDEX ENABLED",
@@ -1398,6 +1455,60 @@ func (a *app) osdSetStatCommand() *cobra.Command {
 	}
 }
 
+func (a *app) osdSetStatJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-stat-json FILE",
+		Short: "Set one post-flight OSD statistic flag from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseOSDStatJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD statistic changes require --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDStat(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_stat": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "osd_stat", Command: "MSP_SET_OSD_CONFIG", Detail: "OSD statistic changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func parseOSDStatJSON(data []byte) (bfcommands.OSDStatSetConfig, error) {
+	var wrapped struct {
+		OSDStat *bfcommands.OSDStatSetConfig `json:"osd_stat"`
+		Stat    *bfcommands.OSDStatSetConfig `json:"stat"`
+		Config  *bfcommands.OSDStatSetConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.OSDStatSetConfig{}, err
+	}
+	switch {
+	case wrapped.OSDStat != nil:
+		return *wrapped.OSDStat, nil
+	case wrapped.Stat != nil:
+		return *wrapped.Stat, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.OSDStatSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.OSDStatSetConfig{}, err
+	}
+	return config, nil
+}
+
 func (a *app) osdSetTimerCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-timer INDEX VALUE",
@@ -1427,6 +1538,60 @@ func (a *app) osdSetTimerCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) osdSetTimerJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-timer-json FILE",
+		Short: "Set one OSD timer value from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseOSDTimerJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD timer changes require --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDTimer(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_timer": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "osd_timer", Command: "MSP_SET_OSD_CONFIG", Detail: "OSD timer changed but not saved"})
+				return env
+			})
+		},
+	}
+}
+
+func parseOSDTimerJSON(data []byte) (bfcommands.OSDTimerSetConfig, error) {
+	var wrapped struct {
+		OSDTimer *bfcommands.OSDTimerSetConfig `json:"osd_timer"`
+		Timer    *bfcommands.OSDTimerSetConfig `json:"timer"`
+		Config   *bfcommands.OSDTimerSetConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.OSDTimerSetConfig{}, err
+	}
+	switch {
+	case wrapped.OSDTimer != nil:
+		return *wrapped.OSDTimer, nil
+	case wrapped.Timer != nil:
+		return *wrapped.Timer, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.OSDTimerSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.OSDTimerSetConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) pidStatusCommand() *cobra.Command {

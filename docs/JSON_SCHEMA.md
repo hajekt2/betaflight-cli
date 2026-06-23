@@ -186,6 +186,7 @@ Successful OSD general config writes include an `osd_general_config` side effect
 `osd set-video-system` returns an `osd_video_system` object with requested video system value/name, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
 Successful OSD video-system writes include an `osd_video_system` side effect.
 `osd set-position`, `osd set-stat`, and `osd set-timer` return `osd_position`, `osd_stat`, and `osd_timer` objects with the requested value, MSP command name/code, acknowledgement flag, and `save_required`.
+`osd set-position-json`, `osd set-stat-json`, and `osd set-timer-json` accept direct objects or objects with `osd_position`/`position`/`config`, `osd_stat`/`stat`/`config`, or `osd_timer`/`timer`/`config` and return the same output roots as their positional forms.
 Successful OSD config writes include `osd_position`, `osd_stat`, or `osd_timer` side effects.
 `vtxtable set-json` returns a `vtxtable` object with applied band rows, applied power rows, row counts, MSP command names, acknowledgement flag, and `save_required`.
 Successful full VTX table writes include a `vtxtable` side effect.

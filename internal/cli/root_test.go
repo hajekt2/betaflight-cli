@@ -655,13 +655,25 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if osdPosition["operation"] != "write" || osdPosition["confirmation"] != "--yes" || osdPosition["requires_connection"] != true || osdPosition["output_root"] != "osd_position" || osdPosition["runnable"] != true {
 		t.Fatalf("osd position capability = %+v", osdPosition)
 	}
+	osdPositionJSON := byCommand["betaflight-cli osd set-position-json"]
+	if osdPositionJSON["operation"] != "write" || osdPositionJSON["confirmation"] != "--yes" || osdPositionJSON["requires_connection"] != true || osdPositionJSON["output_root"] != "osd_position" || osdPositionJSON["input"] == "" || osdPositionJSON["runnable"] != true {
+		t.Fatalf("osd position json capability = %+v", osdPositionJSON)
+	}
 	osdStat := byCommand["betaflight-cli osd set-stat"]
 	if osdStat["operation"] != "write" || osdStat["confirmation"] != "--yes" || osdStat["requires_connection"] != true || osdStat["output_root"] != "osd_stat" || osdStat["runnable"] != true {
 		t.Fatalf("osd stat capability = %+v", osdStat)
 	}
+	osdStatJSON := byCommand["betaflight-cli osd set-stat-json"]
+	if osdStatJSON["operation"] != "write" || osdStatJSON["confirmation"] != "--yes" || osdStatJSON["requires_connection"] != true || osdStatJSON["output_root"] != "osd_stat" || osdStatJSON["input"] == "" || osdStatJSON["runnable"] != true {
+		t.Fatalf("osd stat json capability = %+v", osdStatJSON)
+	}
 	osdTimer := byCommand["betaflight-cli osd set-timer"]
 	if osdTimer["operation"] != "write" || osdTimer["confirmation"] != "--yes" || osdTimer["requires_connection"] != true || osdTimer["output_root"] != "osd_timer" || osdTimer["runnable"] != true {
 		t.Fatalf("osd timer capability = %+v", osdTimer)
+	}
+	osdTimerJSON := byCommand["betaflight-cli osd set-timer-json"]
+	if osdTimerJSON["operation"] != "write" || osdTimerJSON["confirmation"] != "--yes" || osdTimerJSON["requires_connection"] != true || osdTimerJSON["output_root"] != "osd_timer" || osdTimerJSON["input"] == "" || osdTimerJSON["runnable"] != true {
+		t.Fatalf("osd timer json capability = %+v", osdTimerJSON)
 	}
 	vtxTableBand := byCommand["betaflight-cli vtxtable set-band"]
 	if vtxTableBand["operation"] != "write" || vtxTableBand["confirmation"] != "--yes" || vtxTableBand["requires_connection"] != true || vtxTableBand["output_root"] != "vtxtable_band" || vtxTableBand["runnable"] != true {
@@ -4121,6 +4133,26 @@ func TestOSDSetPositionWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestOSDSetPositionJSONWithFakeFC(t *testing.T) {
+	input := `{"osd_position":{"index":7,"raw":2122,"screen":1}}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-position-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_position"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["index"] != float64(7) || config["raw"] != float64(2122) || config["screen"] != float64(1) || result["save_required"] != true {
+		t.Fatalf("osd_position = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "osd_position" || env.SideEffects[0].Command != "MSP_SET_OSD_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestOSDSetStatWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"osd", "set-stat", "3", "true", "--yes"}, nil)
 	if err != nil {
@@ -4134,6 +4166,26 @@ func TestOSDSetStatWithFakeFC(t *testing.T) {
 	config := result["config"].(map[string]any)
 	if config["index"] != float64(3) || config["enabled"] != true || result["save_required"] != true {
 		t.Fatalf("osd_stat = %+v", result)
+	}
+}
+
+func TestOSDSetStatJSONWithFakeFC(t *testing.T) {
+	input := `{"stat":{"index":3,"enabled":true}}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-stat-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_stat"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["index"] != float64(3) || config["enabled"] != true || result["save_required"] != true {
+		t.Fatalf("osd_stat = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "osd_stat" || env.SideEffects[0].Command != "MSP_SET_OSD_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 
@@ -4153,8 +4205,42 @@ func TestOSDSetTimerWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestOSDSetTimerJSONWithFakeFC(t *testing.T) {
+	input := `{"config":{"index":1,"value":1110}}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-timer-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_timer"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["index"] != float64(1) || config["value"] != float64(1110) || result["save_required"] != true {
+		t.Fatalf("osd_timer = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "osd_timer" || env.SideEffects[0].Command != "MSP_SET_OSD_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestOSDSetPositionRequiresConfirmationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"osd", "set-position", "7", "2122"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetPositionJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"position":{"index":7,"raw":2122,"screen":1}}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-position-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})

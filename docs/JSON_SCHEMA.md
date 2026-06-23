@@ -434,6 +434,8 @@ Successful servo writes include `servo_table`, `servo_config`, or `servo_mix_rul
 The object includes adjustment range rows, AUX channel names, range microsecond values, adjustment function names, center and scale values, active markers, and native `adjrange` CLI commands.
 `adjustments set-json` returns an `adjustment_table` object with applied adjustment range rows, row count, MSP command name, acknowledgement flag, and `save_required`.
 `adjustments set-range` returns an `adjustment_range` object with the written row, decoded microsecond equivalents, MSP command name/code, acknowledgement flag, and `save_required`.
+`adjustments set-range-json` accepts either an adjustment range object or an object with `adjustment_range`, `range`, or `config`.
+It returns the same `adjustment_range` object as `adjustments set-range`.
 Successful adjustment range writes include an `adjustment_table` or `adjustment_range` side effect.
 
 ## Error Codes

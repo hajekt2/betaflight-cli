@@ -555,6 +555,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if adjustmentRange["operation"] != "write" || adjustmentRange["confirmation"] != "--yes" || adjustmentRange["requires_connection"] != true || adjustmentRange["output_root"] != "adjustment_range" || adjustmentRange["runnable"] != true {
 		t.Fatalf("adjustment range capability = %+v", adjustmentRange)
 	}
+	adjustmentRangeJSON := byCommand["betaflight-cli adjustments set-range-json"]
+	if adjustmentRangeJSON["operation"] != "write" || adjustmentRangeJSON["confirmation"] != "--yes" || adjustmentRangeJSON["requires_connection"] != true || adjustmentRangeJSON["output_root"] != "adjustment_range" || adjustmentRangeJSON["input"] == "" || adjustmentRangeJSON["runnable"] != true {
+		t.Fatalf("adjustment range json capability = %+v", adjustmentRangeJSON)
+	}
 	adjustmentTable := byCommand["betaflight-cli adjustments set-json"]
 	if adjustmentTable["operation"] != "write" || adjustmentTable["confirmation"] != "--yes" || adjustmentTable["requires_connection"] != true || adjustmentTable["output_root"] != "adjustment_table" || adjustmentTable["runnable"] != true {
 		t.Fatalf("adjustment table capability = %+v", adjustmentTable)
@@ -6487,6 +6491,26 @@ func TestAdjustmentsSetRangeWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestAdjustmentsSetRangeJSONWithFakeFC(t *testing.T) {
+	input := `{"adjustment_range":{"index":1,"slot_index":0,"aux_channel_index":2,"range_start_step":4,"range_end_step":8,"adjustment_function":33,"aux_switch_channel_index":3,"adjustment_center":1600,"adjustment_scale":50}}`
+	env, err := runTestCommandWithInput(t, []string{"adjustments", "set-range-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["adjustment_range"].(map[string]any)
+	row := result["range"].(map[string]any)
+	if row["index"] != float64(1) || row["range_start_us"] != float64(1000) || row["adjustment_function_name"] != "BATTERY_PROFILE" || result["save_required"] != true {
+		t.Fatalf("adjustment_range = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "adjustment_range" || env.SideEffects[0].Command != "MSP_SET_ADJUSTMENT_RANGE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestAdjustmentsSetJSONWithFakeFC(t *testing.T) {
 	input := `{"adjustment_table":{"ranges":[{"index":1,"slot_index":0,"aux_channel_index":2,"range_start_step":4,"range_end_step":8,"adjustment_function":33,"aux_switch_channel_index":3,"adjustment_center":1600,"adjustment_scale":50}]}}`
 	env, err := runTestCommandWithInput(t, []string{"adjustments", "set-json", "-", "--yes"}, input, nil)
@@ -6538,6 +6562,20 @@ func TestAdjustmentsSetJSONValidationBeforeConnect(t *testing.T) {
 
 func TestAdjustmentsSetRangeRequiresConfirmationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"adjustments", "set-range", "1", "0", "2", "4", "8", "33", "3", "1600", "50"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestAdjustmentsSetRangeJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"range":{"index":1,"slot_index":0,"aux_channel_index":2,"range_start_step":4,"range_end_step":8,"adjustment_function":33,"aux_switch_channel_index":3,"adjustment_center":1600,"adjustment_scale":50}}`
+	env, err := runTestCommandWithInput(t, []string{"adjustments", "set-range-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})

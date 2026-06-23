@@ -788,7 +788,7 @@ func (a *app) adjustmentsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.adjustmentSetJSONCommand(), a.adjustmentSetRangeCommand())
+	cmd.AddCommand(set, a.adjustmentSetJSONCommand(), a.adjustmentSetRangeCommand(), a.adjustmentSetRangeJSONCommand())
 	return cmd
 }
 
@@ -929,6 +929,71 @@ func (a *app) adjustmentSetRangeCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) adjustmentSetRangeJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-range-json FILE",
+		Short: "Set one adjustment range from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			row, err := parseAdjustmentRangeJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "adjustment range changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetAdjustmentRange(cmd.Context(), client, row)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"adjustment_range": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "adjustment_range",
+					Command: "MSP_SET_ADJUSTMENT_RANGE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseAdjustmentRangeJSON(data []byte) (bfcommands.AdjustmentRange, error) {
+	var wrapped struct {
+		AdjustmentRange *bfcommands.AdjustmentRange `json:"adjustment_range"`
+		Range           *bfcommands.AdjustmentRange `json:"range"`
+		Config          *bfcommands.AdjustmentRange `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.AdjustmentRange{}, err
+	}
+	switch {
+	case wrapped.AdjustmentRange != nil:
+		return validateAdjustmentRange(*wrapped.AdjustmentRange)
+	case wrapped.Range != nil:
+		return validateAdjustmentRange(*wrapped.Range)
+	case wrapped.Config != nil:
+		return validateAdjustmentRange(*wrapped.Config)
+	}
+	var row bfcommands.AdjustmentRange
+	if err := json.Unmarshal(data, &row); err != nil {
+		return bfcommands.AdjustmentRange{}, err
+	}
+	return validateAdjustmentRange(row)
+}
+
+func validateAdjustmentRange(row bfcommands.AdjustmentRange) (bfcommands.AdjustmentRange, error) {
+	if err := bfcommands.ValidateAdjustmentRange(row); err != nil {
+		return bfcommands.AdjustmentRange{}, err
+	}
+	return row, nil
 }
 
 func (a *app) rxRangeCommand() *cobra.Command {

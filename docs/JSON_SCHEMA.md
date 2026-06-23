@@ -197,6 +197,8 @@ Successful serial config writes include a `serial_config` side effect.
 The object includes active PID gain triplets, PID names, controller identity, the active rate profile, advanced PID tuning fields, and source metadata for each MSP message.
 `pid set-gains-json` returns a `pid_gains` object with the requested PID gain rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful PID gain writes include a `pid_gains` side effect.
+`pid set-advanced-json` returns a `pid_advanced` object with the requested PID advanced profile fields, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful PID advanced writes include a `pid_advanced` side effect.
 
 `rates status` returns a `rates` object decoded from `MSP_RC_TUNING` and `MSP_PID_ADVANCED`.
 The object includes per-axis RC rates, expo, super rate values, rate limits, throttle curve fields, rates type, throttle limit mode, and TPA settings.

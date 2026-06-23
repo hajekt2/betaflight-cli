@@ -399,6 +399,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if pidGains["operation"] != "write" || pidGains["confirmation"] != "--yes" || pidGains["requires_connection"] != true || pidGains["output_root"] != "pid_gains" || pidGains["runnable"] != true {
 		t.Fatalf("pid gains capability = %+v", pidGains)
 	}
+	pidAdvanced := byCommand["betaflight-cli pid set-advanced-json"]
+	if pidAdvanced["operation"] != "write" || pidAdvanced["confirmation"] != "--yes" || pidAdvanced["requires_connection"] != true || pidAdvanced["output_root"] != "pid_advanced" || pidAdvanced["runnable"] != true {
+		t.Fatalf("pid advanced capability = %+v", pidAdvanced)
+	}
 	rateProfile := byCommand["betaflight-cli rates set-profile-json"]
 	if rateProfile["operation"] != "write" || rateProfile["confirmation"] != "--yes" || rateProfile["requires_connection"] != true || rateProfile["output_root"] != "rate_profile" || rateProfile["runnable"] != true {
 		t.Fatalf("rate profile capability = %+v", rateProfile)
@@ -5696,6 +5700,54 @@ func TestPIDSetGainsJSONValidationBeforeConnect(t *testing.T) {
 	input := `[{"p":45,"i":80,"d":30}]`
 	env, err := runTestCommandWithInput(t, []string{"pid", "set-gains-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called for invalid JSON shape")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestPIDSetAdvancedJSONWithFakeFC(t *testing.T) {
+	input := `{"pid_advanced":{"feedforward_transition":20,"rate_accel_limit":100,"yaw_rate_accel_limit":120,"level_angle_limit":55,"anti_gravity_gain":3500,"iterm_rotation":1,"iterm_relax":2,"iterm_relax_type":1,"throttle_boost":5,"acro_trainer_angle_limit":20,"feedforward_roll":120,"feedforward_pitch":125,"feedforward_yaw":120,"d_max_roll":40,"d_max_pitch":42,"d_max_gain":35,"d_max_advance":50,"integrated_yaw_relax":20,"iterm_relax_cutoff":15,"motor_output_limit":95,"idle_min_rpm":30,"feedforward_averaging":2,"feedforward_smooth_factor":10,"feedforward_boost":20,"feedforward_max_rate_limit":30,"feedforward_jitter_factor":90,"vbat_sag_compensation":5,"thrust_linearization":10,"tpa":{"mode":2,"rate":15,"breakpoint":1350}}}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-advanced-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["pid_advanced"].(map[string]any)
+	advanced := result["advanced"].(map[string]any)
+	if advanced["anti_gravity_gain"] != float64(3500) || advanced["feedforward_pitch"] != float64(125) || result["save_required"] != true {
+		t.Fatalf("pid_advanced = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_PID_ADVANCED" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestPIDSetAdvancedJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"pid_advanced":{"feedforward_averaging":2}}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-advanced-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestPIDSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"pid_advanced":{"feedforward_averaging":4}}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-advanced-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid PID advanced config")
 		return nil, connection.TargetInfo{}, nil
 	})
 	if err != nil {

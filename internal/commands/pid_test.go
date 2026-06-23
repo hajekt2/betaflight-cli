@@ -95,6 +95,25 @@ func TestDecodePIDAdvancedRejectsShortPayload(t *testing.T) {
 	}
 }
 
+func TestEncodePIDAdvanced(t *testing.T) {
+	advanced, err := DecodePIDAdvanced(pidAdvancedTestPayload())
+	if err != nil {
+		t.Fatalf("DecodePIDAdvanced() error = %v", err)
+	}
+	payload := EncodePIDAdvanced(*advanced)
+	want := pidAdvancedTestPayload()
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
+func TestValidatePIDAdvancedRejectsInvalidFeedforwardAveraging(t *testing.T) {
+	advanced := PIDAdvanced{FeedforwardAveraging: 4}
+	if err := ValidatePIDAdvanced(advanced); err == nil {
+		t.Fatal("ValidatePIDAdvanced() error = nil, want feedforward averaging error")
+	}
+}
+
 func pidAdvancedTestPayload() []byte {
 	payload := appendU16Test(nil, 0)
 	payload = appendU16Test(payload, 0)

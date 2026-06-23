@@ -62,6 +62,14 @@ type PIDGainsSetResult struct {
 	SaveRequired bool      `json:"save_required"`
 }
 
+type PIDAdvancedSetResult struct {
+	Advanced     PIDAdvanced `json:"advanced"`
+	MSPCode      uint16      `json:"msp_code"`
+	MSPName      string      `json:"msp_name"`
+	Acknowledged bool        `json:"acknowledged"`
+	SaveRequired bool        `json:"save_required"`
+}
+
 type RateProfile struct {
 	Axes                 []RateAxis `json:"axes"`
 	Throttle             Throttle   `json:"throttle"`
@@ -237,6 +245,29 @@ func SetPIDGains(ctx context.Context, client *connection.Client, gains []PIDGain
 	}, nil
 }
 
+func SetPIDAdvanced(ctx context.Context, client *connection.Client, advanced PIDAdvanced) (*PIDAdvancedSetResult, error) {
+	if err := ValidatePIDAdvanced(advanced); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetPIDAdvanced, EncodePIDAdvanced(advanced)); err != nil {
+		return nil, fmt.Errorf("pid advanced request failed: %w", err)
+	}
+	return &PIDAdvancedSetResult{
+		Advanced:     advanced,
+		MSPCode:      msp.MSPSetPIDAdvanced,
+		MSPName:      "MSP_SET_PID_ADVANCED",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidatePIDAdvanced(advanced PIDAdvanced) error {
+	if advanced.FeedforwardAveraging > 3 {
+		return fmt.Errorf("feedforward_averaging must be 0-3")
+	}
+	return nil
+}
+
 func SetRateProfile(ctx context.Context, client *connection.Client, profile RateProfile) (*RateProfileSetResult, error) {
 	if _, err := client.Request(ctx, msp.MSPSetRCTuning, EncodeRateProfile(profile)); err != nil {
 		return nil, fmt.Errorf("rate profile request failed: %w", err)
@@ -294,6 +325,65 @@ func EncodePIDGains(gains []PIDGain) []byte {
 	for _, gain := range gains {
 		payload = append(payload, gain.P, gain.I, gain.D)
 	}
+	return payload
+}
+
+func EncodePIDAdvanced(advanced PIDAdvanced) []byte {
+	payload := make([]byte, 0, pidAdvancedMinLength)
+	payload = appendU16Payload(payload, advanced.RollPitchItermIgnoreRate)
+	payload = appendU16Payload(payload, advanced.YawItermIgnoreRate)
+	payload = appendU16Payload(payload, advanced.YawPLimit)
+	payload = append(payload,
+		advanced.DeltaMethod,
+		advanced.VBATPIDCompensation,
+		advanced.FeedforwardTransition,
+		advanced.DtermSetpointWeightLow,
+		advanced.ToleranceBand,
+		advanced.ToleranceBandReduction,
+		advanced.ItermThrottleGain,
+	)
+	payload = appendU16Payload(payload, advanced.RateAccelLimit)
+	payload = appendU16Payload(payload, advanced.YawRateAccelLimit)
+	payload = append(payload, advanced.LevelAngleLimit, advanced.LevelSensitivity)
+	payload = appendU16Payload(payload, advanced.ItermThrottleThreshold)
+	payload = appendU16Payload(payload, advanced.AntiGravityGain)
+	payload = appendU16Payload(payload, advanced.DtermSetpointWeight)
+	payload = append(payload,
+		advanced.ItermRotation,
+		advanced.SmartFeedforward,
+		advanced.ItermRelax,
+		advanced.ItermRelaxType,
+		advanced.AbsoluteControlGain,
+		advanced.ThrottleBoost,
+		advanced.AcroTrainerAngleLimit,
+	)
+	payload = appendU16Payload(payload, advanced.FeedforwardRoll)
+	payload = appendU16Payload(payload, advanced.FeedforwardPitch)
+	payload = appendU16Payload(payload, advanced.FeedforwardYaw)
+	payload = append(payload,
+		advanced.AntiGravityMode,
+		advanced.DMaxRoll,
+		advanced.DMaxPitch,
+		advanced.DMaxYaw,
+		advanced.DMaxGain,
+		advanced.DMaxAdvance,
+		advanced.UseIntegratedYaw,
+		advanced.IntegratedYawRelax,
+		advanced.ItermRelaxCutoff,
+		advanced.MotorOutputLimit,
+		uint8(advanced.AutoProfileCellCount),
+		advanced.IdleMinRPM,
+		advanced.FeedforwardAveraging,
+		advanced.FeedforwardSmoothFactor,
+		advanced.FeedforwardBoost,
+		advanced.FeedforwardMaxRateLimit,
+		advanced.FeedforwardJitterFactor,
+		advanced.VBATSagCompensation,
+		advanced.ThrustLinearization,
+		advanced.TPA.Mode,
+		advanced.TPA.Rate,
+	)
+	payload = appendU16Payload(payload, advanced.TPA.Breakpoint)
 	return payload
 }
 

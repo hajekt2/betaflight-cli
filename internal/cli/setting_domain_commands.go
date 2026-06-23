@@ -83,6 +83,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "pid" {
 		cmd.AddCommand(a.pidStatusCommand())
 		cmd.AddCommand(a.pidSetGainsJSONCommand())
+		cmd.AddCommand(a.pidSetAdvancedJSONCommand())
 	}
 	if domain.use == "rates" {
 		cmd.AddCommand(a.ratesStatusCommand())
@@ -860,6 +861,40 @@ func (a *app) pidSetGainsJSONCommand() *cobra.Command {
 	}
 }
 
+func (a *app) pidSetAdvancedJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-advanced-json FILE",
+		Short: "Set PID advanced profile fields from JSON through MSP_SET_PID_ADVANCED",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			advanced, err := parsePIDAdvancedJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "PID advanced changes affect flight behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetPIDAdvanced(cmd.Context(), client, advanced)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"pid_advanced": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "pid_advanced",
+					Command: "MSP_SET_PID_ADVANCED",
+					Detail:  "PID advanced profile changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
 func parsePIDGainsJSON(data []byte) ([]bfcommands.PIDGain, error) {
 	var gains []bfcommands.PIDGain
 	if err := json.Unmarshal(data, &gains); err != nil {
@@ -882,6 +917,28 @@ func parsePIDGainsJSON(data []byte) ([]bfcommands.PIDGain, error) {
 		}
 	}
 	return gains, nil
+}
+
+func parsePIDAdvancedJSON(data []byte) (bfcommands.PIDAdvanced, error) {
+	var wrapped struct {
+		PIDAdvanced *bfcommands.PIDAdvanced `json:"pid_advanced"`
+		Advanced    *bfcommands.PIDAdvanced `json:"advanced"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.PIDAdvanced{}, err
+	}
+	var advanced bfcommands.PIDAdvanced
+	if wrapped.PIDAdvanced != nil {
+		advanced = *wrapped.PIDAdvanced
+	} else if wrapped.Advanced != nil {
+		advanced = *wrapped.Advanced
+	} else if err := json.Unmarshal(data, &advanced); err != nil {
+		return bfcommands.PIDAdvanced{}, err
+	}
+	if err := bfcommands.ValidatePIDAdvanced(advanced); err != nil {
+		return bfcommands.PIDAdvanced{}, err
+	}
+	return advanced, nil
 }
 
 func (a *app) ratesStatusCommand() *cobra.Command {

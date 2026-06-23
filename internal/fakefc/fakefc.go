@@ -144,7 +144,7 @@ func New() *FC {
 		},
 		Unsupported:        map[uint16]bool{},
 		DataflashUsedBytes: 262144,
-		DataflashData:      bytes.Repeat([]byte("BLACKBOX\n"), 32768),
+		DataflashData:      fakeDataflashLogData(),
 	}
 }
 
@@ -979,4 +979,25 @@ func fakeModeIDs() []byte {
 		52,
 		53,
 	}
+}
+
+func fakeDataflashLogData() []byte {
+	log := strings.Join([]string{
+		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
+		"H Firmware revision:Betaflight 2025.12.1 (abc123) STM32F405",
+		"H Field I name:loopIteration,time",
+		"H Field I signed:0,0",
+		"H Field I predictor:6,0",
+		"H Field I encoding:1,1",
+		"H Field P predictor:0,10",
+		"H Field P encoding:0,0",
+		"I\x02\x04E",
+		"",
+	}, "\n")
+	data := bytes.Repeat([]byte(log), 1024)
+	if len(data) < 262144 {
+		padding := make([]byte, 262144-len(data))
+		data = append(data, padding...)
+	}
+	return data
 }

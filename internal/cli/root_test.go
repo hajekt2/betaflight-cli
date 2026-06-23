@@ -995,6 +995,54 @@ func TestBlackboxConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestBlackboxExportWithFakeFC(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "exported.bbl")
+	env, err := runTestCommand(t, []string{"blackbox", "export", path, "--size", "64"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	export := data["blackbox_export"].(map[string]any)
+	if export["completed"] != true || export["exported_bytes"] != float64(64) || export["path"] != path {
+		t.Fatalf("export = %+v", export)
+	}
+	inspection := data["inspection"].(map[string]any)
+	if inspection["product"] == "" || inspection["firmware_revision"] == "" {
+		t.Fatalf("inspection = %+v", inspection)
+	}
+	config := data["blackbox"].(map[string]any)
+	if config["supported"] != true {
+		t.Fatalf("config = %+v", config)
+	}
+	content, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	if len(content) != 64 || !strings.HasPrefix(string(content), "H Product:Blackbox") {
+		t.Fatalf("content = %q", string(content))
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "file_write" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestBlackboxExportRequiresForceToOverwrite(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "exported.bbl")
+	if err := os.WriteFile(path, []byte("existing"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+	env, err := runTestCommand(t, []string{"blackbox", "export", path, "--size", "8"}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want existing-file failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "file_exists" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestStorageStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"storage", "status"}, nil)
 	if err != nil {
@@ -1036,7 +1084,7 @@ func TestStorageExportWithFakeFC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadFile() error = %v", err)
 	}
-	if len(content) != 64 || !strings.HasPrefix(string(content), "BLACKBOX\n") {
+	if len(content) != 64 || !strings.HasPrefix(string(content), "H Product:Blackbox") {
 		t.Fatalf("content = %q", string(content))
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "file_write" {

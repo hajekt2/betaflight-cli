@@ -154,6 +154,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `restore apply --include-defaults` and `presets apply --include-defaults` require `--yes` because defaults reset configuration before applying later lines.
 `reboot firmware`, `reboot bootloader`, `reboot bootloader-flash`, `reboot msc`, and `reboot msc-utc` send reviewed `MSP_REBOOT` requests and always require `--yes`.
 `blackbox config` reads current Blackbox configuration over MSP and returns decoded device, sample rate, and enabled or disabled field selections.
+`blackbox export FILE` exports onboard Blackbox data to a local file using `MSP_DATAFLASH_READ`, refuses overwrite unless `--force` is explicit, and returns both a `blackbox_export` summary and a parsed `inspection` of the written log.
 `storage status` reads Dataflash and SD card summaries over MSP and returns capacity, usage, readiness, and state fields.
 `storage export FILE` reads Dataflash contents over MSP into a local file, defaults to the used byte count reported by the firmware, refuses to overwrite unless `--force` is explicit, and returns a `dataflash_export` summary for agents.
 `storage erase` sends `MSP_DATAFLASH_ERASE`, requires `--yes`, captures read-only before and after storage snapshots, emits a `dataflash_erase` side effect, and returns an audit summary with freed bytes.

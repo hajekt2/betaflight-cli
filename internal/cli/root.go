@@ -188,6 +188,7 @@ func (a *app) blackboxCommand() *cobra.Command {
 			}))
 		},
 	})
+	cmd.AddCommand(a.blackboxExportCommand())
 	return cmd
 }
 

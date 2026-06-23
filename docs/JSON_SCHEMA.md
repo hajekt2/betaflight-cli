@@ -164,6 +164,9 @@ The object also includes a `by_key` map for direct agent lookup and per-field wa
 `firmware status` returns a `firmware` object built from MSP identity requests and compiled metadata.
 The object includes variant, firmware version, MSP API, support-policy result, target and board identifiers, build metadata, MCU, UID, configuration-state capabilities, and settings metadata source details.
 
+`target status` returns a `target` object composed from `firmware status`, `system status`, and `resources status`.
+The object includes a compact summary plus the full nested firmware, system, and resource diagnostics sections for agents that need raw detail.
+
 `status` returns a `status` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes the raw runtime status, active sensor names, active flight mode names decoded from `MSP_BOXNAMES` and `MSP_BOXIDS`, decoded arming-disable state, and reboot-required state when firmware supplies configuration flags.
 The `health` object includes CPU load as percent and fraction, cycle time, CPU temperature when supplied by firmware, I2C error presence, arming-blocked state, and decoded configuration-state flags.

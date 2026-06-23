@@ -89,6 +89,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.doctorCommand())
 	root.AddCommand(a.infoCommand())
 	root.AddCommand(a.firmwareCommand())
+	root.AddCommand(a.targetCommand())
 	root.AddCommand(a.textCommand())
 	root.AddCommand(a.statusCommand())
 	root.AddCommand(a.systemCommand())
@@ -464,6 +465,25 @@ func (a *app) firmwareCommand() *cobra.Command {
 				firmware, warnings := bfcommands.ReadFirmwareStatus(cmd.Context(), client)
 				env := output.Success(commandPath(cmd), &target, map[string]any{
 					"firmware": firmware,
+				})
+				addStringWarnings(&env, warnings)
+				return env
+			})
+		},
+	})
+	return cmd
+}
+
+func (a *app) targetCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "target", Short: "Inspect target hardware and runtime inventory"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read firmware, board, system, and resource inventory",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				status, warnings := bfcommands.ReadTargetStatus(cmd.Context(), client)
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"target": status,
 				})
 				addStringWarnings(&env, warnings)
 				return env

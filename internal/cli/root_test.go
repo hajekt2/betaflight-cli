@@ -342,6 +342,31 @@ func TestFirmwareStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestTargetStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"target", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	target := data["target"].(map[string]any)
+	summary := target["summary"].(map[string]any)
+	if summary["supported"] != true || summary["firmware_version"] != "2025.12.1" || summary["target_name"] != "STM32F405" {
+		t.Fatalf("summary = %+v", summary)
+	}
+	if summary["board_name"] != "FAKEF405" || summary["configuration_state"] != "CONFIGURED" || summary["build_key"] != "fake-build-key" {
+		t.Fatalf("summary identity = %+v", summary)
+	}
+	if summary["resource_count"] != float64(2) || summary["timer_count"] != float64(2) || summary["dma_count"] != float64(2) {
+		t.Fatalf("summary counts = %+v", summary)
+	}
+	if target["firmware"] == nil || target["system"] == nil || target["resources"] == nil {
+		t.Fatalf("target sections = %+v", target)
+	}
+}
+
 func TestProbeSupportAndMetadata(t *testing.T) {
 	support := probeSupport(connection.TargetInfo{
 		Variant:         "BTFL",

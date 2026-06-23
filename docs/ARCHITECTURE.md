@@ -95,6 +95,7 @@ Individual command `data` payloads may evolve, but breaking changes require a sc
 The command layer owns high-level workflows.
 Examples include `info`, `telemetry snapshot`, `cli exec`, `settings get`, `settings set`, `backup`, and `save`.
 `firmware status` exposes the connection support policy and compiled metadata baseline in JSON so agents can decide whether domain commands are safe for the attached target.
+`target status` composes identity, system, and resource diagnostics into a one-shot target inventory while preserving the lower-level command payloads.
 `doctor` should be an early command because connection and platform diagnostics are core to the user experience.
 By default, `doctor` should list ports without opening them.
 `doctor --probe` may open candidates and send `MSP_API_VERSION` to test handshakes.

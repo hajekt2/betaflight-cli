@@ -363,6 +363,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 13))
 	case msp.MSP2BatteryProfile:
 		f.out.Write(response(frame.Code, fakeBatteryProfilePayload(), false))
+	case msp.MSP2SetBatteryProfile:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 13))
 	case msp.MSPVoltageMeters:
 		f.out.Write(response(frame.Code, []byte{10, 160, 40, 120}, false))
 	case msp.MSPCurrentMeters:

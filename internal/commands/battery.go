@@ -72,6 +72,14 @@ type BatteryProfile struct {
 	TrailingBytesIgnored      int     `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type BatteryProfileSetResult struct {
+	Profile      BatteryProfile `json:"profile"`
+	MSPCode      uint16         `json:"msp_code"`
+	MSPName      string         `json:"msp_name"`
+	Acknowledged bool           `json:"acknowledged"`
+	SaveRequired bool           `json:"save_required"`
+}
+
 type BatteryRuntimeState struct {
 	CellCount            uint8   `json:"cell_count"`
 	CapacityMAh          uint16  `json:"capacity_mah"`
@@ -223,6 +231,46 @@ func EncodeBatteryConfig(config BatteryConfig) []byte {
 	payload = appendU16Payload(payload, minCell)
 	payload = appendU16Payload(payload, maxCell)
 	payload = appendU16Payload(payload, warnCell)
+	return payload
+}
+
+func SetBatteryProfile(ctx context.Context, client *connection.Client, profile BatteryProfile) (*BatteryProfileSetResult, error) {
+	if err := ValidateBatteryProfile(profile); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSP2SetBatteryProfile, EncodeBatteryProfile(profile)); err != nil {
+		return nil, fmt.Errorf("battery profile request failed: %w", err)
+	}
+	return &BatteryProfileSetResult{
+		Profile:      profile,
+		MSPCode:      msp.MSP2SetBatteryProfile,
+		MSPName:      "MSP2_SET_BATTERY_PROFILE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateBatteryProfile(profile BatteryProfile) error {
+	if profile.MinCellVoltageV > profile.WarningCellVoltageV || profile.WarningCellVoltageV > profile.FullCellVoltageV || profile.FullCellVoltageV > profile.MaxCellVoltageV {
+		return fmt.Errorf("cell voltages must satisfy min_cell_voltage_v <= warning_cell_voltage_v <= full_cell_voltage_v <= max_cell_voltage_v")
+	}
+	if profile.ForceCellCount > 24 {
+		return fmt.Errorf("force_cell_count must be <= 24")
+	}
+	if profile.ConsumptionWarningPercent > 100 {
+		return fmt.Errorf("consumption_warning_percent must be <= 100")
+	}
+	return nil
+}
+
+func EncodeBatteryProfile(profile BatteryProfile) []byte {
+	payload := []byte{profile.Index}
+	payload = appendU16Payload(payload, centivolts(profile.MinCellVoltageV))
+	payload = appendU16Payload(payload, centivolts(profile.MaxCellVoltageV))
+	payload = appendU16Payload(payload, centivolts(profile.WarningCellVoltageV))
+	payload = appendU16Payload(payload, centivolts(profile.FullCellVoltageV))
+	payload = appendU16Payload(payload, profile.CapacityMAh)
+	payload = append(payload, profile.ForceCellCount, profile.ConsumptionWarningPercent)
 	return payload
 }
 

@@ -23,6 +23,46 @@ func TestDecodeBatteryConfigAndProfile(t *testing.T) {
 	}
 }
 
+func TestEncodeBatteryProfile(t *testing.T) {
+	got := EncodeBatteryProfile(BatteryProfile{
+		Index:                     1,
+		MinCellVoltageV:           3.3,
+		MaxCellVoltageV:           4.35,
+		WarningCellVoltageV:       3.5,
+		FullCellVoltageV:          4.2,
+		CapacityMAh:               1300,
+		ForceCellCount:            4,
+		ConsumptionWarningPercent: 20,
+	})
+	want := []byte{1, 74, 1, 179, 1, 94, 1, 164, 1, 20, 5, 4, 20}
+	if string(got) != string(want) {
+		t.Fatalf("EncodeBatteryProfile() = %v, want %v", got, want)
+	}
+}
+
+func TestValidateBatteryProfile(t *testing.T) {
+	err := ValidateBatteryProfile(BatteryProfile{
+		MinCellVoltageV:           3.5,
+		WarningCellVoltageV:       3.3,
+		FullCellVoltageV:          4.2,
+		MaxCellVoltageV:           4.35,
+		ConsumptionWarningPercent: 20,
+	})
+	if err == nil {
+		t.Fatal("ValidateBatteryProfile() error = nil, want voltage order error")
+	}
+	err = ValidateBatteryProfile(BatteryProfile{
+		MinCellVoltageV:           3.3,
+		WarningCellVoltageV:       3.5,
+		FullCellVoltageV:          4.2,
+		MaxCellVoltageV:           4.35,
+		ConsumptionWarningPercent: 101,
+	})
+	if err == nil {
+		t.Fatal("ValidateBatteryProfile() error = nil, want consumption percentage error")
+	}
+}
+
 func TestDecodeBatteryRuntimeState(t *testing.T) {
 	payload := []byte{4}
 	payload = appendU16Test(payload, 1300)

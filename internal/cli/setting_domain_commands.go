@@ -98,6 +98,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "battery" {
 		cmd.AddCommand(a.batteryStatusCommand())
 		cmd.AddCommand(a.batterySetConfigJSONCommand())
+		cmd.AddCommand(a.batterySetProfileJSONCommand())
 		cmd.AddCommand(a.batteryVoltageMeterCommand())
 		cmd.AddCommand(a.batteryCurrentMeterCommand())
 	}
@@ -1294,6 +1295,70 @@ func parseBatteryConfigJSON(data []byte) (bfcommands.BatteryConfig, error) {
 		return bfcommands.BatteryConfig{}, err
 	}
 	return config, nil
+}
+
+func (a *app) batterySetProfileJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-profile-json FILE",
+		Short: "Set battery profile from JSON through MSP2_SET_BATTERY_PROFILE",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			profile, err := parseBatteryProfileJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "battery profile changes affect safety behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetBatteryProfile(cmd.Context(), client, profile)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"battery_profile": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "battery_profile",
+					Command: "MSP2_SET_BATTERY_PROFILE",
+					Detail:  "battery profile changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseBatteryProfileJSON(data []byte) (bfcommands.BatteryProfile, error) {
+	var wrapped struct {
+		BatteryProfile *bfcommands.BatteryProfile `json:"battery_profile"`
+		Profile        *bfcommands.BatteryProfile `json:"profile"`
+		Battery        *struct {
+			Profile *bfcommands.BatteryProfile `json:"profile"`
+		} `json:"battery"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.BatteryProfile{}, err
+	}
+	var profile bfcommands.BatteryProfile
+	switch {
+	case wrapped.BatteryProfile != nil:
+		profile = *wrapped.BatteryProfile
+	case wrapped.Profile != nil:
+		profile = *wrapped.Profile
+	case wrapped.Battery != nil && wrapped.Battery.Profile != nil:
+		profile = *wrapped.Battery.Profile
+	default:
+		if err := json.Unmarshal(data, &profile); err != nil {
+			return bfcommands.BatteryProfile{}, err
+		}
+	}
+	if err := bfcommands.ValidateBatteryProfile(profile); err != nil {
+		return bfcommands.BatteryProfile{}, err
+	}
+	return profile, nil
 }
 
 func (a *app) batteryVoltageMeterCommand() *cobra.Command {

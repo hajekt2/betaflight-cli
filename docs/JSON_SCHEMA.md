@@ -312,6 +312,8 @@ Successful GPS Rescue PID writes include a `gps_rescue_pids` side effect.
 The object includes active battery profile thresholds, runtime battery state, voltage and current meter readings, voltage meter calibration, current meter calibration, and meter source names when known.
 `battery set-config-json` returns a `battery_config` object with the requested battery config, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful battery config writes include a `battery_config` side effect.
+`battery set-profile-json` returns a `battery_profile` object with the requested battery profile, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful battery profile writes include a `battery_profile` side effect.
 `battery set-voltage-meter` returns a `voltage_meter_config` object with meter ID, scale, divider value, divider multiplier, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful voltage meter writes include a `voltage_meter_config` side effect.
 `battery set-current-meter` returns a `current_meter_config` object with meter ID, scale, offset, MSP command name/code, acknowledgement flag, and `save_required`.

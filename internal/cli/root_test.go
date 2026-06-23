@@ -108,6 +108,34 @@ func TestCLIExecWriteRequiresYes(t *testing.T) {
 	}
 }
 
+func TestCLIExecUnknownCommandIsWriteClassified(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"cli", "exec", "mystery command"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("cli exec unknown command was allowed without --yes")
+	}
+
+	env, err = runTestCommand(t, []string{"cli", "exec", "mystery command", "--yes"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("expected OK with --yes, got errors: %+v", env.Errors)
+	}
+}
+
 func TestCLIInteractiveRequiresYes(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"cli", "interactive"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

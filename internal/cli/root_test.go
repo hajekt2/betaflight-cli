@@ -1818,6 +1818,27 @@ func TestMSPRequestWithDecodeForReboot(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForSensorConfig(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_SENSOR_CONFIG", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	sensorConfig := data["decoded"].([]any)
+	if len(sensorConfig) != 5 {
+		t.Fatalf("decoded sensor config = %+v", sensorConfig)
+	}
+	if sensorConfig[0].(map[string]any)["hardware_id"] != float64(1) || sensorConfig[0].(map[string]any)["available"] != true {
+		t.Fatalf("sensor config[0] = %+v", sensorConfig[0])
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

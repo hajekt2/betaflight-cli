@@ -79,7 +79,9 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPGPSRescuePids:      decodeVia(commands.DecodeGPSRescuePID),
 	msp.MSPCompGPS:            decodeVia(commands.DecodeGPSHome),
 	msp.MSPGpssvinfo:          decodeVia(commands.DecodeGPSSatellites),
-	msp.MSPSensorConfig:       decodeVia(commands.DecodeActiveGyros),
+	msp.MSPSensorConfig:       decodeVia(func(payload []byte) ([]commands.SensorHardware, error) {
+		return commands.DecodeSensorHardware(payload, []string{"gyro", "accelerometer", "barometer", "magnetometer", "rangefinder", "opticalflow"})
+	}),
 	msp.MSPRawImu:             decodeVia(commands.DecodeRawIMU),
 	msp.MSPSensorAlignment:     decodeVia(commands.DecodeSensorAlignment),
 	msp.MSPCompassConfig:      decodeVia(commands.DecodeCompassConfig),

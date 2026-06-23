@@ -79,6 +79,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "battery" {
 		cmd.AddCommand(a.batteryStatusCommand())
+		cmd.AddCommand(a.batteryVoltageMeterCommand())
 	}
 	if domain.use == "failsafe" {
 		cmd.AddCommand(a.failsafeStatusCommand())
@@ -321,6 +322,55 @@ func (a *app) batteryStatusCommand() *cobra.Command {
 					"battery":  battery,
 					"warnings": warnings,
 				})
+			})
+		},
+	}
+}
+
+func (a *app) batteryVoltageMeterCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-voltage-meter ID SCALE RES_DIV_VAL RES_DIV_MULTIPLIER",
+		Short: "Set voltage meter calibration through MSP_SET_VOLTAGE_METER_CONFIG",
+		Args:  cobra.ExactArgs(4),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			id, err := parseUint8Arg("id", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			scale, err := parseUint8Arg("scale", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			resDiv, err := parseUint8Arg("res_div_val", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			multiplier, err := parseUint8Arg("res_div_multiplier", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "voltage meter calibration changes configuration; pass --yes"))
+			}
+			config := bfcommands.VoltageMeterConfig{
+				ID:                   id,
+				SensorType:           0,
+				VBATScale:            scale,
+				VBATResDivVal:        resDiv,
+				VBATResDivMultiplier: multiplier,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVoltageMeterConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"voltage_meter_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "voltage_meter_config",
+					Command: "MSP_SET_VOLTAGE_METER_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
 			})
 		},
 	}

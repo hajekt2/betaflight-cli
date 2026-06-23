@@ -99,6 +99,14 @@ type VoltageMeterConfig struct {
 	VBATResDivMultiplier uint8  `json:"vbat_res_div_multiplier"`
 }
 
+type VoltageMeterConfigSetResult struct {
+	Config       VoltageMeterConfig `json:"config"`
+	MSPCode      uint16             `json:"msp_code"`
+	MSPName      string             `json:"msp_name"`
+	Acknowledged bool               `json:"acknowledged"`
+	SaveRequired bool               `json:"save_required"`
+}
+
 type CurrentMeterConfig struct {
 	ID             uint8  `json:"id"`
 	IDName         string `json:"id_name,omitempty"`
@@ -158,6 +166,25 @@ func ReadBatteryStatus(ctx context.Context, client *connection.Client) (*Battery
 		return nil, warnings, fmt.Errorf("battery status unavailable")
 	}
 	return status, warnings, nil
+}
+
+func SetVoltageMeterConfig(ctx context.Context, client *connection.Client, config VoltageMeterConfig) (*VoltageMeterConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetVoltageMeterConfig, EncodeVoltageMeterConfig(config)); err != nil {
+		return nil, fmt.Errorf("voltage meter config request failed: %w", err)
+	}
+	config.IDName = voltageMeterIDName(config.ID)
+	config.SensorTypeName = indexedName(voltageSensorTypeNames, config.SensorType)
+	return &VoltageMeterConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetVoltageMeterConfig,
+		MSPName:      "MSP_SET_VOLTAGE_METER_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeVoltageMeterConfig(config VoltageMeterConfig) []byte {
+	return []byte{config.ID, config.VBATScale, config.VBATResDivVal, config.VBATResDivMultiplier}
 }
 
 func DecodeBatteryConfig(payload []byte) (*BatteryConfig, error) {

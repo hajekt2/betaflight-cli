@@ -85,6 +85,14 @@ func TestDecodeMeterConfigs(t *testing.T) {
 	}
 }
 
+func TestEncodeVoltageMeterConfig(t *testing.T) {
+	got := EncodeVoltageMeterConfig(VoltageMeterConfig{ID: 10, VBATScale: 110, VBATResDivVal: 10, VBATResDivMultiplier: 1})
+	want := []byte{10, 110, 10, 1}
+	if string(got) != string(want) {
+		t.Fatalf("EncodeVoltageMeterConfig() = %v, want %v", got, want)
+	}
+}
+
 func TestDecodeBatteryRejectsShortPayload(t *testing.T) {
 	if _, err := DecodeBatteryConfig([]byte{1, 2}); err == nil {
 		t.Fatal("DecodeBatteryConfig() error = nil, want short payload error")

@@ -368,6 +368,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPVoltageMeterConfig:
 		f.out.Write(response(frame.Code, []byte{1, 5, 10, 0, 110, 10, 1}, false))
+	case msp.MSPSetVoltageMeterConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 4))
 	case msp.MSPCurrentMeterConfig:
 		payload := []byte{1, 6, 10, 1}
 		payload = appendS16(payload, 400)

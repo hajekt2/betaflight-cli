@@ -32,8 +32,10 @@ Example:
     "msp_api_version": "1.48"
   },
   "data": {
-    "board": {
-      "identifier": "EXMP"
+    "info": {
+      "board": {
+        "identifier": "EXMP"
+      }
     }
   },
   "warnings": [],

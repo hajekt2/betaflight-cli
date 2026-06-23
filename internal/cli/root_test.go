@@ -1022,6 +1022,62 @@ func TestOfflineCommandOutputRootsMatchCapabilities(t *testing.T) {
 	}
 }
 
+func TestReadOnlyCommandOutputRootsMatchCapabilities(t *testing.T) {
+	cases := []struct {
+		command string
+		args    []string
+	}{
+		{command: "betaflight-cli info", args: []string{"info"}},
+		{command: "betaflight-cli status", args: []string{"status"}},
+		{command: "betaflight-cli telemetry snapshot", args: []string{"telemetry", "snapshot"}},
+		{command: "betaflight-cli firmware status", args: []string{"firmware", "status"}},
+		{command: "betaflight-cli target status", args: []string{"target", "status"}},
+		{command: "betaflight-cli text status", args: []string{"text", "status"}},
+		{command: "betaflight-cli features status", args: []string{"features", "status"}},
+		{command: "betaflight-cli battery status", args: []string{"battery", "status"}},
+		{command: "betaflight-cli receiver status", args: []string{"receiver", "status"}},
+		{command: "betaflight-cli sensors status", args: []string{"sensors", "status"}},
+		{command: "betaflight-cli modes list", args: []string{"modes", "list"}},
+		{command: "betaflight-cli serial status", args: []string{"serial", "status"}},
+		{command: "betaflight-cli motors status", args: []string{"motors", "status"}},
+		{command: "betaflight-cli profiles status", args: []string{"profiles", "status"}},
+		{command: "betaflight-cli rates status", args: []string{"rates", "status"}},
+		{command: "betaflight-cli filters status", args: []string{"filters", "status"}},
+		{command: "betaflight-cli debug status", args: []string{"debug", "status"}},
+		{command: "betaflight-cli environment status", args: []string{"environment", "status"}},
+		{command: "betaflight-cli rtc status", args: []string{"rtc", "status"}},
+		{command: "betaflight-cli beeper config", args: []string{"beeper", "config"}},
+		{command: "betaflight-cli transponder config", args: []string{"transponder", "config"}},
+		{command: "betaflight-cli vtx config", args: []string{"vtx", "config"}},
+		{command: "betaflight-cli osd status", args: []string{"osd", "status"}},
+		{command: "betaflight-cli leds status", args: []string{"leds", "status"}},
+		{command: "betaflight-cli storage status", args: []string{"storage", "status"}},
+		{command: "betaflight-cli system status", args: []string{"system", "status"}},
+		{command: "betaflight-cli tasks status", args: []string{"tasks", "status"}},
+	}
+
+	roots := capabilityOutputRoots(t)
+	for _, tt := range cases {
+		t.Run(tt.command, func(t *testing.T) {
+			want := roots[tt.command]
+			if want == "" {
+				t.Fatalf("missing capability output root for %q", tt.command)
+			}
+			env, err := runTestCommand(t, tt.args, nil)
+			if err != nil {
+				t.Fatalf("command error = %v", err)
+			}
+			if !env.OK {
+				t.Fatalf("env.OK = false: %+v", env.Errors)
+			}
+			data := env.Data.(map[string]any)
+			if _, ok := data[want]; !ok {
+				t.Fatalf("%s data missing advertised output root %q: %+v", tt.command, want, data)
+			}
+		})
+	}
+}
+
 func TestMSPListDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"msp", "list"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
@@ -1350,7 +1406,8 @@ func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
 	data, ok := env.Data.(map[string]any)
-	if !ok || data["attitude"] == nil || data["battery"] == nil || data["rc"] == nil {
+	telemetry, _ := data["telemetry"].(map[string]any)
+	if !ok || telemetry["attitude"] == nil || telemetry["battery"] == nil || telemetry["rc"] == nil {
 		t.Fatalf("unexpected telemetry data: %+v", env.Data)
 	}
 }
@@ -1367,7 +1424,8 @@ func TestTelemetryDefaultCommandMapsToSnapshot(t *testing.T) {
 	if !ok {
 		t.Fatalf("env.Data type = %T", env.Data)
 	}
-	sources, ok := data["sources"].(map[string]any)
+	telemetry := data["telemetry"].(map[string]any)
+	sources, ok := telemetry["sources"].(map[string]any)
 	if !ok {
 		t.Fatalf("unexpected telemetry sources: %+v", data["sources"])
 	}
@@ -2230,7 +2288,7 @@ func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := env.Data.(map[string]any)["info"].(map[string]any)
 	if data["legacy_name"] != "BetaFlight" {
 		t.Fatalf("legacy name = %+v", data["legacy_name"])
 	}

@@ -1179,16 +1179,29 @@ func (a *app) configListCommand(use, short string, selectData func(bfconfig.Docu
 		Short: short,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return a.withConfiguration(cmd.Context(), commandPath(cmd), func(target output.Target, doc bfconfig.Document, lines []string) output.Envelope {
-				return output.Success(commandPath(cmd), &target, map[string]any{
+				data := map[string]any{
 					"source_command":    "dump all",
-					"view":              selectData(doc),
 					"configuration":     doc,
 					"raw":               strings.Join(lines, "\n"),
 					"raw_authoritative": true,
-				})
+				}
+				view := selectData(doc)
+				data["view"] = view
+				if root := commandOutputRoot(cmd); root != "" && root != "configuration" {
+					data[root] = view
+				}
+				return output.Success(commandPath(cmd), &target, data)
 			})
 		},
 	}
+}
+
+func commandOutputRoot(cmd *cobra.Command) string {
+	parts := strings.Fields(commandPath(cmd))
+	if len(parts) < 2 {
+		return ""
+	}
+	return strings.ReplaceAll(parts[1], "-", "_")
 }
 
 func (a *app) withConfiguration(ctx context.Context, command string, fn func(output.Target, bfconfig.Document, []string) output.Envelope) error {

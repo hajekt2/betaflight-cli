@@ -1840,7 +1840,9 @@ func (a *app) infoCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
 				info, warnings := bfcommands.ReadInfo(cmd.Context(), client)
-				env := output.Success(commandPath(cmd), &target, info)
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"info": info,
+				})
 				addStringWarnings(&env, warnings)
 				return env
 			})
@@ -2508,7 +2510,9 @@ func (a *app) telemetryCommand() *cobra.Command {
 	readSnapshot := func(cmd *cobra.Command, _ []string) error {
 		return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
 			telemetry, warnings := bfcommands.ReadTelemetry(cmd.Context(), client)
-			env := output.Success(commandPath(cmd), &target, telemetry)
+			env := output.Success(commandPath(cmd), &target, map[string]any{
+				"telemetry": telemetry,
+			})
 			addStringWarnings(&env, warnings)
 			return env
 		})

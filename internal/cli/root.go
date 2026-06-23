@@ -92,6 +92,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.telemetryCommand())
 	root.AddCommand(a.debugCommand())
 	root.AddCommand(a.environmentCommand())
+	root.AddCommand(a.rtcCommand())
 	root.AddCommand(a.cliCommand())
 	root.AddCommand(a.backupCommand())
 	root.AddCommand(a.restoreCommand())
@@ -466,6 +467,27 @@ func (a *app) environmentCommand() *cobra.Command {
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"environment": environment,
 					"warnings":    warnings,
+				})
+			})
+		},
+	})
+	return cmd
+}
+
+func (a *app) rtcCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "rtc", Short: "Inspect flight controller real-time clock"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read RTC datetime over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				rtc, warnings, err := bfcommands.ReadRTCStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"rtc":      rtc,
+					"warnings": warnings,
 				})
 			})
 		},

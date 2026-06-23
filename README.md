@@ -120,6 +120,7 @@ Those commands expose domain-specific list and set operations while preserving t
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
 `debug status` reads live debug channels and accelerometer trims over MSP.
 `environment status` reads altitude, vario, rangefinder altitude, and legacy analog telemetry over MSP.
+`rtc status` reads the flight controller real-time clock over MSP and returns a normalized UTC timestamp when firmware supplies one.
 Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch plan` validates without connecting.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.

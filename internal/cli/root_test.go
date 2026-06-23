@@ -125,6 +125,21 @@ func TestEnvironmentStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestRTCStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"rtc", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	rtc := data["rtc"].(map[string]any)
+	if rtc["available"] != true || rtc["iso_utc"] != "2026-06-23T12:34:56.789Z" || rtc["millis"] != float64(789) {
+		t.Fatalf("rtc = %+v", rtc)
+	}
+}
+
 func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"info"}, nil)
 	if err != nil {

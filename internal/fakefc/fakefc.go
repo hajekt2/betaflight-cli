@@ -277,6 +277,11 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, -123)
 		payload = appendU16(payload, 1599)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPRtc:
+		payload := appendU16(nil, 2026)
+		payload = append(payload, 6, 23, 12, 34, 56)
+		payload = appendU16(payload, 789)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBatteryState:
 		payload := []byte{4}
 		payload = appendU16(payload, 1300)

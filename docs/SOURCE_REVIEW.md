@@ -99,6 +99,9 @@ Configurator stores those values as `accelerometerTrims`.
 `MSP_ALTITUDE` returns estimated altitude in centimeters followed by signed vario.
 Configurator displays altitude by dividing centimeters by 100.
 
+`MSP_RTC` returns year, month, day, hours, minutes, seconds, and milliseconds when RTC time is available.
+Configurator sends `MSP_SET_RTC` on connect and marks `MSP_RTC` as not used, but firmware exposes the read command for diagnostics.
+
 `MSP_SONAR_ALTITUDE` returns the latest rangefinder altitude in centimeters.
 
 `MSP_ANALOG` returns legacy voltage, drawn mAh, RSSI, amperage in 0.01A units, and battery voltage in 0.01V units.

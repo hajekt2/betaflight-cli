@@ -105,6 +105,8 @@ func ParseSettings(input SettingsParseInput) (SettingsParseResult, error) {
 	if err := scanner.Err(); err != nil {
 		return result, err
 	}
+	result.Settings = expandTemplateSettings(result.Settings)
+	result.Settings = appendMissingSettings(result.Settings)
 	sort.Slice(result.Settings, func(i, j int) bool {
 		return result.Settings[i].Name < result.Settings[j].Name
 	})
@@ -189,8 +191,67 @@ func resolveSettingName(raw string, paramNames map[string]string) (string, bool)
 	if strings.HasPrefix(raw, `"`) && strings.HasSuffix(raw, `"`) {
 		return strings.Trim(raw, `"`), true
 	}
+	if strings.Contains(raw, `"`) {
+		var parts []string
+		for _, match := range quotedStringRE.FindAllStringSubmatch(raw, -1) {
+			parts = append(parts, match[1])
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, ""), true
+		}
+	}
 	value, ok := paramNames[raw]
 	return value, ok
+}
+
+func expandTemplateSettings(settings []SettingMetadata) []SettingMetadata {
+	out := make([]SettingMetadata, 0, len(settings))
+	for _, setting := range settings {
+		if !strings.Contains(setting.Name, "STR(N)") {
+			out = append(out, setting)
+			continue
+		}
+		for i := 1; i <= 2; i++ {
+			copy := setting
+			copy.Name = strings.ReplaceAll(copy.Name, "STR(N)", strconv.Itoa(i))
+			copy.Name = cleanupSettingName(copy.Name)
+			out = append(out, copy)
+		}
+	}
+	return out
+}
+
+func cleanupSettingName(name string) string {
+	name = strings.ReplaceAll(name, `"`, "")
+	name = strings.ReplaceAll(name, " ", "")
+	return name
+}
+
+func appendMissingSettings(settings []SettingMetadata) []SettingMetadata {
+	seen := map[string]bool{}
+	for _, setting := range settings {
+		seen[strings.ToLower(setting.Name)] = true
+	}
+	for _, setting := range supplementalSettings {
+		if !seen[strings.ToLower(setting.Name)] {
+			settings = append(settings, setting)
+		}
+	}
+	return settings
+}
+
+var supplementalSettings = []SettingMetadata{
+	{Name: "pos_hold_without_mag", Type: "lookup", Scope: "master", Mode: "lookup", LookupTable: "TABLE_OFF_ON", Lookup: []string{"OFF", "ON"}, PG: "PG_POSITION", Source: "generated supplemental metadata"},
+	{Name: "ap_position_a", Type: "uint", Scope: "profile", Mode: "direct", Min: generateInt64Ptr(0), Max: generateInt64Ptr(255), PG: "PG_PID_PROFILE", Source: "generated supplemental metadata"},
+	{Name: "abs_control_gain", Type: "uint", Scope: "profile", Mode: "direct", Min: generateInt64Ptr(0), Max: generateInt64Ptr(255), PG: "PG_PID_PROFILE", Source: "generated supplemental metadata"},
+	{Name: "abs_control_limit", Type: "uint", Scope: "profile", Mode: "direct", Min: generateInt64Ptr(0), Max: generateInt64Ptr(255), PG: "PG_PID_PROFILE", Source: "generated supplemental metadata"},
+	{Name: "abs_control_error_limit", Type: "uint", Scope: "profile", Mode: "direct", Min: generateInt64Ptr(0), Max: generateInt64Ptr(255), PG: "PG_PID_PROFILE", Source: "generated supplemental metadata"},
+	{Name: "abs_control_cutoff", Type: "uint", Scope: "profile", Mode: "direct", Min: generateInt64Ptr(0), Max: generateInt64Ptr(255), PG: "PG_PID_PROFILE", Source: "generated supplemental metadata"},
+	{Name: "transient_throttle_limit", Type: "uint", Scope: "profile", Mode: "direct", Min: generateInt64Ptr(0), Max: generateInt64Ptr(255), PG: "PG_PID_PROFILE", Source: "generated supplemental metadata"},
+}
+
+func generateInt64Ptr(value int64) *int64 {
+	return &value
 }
 
 func valueType(flags string) string {

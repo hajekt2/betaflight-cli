@@ -38,6 +38,7 @@ const clivalue_t valueTable[] = {
     { "msp_override_channels_mask", VAR_UINT32 | MASTER_VALUE, .config.u32Max = (1 << MAX_SUPPORTED_RC_CHANNEL_COUNT) - 1, PG_RX_CONFIG, offsetof(rxConfig_t, msp_override_channels_mask) },
     { "craft_name", VAR_UINT8 | MASTER_VALUE | MODE_STRING, .config.string = { 1, 16, STRING_FLAGS_NONE }, PG_PILOT_CONFIG, offsetof(pilotConfig_t, name) },
     { "gyro_1_enabled", VAR_UINT8 | HARDWARE_VALUE | MODE_BITSET, .config.bitpos = 0, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_enabled_bitmask) },
+    { "gyro_" STR(N) "_bustype", VAR_UINT8 | HARDWARE_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_GYRO_DEVICE_CONFIG, offsetof(gyroConfig_t, dev.busType) },
 };
 `,
 		SourceC: "src/main/cli/settings.c",
@@ -47,7 +48,7 @@ const clivalue_t valueTable[] = {
 	if err != nil {
 		t.Fatalf("ParseSettings() error = %v", err)
 	}
-	if len(result.Settings) != 6 {
+	if len(result.Settings) != 15 {
 		t.Fatalf("len(settings) = %d, warnings = %+v", len(result.Settings), result.Warnings)
 	}
 	byName := map[string]SettingMetadata{}
@@ -77,6 +78,15 @@ const clivalue_t valueTable[] = {
 	bitset := byName["gyro_1_enabled"]
 	if bitset.Scope != "hardware" || bitset.BitPosition == nil || *bitset.BitPosition != 0 {
 		t.Fatalf("bitset metadata = %+v", bitset)
+	}
+	if _, ok := byName["gyro_1_bustype"]; !ok {
+		t.Fatalf("missing gyro_1_bustype in %+v", byName)
+	}
+	if _, ok := byName["gyro_2_bustype"]; !ok {
+		t.Fatalf("missing gyro_2_bustype in %+v", byName)
+	}
+	if byName["pos_hold_without_mag"].Type != "lookup" || byName["abs_control_gain"].Scope != "profile" {
+		t.Fatalf("supplemental settings missing: %+v / %+v", byName["pos_hold_without_mag"], byName["abs_control_gain"])
 	}
 }
 

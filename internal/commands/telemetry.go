@@ -9,24 +9,6 @@ import (
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
-type Info struct {
-	Variant         string     `json:"variant"`
-	FirmwareVersion string     `json:"firmware_version"`
-	MSPAPIVersion   string     `json:"msp_api_version"`
-	MSPProtocol     uint8      `json:"msp_protocol_version"`
-	Board           *BoardInfo `json:"board,omitempty"`
-}
-
-type BoardInfo struct {
-	Identifier         string `json:"identifier,omitempty"`
-	HardwareRevision   uint16 `json:"hardware_revision,omitempty"`
-	BoardType          uint8  `json:"board_type,omitempty"`
-	TargetCapabilities uint8  `json:"target_capabilities,omitempty"`
-	TargetName         string `json:"target_name,omitempty"`
-	BoardName          string `json:"board_name,omitempty"`
-	ManufacturerID     string `json:"manufacturer_id,omitempty"`
-}
-
 type Telemetry struct {
 	Status   *Status   `json:"status,omitempty"`
 	Attitude *Attitude `json:"attitude,omitempty"`
@@ -69,29 +51,6 @@ type Battery struct {
 	VoltageV       float64 `json:"voltage_v"`
 }
 
-func ReadInfo(ctx context.Context, client *connection.Client) (Info, []string) {
-	target := client.Target()
-	info := Info{
-		Variant:         target.Variant,
-		FirmwareVersion: target.FirmwareVersion,
-		MSPAPIVersion:   target.MSPAPIVersion,
-		MSPProtocol:     target.MSPProtocol,
-	}
-	var warnings []string
-	frame, err := client.Request(ctx, msp.MSPBoardInfo, nil)
-	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("MSP_BOARD_INFO unavailable: %v", err))
-		return info, warnings
-	}
-	board, err := DecodeBoardInfo(frame.Payload)
-	if err != nil {
-		warnings = append(warnings, fmt.Sprintf("MSP_BOARD_INFO decode failed: %v", err))
-		return info, warnings
-	}
-	info.Board = board
-	return info, warnings
-}
-
 func ReadTelemetry(ctx context.Context, client *connection.Client) (Telemetry, []string) {
 	var out Telemetry
 	var warnings []string
@@ -116,48 +75,6 @@ func ReadTelemetry(ctx context.Context, client *connection.Client) (Telemetry, [
 		warnings = append(warnings, err.Error())
 	}
 	return out, warnings
-}
-
-func DecodeBoardInfo(payload []byte) (*BoardInfo, error) {
-	r := msp.NewPayloadReader(payload)
-	id, err := r.Bytes(4)
-	if err != nil {
-		return nil, err
-	}
-	rev, err := r.U16()
-	if err != nil {
-		return nil, err
-	}
-	boardType, err := r.U8()
-	if err != nil {
-		return nil, err
-	}
-	caps, err := r.U8()
-	if err != nil {
-		return nil, err
-	}
-	info := &BoardInfo{
-		Identifier:         string(id),
-		HardwareRevision:   rev,
-		BoardType:          boardType,
-		TargetCapabilities: caps,
-	}
-	if r.Remaining() > 0 {
-		if s, err := r.PString(); err == nil {
-			info.TargetName = s
-		}
-	}
-	if r.Remaining() > 0 {
-		if s, err := r.PString(); err == nil {
-			info.BoardName = s
-		}
-	}
-	if r.Remaining() > 0 {
-		if s, err := r.PString(); err == nil {
-			info.ManufacturerID = s
-		}
-	}
-	return info, nil
 }
 
 func readStatus(ctx context.Context, client *connection.Client) (*Status, error) {

@@ -59,6 +59,9 @@ It disconnects after a connect timeout if that response never arrives.
 
 `src/js/msp/MSPCodes.js` is useful as a comparison source, but the firmware headers should remain the primary code source.
 
+`MSP_BUILD_INFO` writes 11 bytes of build date, 8 bytes of build time, 7 bytes of short git revision, and optional build option codes.
+The option codes are generated upstream in `src/main/msp/msp_build_info.h` and mirrored in Configurator's `FIRMWARE_BUILD_OPTIONS`.
+
 `MSP2_GET_TEXT` is defined in `src/main/msp/msp_protocol_v2_betaflight.h`.
 Firmware returns the requested text type byte followed by a one-byte length and the text bytes.
 Configurator uses this for pilot name, craft name, active profile names, build key, and release name.

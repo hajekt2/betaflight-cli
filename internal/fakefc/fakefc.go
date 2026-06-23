@@ -207,6 +207,16 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendPString(payload, "FAKEF405")
 		payload = appendPString(payload, "FAKE")
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPBuildInfo:
+		payload := []byte("Jan 01 2026")
+		payload = append(payload, []byte("00:00:00")...)
+		payload = append(payload, []byte("abc1234")...)
+		payload = appendU16(payload, 16412)
+		payload = appendU16(payload, 8231)
+		payload = appendU16(payload, 65000)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPName:
+		f.out.Write(response(frame.Code, []byte("BetaFlight"), false))
 	case msp.MSPFeatureConfig:
 		f.out.Write(response(frame.Code, appendU32(nil, 0x00040488), false))
 	case msp.MSPStatusEx:

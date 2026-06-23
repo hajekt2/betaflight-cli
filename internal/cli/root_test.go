@@ -81,6 +81,32 @@ func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
+	env, err := runTestCommand(t, []string{"info"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["legacy_name"] != "BetaFlight" {
+		t.Fatalf("legacy name = %+v", data["legacy_name"])
+	}
+	build := data["build"].(map[string]any)
+	if build["date_time"] != "Jan 01 2026 00:00:00" || build["git_revision"] != "abc1234" {
+		t.Fatalf("build = %+v", build)
+	}
+	names := build["build_option_names"].([]any)
+	if len(names) != 2 || names[0] != "USE_GPS" || names[1] != "USE_DSHOT" {
+		t.Fatalf("build option names = %+v", names)
+	}
+	unknown := build["unknown_options"].([]any)
+	if len(unknown) != 1 || unknown[0].(map[string]any)["code"] != float64(65000) {
+		t.Fatalf("unknown options = %+v", unknown)
+	}
+}
+
 func TestTextStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"text", "status"}, nil)
 	if err != nil {

@@ -23,6 +23,7 @@ Important upstream files:
 - `src/main/msp/msp_protocol.h`
 - `src/main/msp/msp_protocol_v2_common.h`
 - `src/main/msp/msp_protocol_v2_betaflight.h`
+- `src/main/msp/msp_build_info.h`
 - `src/main/msp/msp.c`
 - `src/main/msp/msp_serial.c`
 - `src/main/cli/settings.c`
@@ -45,7 +46,7 @@ Configurator files are useful when payload interpretation or workflow behavior i
 3. Run the settings metadata generator.
 4. Run `go generate ./...`.
 5. Review generated diffs for added, removed, renamed, and deprecated messages or settings.
-6. Update compatibility tables for commands whose payload changed.
+6. Update compatibility tables for commands whose payload changed, including build option IDs from `msp_build_info.h`.
 7. Add or update captured frame fixtures for changed MSP messages.
 8. Run unit tests and command contract tests.
 9. Update docs that mention supported Betaflight versions.

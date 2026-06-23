@@ -2,16 +2,15 @@ package commands
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 	"strings"
-	"unicode"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/internal/support"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
 )
 
-const supportedFirmwarePolicy = "official Betaflight 2025.12.x and newer"
+const supportedFirmwarePolicy = support.SupportedFirmwarePolicy
 
 type FirmwareStatus struct {
 	Source       string               `json:"source"`
@@ -159,7 +158,7 @@ func EvaluateFirmwareSupport(variant, firmwareVersion, apiVersion string) Firmwa
 		support.Reason = "missing MSP API version"
 	case !strings.HasPrefix(apiVersion, "1."):
 		support.Reason = "unsupported MSP API major version"
-	case isSupportedFirmwareVersion(firmwareVersion):
+	case support.IsSupportedFirmwareVersion(firmwareVersion):
 		support.Supported = true
 		support.Reason = "firmware is inside the supported metadata range"
 	case firmwareVersion == "":
@@ -168,39 +167,4 @@ func EvaluateFirmwareSupport(variant, firmwareVersion, apiVersion string) Firmwa
 		support.Reason = "firmware is outside the supported metadata range"
 	}
 	return support
-}
-
-func isSupportedFirmwareVersion(version string) bool {
-	parts := strings.Split(version, ".")
-	if len(parts) < 2 {
-		return false
-	}
-	year, err := parseLeadingInt(parts[0])
-	if err != nil || year < 2025 {
-		return false
-	}
-	if year > 2025 {
-		return true
-	}
-	month, err := parseLeadingInt(parts[1])
-	return err == nil && month >= 12
-}
-
-func parseLeadingInt(raw string) (int, error) {
-	raw = strings.TrimSpace(raw)
-	if raw == "" {
-		return 0, fmt.Errorf("empty version component")
-	}
-	digits := make([]rune, 0, len(raw))
-	for _, ch := range raw {
-		if unicode.IsDigit(ch) {
-			digits = append(digits, ch)
-			continue
-		}
-		break
-	}
-	if len(digits) == 0 {
-		return 0, fmt.Errorf("no digits in %q", raw)
-	}
-	return strconv.Atoi(string(digits))
 }

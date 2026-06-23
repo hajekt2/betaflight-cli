@@ -401,8 +401,95 @@ func (a *app) resourcesCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set)
+	cmd.AddCommand(set, a.resourcesSetJSONCommand())
 	return cmd
+}
+
+type resourceSetRow struct {
+	Kind   string `json:"kind"`
+	Index  int    `json:"index"`
+	Target string `json:"target"`
+}
+
+func (a *app) resourcesSetJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Plan or set resource assignments from JSON using native Betaflight CLI syntax",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			rows, err := parseResourceRowsJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			lines := make([]string, 0, len(rows))
+			for _, row := range rows {
+				lines = append(lines, fmt.Sprintf("resource %s %d %s", strings.ToUpper(row.Kind), row.Index, strings.ToUpper(row.Target)))
+			}
+			return a.planOrApplyCLI(cmd, lines, "resource", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseResourceRowsJSON(data []byte) ([]resourceSetRow, error) {
+	var wrapped struct {
+		Resource  *resourceSetRow  `json:"resource"`
+		Row       *resourceSetRow  `json:"row"`
+		Resources []resourceSetRow `json:"resources"`
+		Rows      []resourceSetRow `json:"rows"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	switch {
+	case wrapped.Resource != nil:
+		return validateResourceRows([]resourceSetRow{*wrapped.Resource})
+	case wrapped.Row != nil:
+		return validateResourceRows([]resourceSetRow{*wrapped.Row})
+	case wrapped.Resources != nil:
+		return validateResourceRows(wrapped.Resources)
+	case wrapped.Rows != nil:
+		return validateResourceRows(wrapped.Rows)
+	}
+	var rows []resourceSetRow
+	if err := json.Unmarshal(data, &rows); err == nil {
+		return validateResourceRows(rows)
+	}
+	var row resourceSetRow
+	if err := json.Unmarshal(data, &row); err != nil {
+		return nil, err
+	}
+	return validateResourceRows([]resourceSetRow{row})
+}
+
+func validateResourceRows(rows []resourceSetRow) ([]resourceSetRow, error) {
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("at least one resource row is required")
+	}
+	for i, row := range rows {
+		if strings.TrimSpace(row.Kind) == "" {
+			return nil, fmt.Errorf("row %d kind is required", i)
+		}
+		if strings.ContainsAny(row.Kind, " \t\r\n") {
+			return nil, fmt.Errorf("row %d kind must be a single CLI token", i)
+		}
+		if row.Index < 0 {
+			return nil, fmt.Errorf("row %d index must be >= 0", i)
+		}
+		if strings.TrimSpace(row.Target) == "" {
+			return nil, fmt.Errorf("row %d target is required", i)
+		}
+		if strings.ContainsAny(row.Target, " \t\r\n") {
+			return nil, fmt.Errorf("row %d target must be a single CLI token", i)
+		}
+	}
+	return rows, nil
 }
 
 func (a *app) profilesCommand() *cobra.Command {

@@ -163,6 +163,8 @@ It preserves extended flight-mode bytes so new Betaflight modes beyond the legac
 `tasks status` reads Betaflight scheduler task diagnostics through the read-only `tasks` CLI command and returns parsed task rows plus raw lines.
 `system status` reads Betaflight's CLI `status` output and returns parsed config, device, uptime, runtime, voltage, GPS, OSD, storage, build-key, and arming lines plus raw text.
 `resources status` reads Betaflight's `resource show all` output and returns parsed resource, timer, and DMA assignments plus raw text.
+`resources set-json` plans or applies native `resource KIND INDEX TARGET` CLI rows from a JSON object, array, or object with `resource`, `resources`, `row`, or `rows`.
+It defaults to dry-run planning and requires `--yes` when applying or saving.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 `profiles copy` copies PID or rate profiles through `MSP_COPY_PROFILE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.

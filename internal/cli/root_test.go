@@ -49,12 +49,12 @@ func TestClassifyCLI(t *testing.T) {
 
 func TestIsKnownCLICommand(t *testing.T) {
 	tests := map[string]bool{
-		"set foo = 1":        true,
+		"set foo = 1":         true,
 		"resource serialrx 1": true,
-		"help":               true,
-		"impossible line":    false,
-		"":                   false,
-		"   ":                false,
+		"help":                true,
+		"impossible line":     false,
+		"":                    false,
+		"   ":                 false,
 	}
 	for line, want := range tests {
 		if got := isKnownCLICommand(line); got != want {
@@ -65,17 +65,17 @@ func TestIsKnownCLICommand(t *testing.T) {
 
 func TestIsBatchAllowed(t *testing.T) {
 	tests := map[string]bool{
-		"set foo = 1":        true,
-		"serial 0 1 1":       true,
+		"set foo = 1":         true,
+		"serial 0 1 1":        true,
 		"resource serialrx 1": true,
-		"save":               false,
-		"diff all":           false,
-		"reboot":             false,
-		"feature GPS":        true,
-		"beeper 1":           true,
-		"map 1 2 3":          true,
-		"timer 2":            true,
-		"dma 1":              true,
+		"save":                false,
+		"diff all":            false,
+		"reboot":              false,
+		"feature GPS":         true,
+		"beeper 1":            true,
+		"map 1 2 3":           true,
+		"timer 2":             true,
+		"dma 1":               true,
 	}
 	for line, want := range tests {
 		if got := isBatchAllowed(line); got != want {
@@ -546,6 +546,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	ledSetJSON := byCommand["betaflight-cli leds set-json"]
 	if ledSetJSON["operation"] != "plan_or_write" || ledSetJSON["confirmation"] != "--yes with --apply or --save" || ledSetJSON["requires_connection"] != true || ledSetJSON["output_root"] != "change_plan" || ledSetJSON["input"] == "" || ledSetJSON["runnable"] != true {
 		t.Fatalf("led set json capability = %+v", ledSetJSON)
+	}
+	resourcesJSON := byCommand["betaflight-cli resources set-json"]
+	if resourcesJSON["operation"] != "plan_or_write" || resourcesJSON["confirmation"] != "--yes with --apply or --save" || resourcesJSON["requires_connection"] != true || resourcesJSON["output_root"] != "change_plan" || resourcesJSON["input"] == "" || resourcesJSON["runnable"] != true {
+		t.Fatalf("resources JSON capability = %+v", resourcesJSON)
 	}
 	ledValues := byCommand["betaflight-cli leds set-values"]
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
@@ -8707,6 +8711,75 @@ func TestRXRangeSetJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestResourcesSetJSONPlansDoNotConnect(t *testing.T) {
+	input := `{"resources":[{"kind":"motor","index":1,"target":"a00"},{"kind":"serial_tx","index":2,"target":"b10"}]}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"resources", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if data["applied"] != false || len(lines) != 2 || lines[0] != "resource MOTOR 1 A00" || lines[1] != "resource SERIAL_TX 2 B10" {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for resources JSON plan")
+	}
+}
+
+func TestResourcesSetJSONApplyWithFakeFC(t *testing.T) {
+	input := `{"resource":{"kind":"motor","index":1,"target":"a00"}}`
+	env, err := runTestCommandWithInput(t, []string{"resources", "set-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "resource MOTOR 1 A00" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestResourcesSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"resource":{"kind":"motor output","index":1,"target":"a00"}}`
+	env, err := runTestCommandWithInput(t, []string{"resources", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid resources JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestResourcesSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"resource":{"kind":"motor","index":1,"target":"a00"}}`
+	env, err := runTestCommandWithInput(t, []string{"resources", "set-json", "-", "--apply"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
 		t.Fatalf("env = %+v", env)
 	}
 }

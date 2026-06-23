@@ -289,6 +289,8 @@ The object includes raw lines, parsed configuration storage usage, detected devi
 
 `resources status` returns a `resources` object parsed from Betaflight's CLI `resource show all` command.
 The object includes raw lines, resource assignments, timer alternate-function assignments, DMA assignments, comments, and unparsed lines for firmware text drift.
+`resources set-json` returns a `change_plan` object with native `resource KIND INDEX TARGET` CLI rows, `applied`, `saved`, and command response fields when applied.
+`resources set-json` accepts a direct resource row object, an array of rows, or an object with `resource`, `resources`, `row`, or `rows`.
 
 `debug status` returns a `debug` object decoded from `MSP_DEBUG` and `MSP_ACC_TRIM`.
 The object includes signed debug channel values, signed accelerometer pitch/roll trims, source metadata, and per-message warnings when one optional request is unavailable.

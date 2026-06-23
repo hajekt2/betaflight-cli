@@ -201,6 +201,7 @@ Betaflight 2025.12 declares `MSP_OSD_VIDEO_CONFIG` and `MSP_SET_OSD_VIDEO_CONFIG
 `serial apply-config-json` writes a complete serial port table through `MSP_SET_CF_SERIAL_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.
+`modes set-json` writes AUX mode range rows through `MSP_SET_MODE_RANGE`, accepts either a JSON array or an object with `ranges`, `mode_ranges`, or `modes`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `modes set-range` writes one AUX mode range through `MSP_SET_MODE_RANGE` using step values, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `pid set-gains-json` writes the complete five-row PID gain table through `MSP_SET_PID`, accepts either a JSON array or an object with `gains`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `pid set-advanced-json` writes the active PID profile's advanced tuning fields through `MSP_SET_PID_ADVANCED`, accepts either a PID advanced object or an object with `pid_advanced`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

@@ -227,8 +227,9 @@ Successful filter config writes include a `filter_config` side effect.
 
 `modes active` returns a `modes` object decoded from `MSP_BOXNAMES`, `MSP_BOXIDS`, `MSP_MODE_RANGES`, and `MSP_MODE_RANGES_EXTRA`.
 The object includes a paged mode definition catalog and mode range rows with permanent IDs, names, AUX channel indexes, microsecond ranges, logic, and linked mode names when supplied by firmware.
+`modes set-json` returns a `mode_ranges` object with applied mode range rows, row count, MSP command name, acknowledgement flag, and `save_required`.
 `modes set-range` returns a `mode_range` object with the written row, decoded microsecond equivalents, MSP command name/code, acknowledgement flag, and `save_required`.
-Successful mode range writes include a `mode_range` side effect.
+Successful mode range writes include a `mode_ranges` or `mode_range` side effect.
 
 `profiles status` returns a `profiles` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes active PID, rate, and battery profile indexes, profile counts when supplied by firmware, native CLI selector commands, and reboot-required state when supplied by firmware.

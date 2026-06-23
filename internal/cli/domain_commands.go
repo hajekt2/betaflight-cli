@@ -228,8 +228,74 @@ func (a *app) modesCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.modeSetRangeCommand())
+	cmd.AddCommand(set, a.modeSetJSONCommand(), a.modeSetRangeCommand())
 	return cmd
+}
+
+func (a *app) modeSetJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Set AUX mode range rows from JSON through MSP_SET_MODE_RANGE",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseModeRangeTableJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "mode range changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetModeRangeTable(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"mode_ranges": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "mode_ranges",
+					Command: "MSP_SET_MODE_RANGE",
+					Detail:  "mode range rows changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseModeRangeTableJSON(data []byte) (bfcommands.ModeRangeTableSetConfig, error) {
+	var wrapped struct {
+		ModeRanges *bfcommands.ModeRangeTableSetConfig `json:"mode_ranges"`
+		Modes      *bfcommands.ModeRangeTableSetConfig `json:"modes"`
+		Ranges     []bfcommands.ModeRange              `json:"ranges"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.ModeRangeTableSetConfig{}, err
+	}
+	if wrapped.ModeRanges != nil {
+		return validateModeRangeTableConfig(*wrapped.ModeRanges)
+	}
+	if wrapped.Modes != nil {
+		return validateModeRangeTableConfig(*wrapped.Modes)
+	}
+	if wrapped.Ranges != nil {
+		return validateModeRangeTableConfig(bfcommands.ModeRangeTableSetConfig{Ranges: wrapped.Ranges})
+	}
+	var ranges []bfcommands.ModeRange
+	if err := json.Unmarshal(data, &ranges); err != nil {
+		return bfcommands.ModeRangeTableSetConfig{}, err
+	}
+	return validateModeRangeTableConfig(bfcommands.ModeRangeTableSetConfig{Ranges: ranges})
+}
+
+func validateModeRangeTableConfig(config bfcommands.ModeRangeTableSetConfig) (bfcommands.ModeRangeTableSetConfig, error) {
+	if err := bfcommands.ValidateModeRangeTable(config); err != nil {
+		return bfcommands.ModeRangeTableSetConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) modeSetRangeCommand() *cobra.Command {

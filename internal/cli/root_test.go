@@ -463,6 +463,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if modeRange["operation"] != "write" || modeRange["confirmation"] != "--yes" || modeRange["requires_connection"] != true || modeRange["output_root"] != "mode_range" || modeRange["runnable"] != true {
 		t.Fatalf("mode range capability = %+v", modeRange)
 	}
+	modeRanges := byCommand["betaflight-cli modes set-json"]
+	if modeRanges["operation"] != "write" || modeRanges["confirmation"] != "--yes" || modeRanges["requires_connection"] != true || modeRanges["output_root"] != "mode_ranges" || modeRanges["runnable"] != true {
+		t.Fatalf("mode ranges capability = %+v", modeRanges)
+	}
 	ledValues := byCommand["betaflight-cli leds set-values"]
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
 		t.Fatalf("led values capability = %+v", ledValues)
@@ -3149,6 +3153,56 @@ func TestModesSetRangeWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_MODE_RANGE" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestModesSetJSONWithFakeFC(t *testing.T) {
+	input := `{"mode_ranges":{"ranges":[{"index":1,"id":52,"aux_channel_index":2,"range":{"start_step":16,"end_step":32},"mode_logic":1,"linked_to":53}]}}`
+	env, err := runTestCommandWithInput(t, []string{"modes", "set-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["mode_ranges"].(map[string]any)
+	ranges := result["ranges"].([]any)
+	row := ranges[0].(map[string]any)
+	rangeData := row["range"].(map[string]any)
+	if result["range_count"] != float64(1) || row["mode_logic_name"] != "AND" || rangeData["start_us"] != float64(1300) || result["save_required"] != true {
+		t.Fatalf("mode_ranges = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_MODE_RANGE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestModesSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `[{"index":1,"id":52,"aux_channel_index":2,"range":{"start_step":16,"end_step":32}}]`
+	env, err := runTestCommandWithInput(t, []string{"modes", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestModesSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `[{"index":1,"id":52,"aux_channel_index":2,"range":{"start_step":32,"end_step":16}}]`
+	env, err := runTestCommandWithInput(t, []string{"modes", "set-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

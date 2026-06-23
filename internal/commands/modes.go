@@ -57,6 +57,18 @@ type ModeRangeSetResult struct {
 	SaveRequired bool      `json:"save_required"`
 }
 
+type ModeRangeTableSetConfig struct {
+	Ranges []ModeRange `json:"ranges"`
+}
+
+type ModeRangeTableSetResult struct {
+	Ranges       []ModeRange `json:"ranges"`
+	RangeCount   int         `json:"range_count"`
+	MSPName      string      `json:"msp_name"`
+	Acknowledged bool        `json:"acknowledged"`
+	SaveRequired bool        `json:"save_required"`
+}
+
 func ReadModeConfiguration(ctx context.Context, client *connection.Client) (*ModeConfiguration, []string, error) {
 	definitions, err := readModeDefinitions(ctx, client)
 	if err != nil {
@@ -93,6 +105,9 @@ func ReadModeConfiguration(ctx context.Context, client *connection.Client) (*Mod
 }
 
 func SetModeRange(ctx context.Context, client *connection.Client, row ModeRange) (*ModeRangeSetResult, error) {
+	if err := ValidateModeRange(row); err != nil {
+		return nil, err
+	}
 	if _, err := client.Request(ctx, msp.MSPSetModeRange, EncodeModeRange(row)); err != nil {
 		return nil, fmt.Errorf("mode range request failed: %w", err)
 	}
@@ -139,6 +154,52 @@ func EncodeModeRange(row ModeRange) []byte {
 		payload = append(payload, *row.ModeLogic, *row.LinkedTo)
 	}
 	return payload
+}
+
+func SetModeRangeTable(ctx context.Context, client *connection.Client, config ModeRangeTableSetConfig) (*ModeRangeTableSetResult, error) {
+	if err := ValidateModeRangeTable(config); err != nil {
+		return nil, err
+	}
+	ranges := make([]ModeRange, 0, len(config.Ranges))
+	for _, row := range config.Ranges {
+		result, err := SetModeRange(ctx, client, row)
+		if err != nil {
+			return nil, err
+		}
+		ranges = append(ranges, result.Range)
+	}
+	return &ModeRangeTableSetResult{
+		Ranges:       ranges,
+		RangeCount:   len(ranges),
+		MSPName:      "MSP_SET_MODE_RANGE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func ValidateModeRangeTable(config ModeRangeTableSetConfig) error {
+	if len(config.Ranges) == 0 {
+		return fmt.Errorf("at least one mode range is required")
+	}
+	for i, row := range config.Ranges {
+		if err := ValidateModeRange(row); err != nil {
+			return fmt.Errorf("ranges[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func ValidateModeRange(row ModeRange) error {
+	if row.Index < 0 || row.Index > 255 {
+		return fmt.Errorf("index must be 0..255")
+	}
+	if row.Range.StartStep > row.Range.EndStep {
+		return fmt.Errorf("range.start_step must be less than or equal to range.end_step")
+	}
+	if (row.ModeLogic == nil) != (row.LinkedTo == nil) {
+		return fmt.Errorf("mode_logic and linked_to must be provided together")
+	}
+	return nil
 }
 
 func readModeDefinitions(ctx context.Context, client *connection.Client) ([]ModeDefinition, error) {

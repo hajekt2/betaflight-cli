@@ -78,3 +78,25 @@ func TestEncodeModeRangeWithExtras(t *testing.T) {
 		t.Fatalf("payload = %v, want %v", payload, want)
 	}
 }
+
+func TestValidateModeRangeTable(t *testing.T) {
+	logic := uint8(1)
+	linkedTo := uint8(53)
+	err := ValidateModeRangeTable(ModeRangeTableSetConfig{Ranges: []ModeRange{{
+		Index:           1,
+		ID:              52,
+		AuxChannelIndex: 2,
+		Range: StepRange{
+			StartStep: 16,
+			EndStep:   32,
+		},
+		ModeLogic: &logic,
+		LinkedTo:  &linkedTo,
+	}}})
+	if err != nil {
+		t.Fatalf("ValidateModeRangeTable() error = %v", err)
+	}
+	if err := ValidateModeRangeTable(ModeRangeTableSetConfig{}); err == nil {
+		t.Fatal("ValidateModeRangeTable() error = nil")
+	}
+}

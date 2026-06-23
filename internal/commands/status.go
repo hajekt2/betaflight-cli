@@ -9,10 +9,30 @@ import (
 
 type RuntimeStatus struct {
 	Runtime           *Status             `json:"runtime"`
+	Health            *RuntimeHealth      `json:"health,omitempty"`
 	ActiveSensorNames []string            `json:"active_sensor_names,omitempty"`
 	FlightModes       *FlightModeState    `json:"flight_modes,omitempty"`
 	Arming            *ArmingDisableState `json:"arming,omitempty"`
 	RebootRequired    *bool               `json:"reboot_required,omitempty"`
+}
+
+type RuntimeHealth struct {
+	CPULoadPercent   *uint16           `json:"cpu_load_percent,omitempty"`
+	CPULoadFraction  *float64          `json:"cpu_load_fraction,omitempty"`
+	CPUTemperatureC  *float64          `json:"cpu_temperature_c,omitempty"`
+	CycleTimeUS      uint16            `json:"cycle_time_us"`
+	I2CErrors        uint16            `json:"i2c_errors"`
+	I2CErrorsPresent bool              `json:"i2c_errors_present"`
+	ArmingBlocked    *bool             `json:"arming_blocked,omitempty"`
+	RebootRequired   *bool             `json:"reboot_required,omitempty"`
+	ConfigState      *ConfigStateFlags `json:"config_state,omitempty"`
+}
+
+type ConfigStateFlags struct {
+	Raw            uint8    `json:"raw"`
+	RebootRequired bool     `json:"reboot_required"`
+	ActiveNames    []string `json:"active_names"`
+	UnknownMask    uint8    `json:"unknown_mask,omitempty"`
 }
 
 type FlightModeState struct {
@@ -45,6 +65,7 @@ func ReadRuntimeStatus(ctx context.Context, client *connection.Client) (*Runtime
 		ActiveSensorNames: activeSensorNames(status.ActiveSensors),
 		Arming:            DecodeArmingDisableState(status),
 	}
+	out.Health = DecodeRuntimeHealth(status, out.Arming)
 	if definitions, err := readModeDefinitions(ctx, client); err == nil {
 		out.FlightModes = DecodeFlightModeState(status, definitions)
 	}
@@ -53,6 +74,48 @@ func ReadRuntimeStatus(ctx context.Context, client *connection.Client) (*Runtime
 		out.RebootRequired = &rebootRequired
 	}
 	return out, nil
+}
+
+func DecodeRuntimeHealth(status *Status, arming *ArmingDisableState) *RuntimeHealth {
+	if status == nil {
+		return nil
+	}
+	health := &RuntimeHealth{
+		CycleTimeUS:      status.CycleTimeUS,
+		I2CErrors:        status.I2CErrors,
+		I2CErrorsPresent: status.I2CErrors != 0,
+		CPUTemperatureC:  status.CPUTemperatureC,
+	}
+	if status.CPULoad != nil {
+		health.CPULoadPercent = status.CPULoad
+		fraction := float64(*status.CPULoad) / 100
+		health.CPULoadFraction = &fraction
+	}
+	if arming != nil {
+		blocked := arming.Disabled
+		health.ArmingBlocked = &blocked
+	}
+	if status.ConfigStateFlag != nil {
+		config := DecodeConfigStateFlags(*status.ConfigStateFlag)
+		health.ConfigState = config
+		rebootRequired := config.RebootRequired
+		health.RebootRequired = &rebootRequired
+	}
+	return health
+}
+
+func DecodeConfigStateFlags(raw uint8) *ConfigStateFlags {
+	const rebootRequiredMask uint8 = 1 << 0
+	state := &ConfigStateFlags{
+		Raw:            raw,
+		RebootRequired: raw&rebootRequiredMask != 0,
+		ActiveNames:    []string{},
+		UnknownMask:    raw &^ rebootRequiredMask,
+	}
+	if state.RebootRequired {
+		state.ActiveNames = append(state.ActiveNames, "REBOOT_REQUIRED")
+	}
+	return state
 }
 
 func DecodeFlightModeState(status *Status, definitions []ModeDefinition) *FlightModeState {

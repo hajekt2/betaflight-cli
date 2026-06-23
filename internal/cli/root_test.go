@@ -154,6 +154,10 @@ func TestStatusWithFakeFC(t *testing.T) {
 	if runtime["source"] != "MSP_STATUS_EX" || runtime["cycle_time_us"] != float64(250) || runtime["active_sensors"] != float64(33) {
 		t.Fatalf("runtime = %+v", runtime)
 	}
+	health := status["health"].(map[string]any)
+	if health["cpu_load_percent"] != float64(42) || health["i2c_errors_present"] != false {
+		t.Fatalf("health = %+v", health)
+	}
 	activeNames := status["active_sensor_names"].([]any)
 	if len(activeNames) != 2 || activeNames[0] != "accelerometer" || activeNames[1] != "gyro" {
 		t.Fatalf("active_sensor_names = %+v", activeNames)

@@ -153,6 +153,7 @@ The object also includes a `by_key` map for direct agent lookup and per-field wa
 
 `status` returns a `status` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes the raw runtime status, active sensor names, active flight mode names decoded from `MSP_BOXNAMES` and `MSP_BOXIDS`, decoded arming-disable state, and reboot-required state when firmware supplies configuration flags.
+The `health` object includes CPU load as percent and fraction, cycle time, CPU temperature when supplied by firmware, I2C error presence, arming-blocked state, and decoded configuration-state flags.
 The raw runtime object keeps the legacy first 32 mode bits in `mode_flags` and the full packed mode bitset in `mode_flags_bytes`.
 Flight mode records include `byte_index` and `bit_index` so modes above bit 31 remain addressable when Betaflight adds more modes.
 

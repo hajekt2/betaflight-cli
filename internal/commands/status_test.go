@@ -54,3 +54,38 @@ func TestDecodeFlightModeStateUsesExtendedFlagBytes(t *testing.T) {
 		t.Fatalf("active extended mode = %+v", active)
 	}
 }
+
+func TestDecodeRuntimeHealth(t *testing.T) {
+	cpu := uint16(42)
+	configState := uint8(1)
+	temp := 4.25
+	health := DecodeRuntimeHealth(&Status{
+		CycleTimeUS:     250,
+		I2CErrors:       3,
+		CPULoad:         &cpu,
+		CPUTemperatureC: &temp,
+		ConfigStateFlag: &configState,
+	}, &ArmingDisableState{Disabled: true})
+	if health == nil {
+		t.Fatal("DecodeRuntimeHealth() = nil")
+	}
+	if health.CPULoadPercent == nil || *health.CPULoadPercent != 42 || health.CPULoadFraction == nil || *health.CPULoadFraction != 0.42 {
+		t.Fatalf("cpu health = %+v", health)
+	}
+	if !health.I2CErrorsPresent || health.ArmingBlocked == nil || !*health.ArmingBlocked {
+		t.Fatalf("health = %+v", health)
+	}
+	if health.ConfigState == nil || !health.ConfigState.RebootRequired || health.RebootRequired == nil || !*health.RebootRequired {
+		t.Fatalf("config state = %+v", health.ConfigState)
+	}
+}
+
+func TestDecodeConfigStateFlagsReportsUnknownBits(t *testing.T) {
+	state := DecodeConfigStateFlags(0b101)
+	if !state.RebootRequired || state.UnknownMask != 0b100 {
+		t.Fatalf("state = %+v", state)
+	}
+	if len(state.ActiveNames) != 1 || state.ActiveNames[0] != "REBOOT_REQUIRED" {
+		t.Fatalf("active names = %+v", state.ActiveNames)
+	}
+}

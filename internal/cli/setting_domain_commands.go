@@ -274,6 +274,13 @@ func (a *app) receiverSetRXFailJSONCommand() *cobra.Command {
 }
 
 func parseRXFailTableJSON(data []byte) (bfcommands.RXFailTableSetConfig, error) {
+	if isJSONArray(data) {
+		var channels []bfcommands.RXFailChannel
+		if err := json.Unmarshal(data, &channels); err != nil {
+			return bfcommands.RXFailTableSetConfig{}, err
+		}
+		return bfcommands.RXFailTableSetConfig{Channels: channels}, nil
+	}
 	var wrapped struct {
 		RXFailTable *bfcommands.RXFailTableSetConfig `json:"rx_fail_table"`
 		RXFail      []bfcommands.RXFailChannel       `json:"rx_fail"`
@@ -297,10 +304,6 @@ func parseRXFailTableJSON(data []byte) (bfcommands.RXFailTableSetConfig, error) 
 		return bfcommands.RXFailTableSetConfig{Channels: wrapped.Channels}, nil
 	case wrapped.Receiver != nil && wrapped.Receiver.Failsafe != nil:
 		return bfcommands.RXFailTableSetConfig{Channels: wrapped.Receiver.Failsafe}, nil
-	}
-	var channels []bfcommands.RXFailChannel
-	if err := json.Unmarshal(data, &channels); err == nil {
-		return bfcommands.RXFailTableSetConfig{Channels: channels}, nil
 	}
 	var config bfcommands.RXFailTableSetConfig
 	if err := json.Unmarshal(data, &config); err != nil {
@@ -793,6 +796,10 @@ func (a *app) receiverDeadbandJSONCommand() *cobra.Command {
 }
 
 func parseRCDeadbandJSON(data []byte) (bfcommands.RCDeadband, error) {
+	var config bfcommands.RCDeadband
+	if err := json.Unmarshal(data, &config); err == nil && config != (bfcommands.RCDeadband{}) {
+		return config, nil
+	}
 	var wrapped struct {
 		RCDeadband *bfcommands.RCDeadband `json:"rc_deadband"`
 		Deadband   *bfcommands.RCDeadband `json:"deadband"`
@@ -814,11 +821,7 @@ func parseRCDeadbandJSON(data []byte) (bfcommands.RCDeadband, error) {
 	case wrapped.Receiver != nil && wrapped.Receiver.Deadband != nil:
 		return *wrapped.Receiver.Deadband, nil
 	}
-	var config bfcommands.RCDeadband
-	if err := json.Unmarshal(data, &config); err != nil {
-		return bfcommands.RCDeadband{}, err
-	}
-	return config, nil
+	return bfcommands.RCDeadband{}, fmt.Errorf("expected rc_deadband, deadband, config, receiver.deadband, or a direct deadband object")
 }
 
 func receiverRXFailLine(args []string) (string, error) {

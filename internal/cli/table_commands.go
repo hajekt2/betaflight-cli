@@ -189,6 +189,10 @@ func (a *app) vtxTableSetBandJSONCommand() *cobra.Command {
 }
 
 func parseVTXTableBandJSON(data []byte) (bfcommands.VTXTableBandSetConfig, error) {
+	var config bfcommands.VTXTableBandSetConfig
+	if err := json.Unmarshal(data, &config); err == nil && hasVTXTableBandFields(config) {
+		return normalizeVTXTableBandConfig(config)
+	}
 	var wrapped struct {
 		VTXTableBand *bfcommands.VTXTableBandSetConfig `json:"vtxtable_band"`
 		Band         *bfcommands.VTXTableBandSetConfig `json:"band"`
@@ -200,7 +204,6 @@ func parseVTXTableBandJSON(data []byte) (bfcommands.VTXTableBandSetConfig, error
 	if err := json.Unmarshal(data, &wrapped); err != nil {
 		return bfcommands.VTXTableBandSetConfig{}, err
 	}
-	var config bfcommands.VTXTableBandSetConfig
 	switch {
 	case wrapped.VTXTableBand != nil:
 		config = *wrapped.VTXTableBand
@@ -211,10 +214,16 @@ func parseVTXTableBandJSON(data []byte) (bfcommands.VTXTableBandSetConfig, error
 	case wrapped.VTXTable != nil && wrapped.VTXTable.Band != nil:
 		config = *wrapped.VTXTable.Band
 	default:
-		if err := json.Unmarshal(data, &config); err != nil {
-			return bfcommands.VTXTableBandSetConfig{}, err
-		}
+		return bfcommands.VTXTableBandSetConfig{}, fmt.Errorf("expected vtxtable_band, band, config, vtxtable.band, or a direct VTX table band object")
 	}
+	return normalizeVTXTableBandConfig(config)
+}
+
+func hasVTXTableBandFields(config bfcommands.VTXTableBandSetConfig) bool {
+	return config.Band != 0 || config.Name != "" || config.Letter != "" || config.Factory || len(config.FrequenciesMHz) > 0
+}
+
+func normalizeVTXTableBandConfig(config bfcommands.VTXTableBandSetConfig) (bfcommands.VTXTableBandSetConfig, error) {
 	config.Name = strings.ToUpper(config.Name)
 	config.Letter = strings.ToUpper(config.Letter)
 	if err := bfcommands.ValidateVTXTableBand(config); err != nil {

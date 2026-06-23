@@ -147,6 +147,42 @@ func TestMSPRequestWriteLikeRequiresYes(t *testing.T) {
 	}
 }
 
+func TestMSPRequestInvalidCodeReturnsValidationError(t *testing.T) {
+	// invalid code that cannot be resolved must fail before attempting transport
+	called := false
+	env, err := runTestCommand(t, []string{"msp", "request", "not-a-code"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) == 0 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope for invalid code: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("msp request attempted transport for invalid code")
+	}
+}
+
+func TestMSPRequestInvalidPayloadHexFails(t *testing.T) {
+	// malformed hex should fail with explicit payload error
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"msp", "request", "MSP_NAME", "--yes", "--payload-hex", "Z1"}, "", func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) == 0 || !strings.Contains(strings.ToLower(env.Errors[0].Message), "encoding/hex") {
+		t.Fatalf("unexpected envelope for invalid payload hex: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("msp request attempted transport for invalid payload")
+	}
+}
+
 func TestMSPRequestReadLikeDoesNotRequireYes(t *testing.T) {
 	called := false
 	env, err := runTestCommandWithInput(t, []string{"msp", "request", "MSP_API_VERSION"}, "", func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

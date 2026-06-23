@@ -27,7 +27,7 @@ func TestClassifyPortFollowsPlatformConventions(t *testing.T) {
 		wantCandidate bool
 	}{
 		{"linux acm device", "/dev/ttyACM0", runtime.GOOS == "linux"},
-		{"generic usb fallback", "/dev/serial-usb", runtime.GOOS == "linux" || runtime.GOOS == "windows"},
+		{"generic usb fallback", "/dev/serial-usb", true},
 		{"mac usb modem", "/dev/cu.usbmodem1234", runtime.GOOS == "darwin"},
 		{"windows com", "COM3", runtime.GOOS == "windows"},
 		{"generic serial", "/dev/ttyS0", false},

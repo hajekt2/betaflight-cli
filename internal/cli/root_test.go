@@ -585,6 +585,36 @@ func TestConfigurationApplyWithSaveWritesAndSaves(t *testing.T) {
 	}
 }
 
+func TestConfigurationApplyWithJSONFileCanSave(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommandWithInput(t, []string{"configuration", "apply", "--file", "-", "--save", "--yes"}, `{"data":{"lines":["feature GPS"]}}`, func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["source_format"] != "json" || data["kind"] != "configuration" || data["applied"] != true || data["saved"] != true {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
 func TestConfigurationValidateReportsDangerousLine(t *testing.T) {
 	env, err := runTestCommandWithInput(t, []string{"configuration", "validate"}, "reboot\nfeature GPS\n", nil)
 	if err != nil {
@@ -3029,6 +3059,36 @@ func TestRestorePlanAcceptsJSONNoConnect(t *testing.T) {
 	data := env.Data.(map[string]any)
 	lines := data["cli_lines"].([]any)
 	if len(lines) != 1 || lines[0] != "feature GPS" {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
+func TestRestoreApplyWithJSONFileAndYes(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--file", "-", "--yes"}, `{"data":{"lines":["feature GPS","set gyro_lpf1_static_hz = 0"]}}`, func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Write {
+		t.Fatalf("operation = %v, want Write", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["source_format"] != "json" || data["kind"] != "restore" || data["applied"] != true {
 		t.Fatalf("plan = %+v", data)
 	}
 }

@@ -268,8 +268,24 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 		t.Fatalf("vtx list capability = %+v", vtxList)
 	}
 	mspRequest := byCommand["betaflight-cli msp request"]
-	if mspRequest["operation"] != "read_only" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "none" || mspRequest["runnable"] != true {
+	if mspRequest["operation"] != "read_only_or_write_or_dangerous" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "read-only unless --code implies write; write commands require --yes" || mspRequest["runnable"] != true {
 		t.Fatalf("msp request capability = %+v", mspRequest)
+	}
+	mspList := byCommand["betaflight-cli msp list"]
+	if mspList["operation"] != "offline" || mspList["requires_connection"] != false || mspList["confirmation"] != "none" || mspList["runnable"] != true {
+		t.Fatalf("msp list capability = %+v", mspList)
+	}
+	mspMetadata := byCommand["betaflight-cli msp metadata"]
+	if mspMetadata["operation"] != "offline" || mspMetadata["requires_connection"] != false || mspMetadata["confirmation"] != "none" || mspMetadata["runnable"] != true {
+		t.Fatalf("msp metadata capability = %+v", mspMetadata)
+	}
+	schema := byCommand["betaflight-cli schema"]
+	if schema["operation"] != "offline" || schema["requires_connection"] != false || schema["confirmation"] != "none" || schema["runnable"] != true {
+		t.Fatalf("schema capability = %+v", schema)
+	}
+	capabilitiesCoverage := byCommand["betaflight-cli capabilities coverage"]
+	if capabilitiesCoverage["operation"] != "offline" || capabilitiesCoverage["requires_connection"] != false || capabilitiesCoverage["confirmation"] != "none" || capabilitiesCoverage["runnable"] != true {
+		t.Fatalf("capabilities coverage capability = %+v", capabilitiesCoverage)
 	}
 	transponderSetProvider := byCommand["betaflight-cli transponder set-provider"]
 	if transponderSetProvider["operation"] != "plan_or_write" || transponderSetProvider["requires_connection"] != true || transponderSetProvider["confirmation"] != "--yes with --apply or --save" || transponderSetProvider["runnable"] != true {

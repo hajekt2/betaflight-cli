@@ -399,6 +399,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if boardAlignment["operation"] != "write" || boardAlignment["confirmation"] != "--yes" || boardAlignment["requires_connection"] != true || boardAlignment["output_root"] != "board_alignment" || boardAlignment["runnable"] != true {
 		t.Fatalf("board alignment capability = %+v", boardAlignment)
 	}
+	boardAlignmentJSON := byCommand["betaflight-cli failsafe set-board-alignment-json"]
+	if boardAlignmentJSON["operation"] != "write" || boardAlignmentJSON["confirmation"] != "--yes" || boardAlignmentJSON["requires_connection"] != true || boardAlignmentJSON["output_root"] != "board_alignment" || boardAlignmentJSON["input"] == "" || boardAlignmentJSON["runnable"] != true {
+		t.Fatalf("board alignment JSON capability = %+v", boardAlignmentJSON)
+	}
 	receiverConfig := byCommand["betaflight-cli receiver set-config-json"]
 	if receiverConfig["operation"] != "write" || receiverConfig["confirmation"] != "--yes" || receiverConfig["requires_connection"] != true || receiverConfig["output_root"] != "receiver_config" || receiverConfig["runnable"] != true {
 		t.Fatalf("receiver config capability = %+v", receiverConfig)
@@ -406,6 +410,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	rssiChannel := byCommand["betaflight-cli receiver set-rssi-channel"]
 	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
 		t.Fatalf("rssi channel capability = %+v", rssiChannel)
+	}
+	rssiChannelJSON := byCommand["betaflight-cli receiver set-rssi-channel-json"]
+	if rssiChannelJSON["operation"] != "write" || rssiChannelJSON["confirmation"] != "--yes" || rssiChannelJSON["requires_connection"] != true || rssiChannelJSON["output_root"] != "rssi_channel" || rssiChannelJSON["input"] == "" || rssiChannelJSON["runnable"] != true {
+		t.Fatalf("rssi channel JSON capability = %+v", rssiChannelJSON)
 	}
 	rxFail := byCommand["betaflight-cli receiver set-rxfail"]
 	if rxFail["operation"] != "write" || rxFail["confirmation"] != "--yes" || rxFail["requires_connection"] != true || rxFail["output_root"] != "rx_fail" || rxFail["runnable"] != true {
@@ -670,6 +678,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	osdVideoSystem := byCommand["betaflight-cli osd set-video-system"]
 	if osdVideoSystem["operation"] != "write" || osdVideoSystem["confirmation"] != "--yes" || osdVideoSystem["requires_connection"] != true || osdVideoSystem["output_root"] != "osd_video_system" || osdVideoSystem["runnable"] != true {
 		t.Fatalf("osd video system capability = %+v", osdVideoSystem)
+	}
+	osdVideoSystemJSON := byCommand["betaflight-cli osd set-video-system-json"]
+	if osdVideoSystemJSON["operation"] != "write" || osdVideoSystemJSON["confirmation"] != "--yes" || osdVideoSystemJSON["requires_connection"] != true || osdVideoSystemJSON["output_root"] != "osd_video_system" || osdVideoSystemJSON["input"] == "" || osdVideoSystemJSON["runnable"] != true {
+		t.Fatalf("osd video system json capability = %+v", osdVideoSystemJSON)
 	}
 	osdPosition := byCommand["betaflight-cli osd set-position"]
 	if osdPosition["operation"] != "write" || osdPosition["confirmation"] != "--yes" || osdPosition["requires_connection"] != true || osdPosition["output_root"] != "osd_position" || osdPosition["runnable"] != true {
@@ -3653,6 +3665,34 @@ func TestReceiverSetRSSIChannelRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestReceiverSetRSSIChannelJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"rssi_channel":19}`
+	env, err := runTestCommandWithInput(t, []string{"receiver", "set-rssi-channel-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestReceiverSetRSSIChannelJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"receiver":{"rssi_channel":8}}`
+	env, err := runTestCommandWithInput(t, []string{"receiver", "set-rssi-channel-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestReceiverSetMapWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"receiver", "set-map", "0", "1", "3", "2", "--yes"}, nil)
 	if err != nil {
@@ -3761,6 +3801,25 @@ func TestReceiverSetMapRejectsDuplicateValuesBeforeConnect(t *testing.T) {
 
 func TestReceiverSetRSSIChannelWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"receiver", "set-rssi-channel", "8", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["rssi_channel"].(map[string]any)
+	if result["channel"] != float64(8) || result["msp_name"] != "MSP_SET_RSSI_CONFIG" || result["save_required"] != true {
+		t.Fatalf("rssi channel = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "rssi_channel" || env.SideEffects[0].Command != "MSP_SET_RSSI_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestReceiverSetRSSIChannelJSONWithFakeFC(t *testing.T) {
+	input := `{"receiver":{"rssi_channel":8}}`
+	env, err := runTestCommandWithInput(t, []string{"receiver", "set-rssi-channel-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -4272,6 +4331,26 @@ func TestOSDSetVideoSystemWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestOSDSetVideoSystemJSONWithFakeFC(t *testing.T) {
+	input := `{"osd":{"video_system":3}}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-video-system-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_video_system"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["video_system"] != float64(3) || config["video_system_name"] != "HD" || result["save_required"] != true || result["reboot_possible"] != true {
+		t.Fatalf("osd_video_system = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_OSD_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestOSDSetVideoSystemRequiresConfirmationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"osd", "set-video-system", "3"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
@@ -4279,6 +4358,20 @@ func TestOSDSetVideoSystemRequiresConfirmationBeforeConnect(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetVideoSystemJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"video_system":3}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-video-system-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
 		t.Fatalf("env = %+v", env)
@@ -4294,6 +4387,20 @@ func TestOSDSetVideoSystemValidationBeforeConnect(t *testing.T) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetVideoSystemJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"video_system":4}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-video-system-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -8118,8 +8225,49 @@ func TestFailsafeSetBoardAlignmentRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestFailsafeSetBoardAlignmentJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"board_alignment":{"roll_degrees":-2,"pitch_degrees":3,"yaw_degrees":90}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"failsafe", "set-board-alignment-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after board alignment confirmation failure")
+	}
+}
+
 func TestFailsafeSetBoardAlignmentWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"failsafe", "set-board-alignment", "-2", "3", "90", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["board_alignment"].(map[string]any)
+	alignment := result["board_alignment"].(map[string]any)
+	if alignment["roll_degrees"] != float64(-2) || alignment["pitch_degrees"] != float64(3) || alignment["yaw_degrees"] != float64(90) {
+		t.Fatalf("board alignment = %+v", result)
+	}
+	if result["msp_name"] != "MSP_SET_BOARD_ALIGNMENT_CONFIG" || result["save_required"] != true {
+		t.Fatalf("board alignment = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "board_alignment" || env.SideEffects[0].Command != "MSP_SET_BOARD_ALIGNMENT_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestFailsafeSetBoardAlignmentJSONWithFakeFC(t *testing.T) {
+	input := `{"failsafe":{"board_alignment":{"roll_degrees":-2,"pitch_degrees":3,"yaw_degrees":90}}}`
+	env, err := runTestCommandWithInput(t, []string{"failsafe", "set-board-alignment-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

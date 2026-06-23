@@ -67,6 +67,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.receiverSetRXFailCommand())
 		cmd.AddCommand(a.receiverSetRXFailJSONCommand())
 		cmd.AddCommand(a.receiverRSSIChannelCommand())
+		cmd.AddCommand(a.receiverRSSIChannelJSONCommand())
 		cmd.AddCommand(a.receiverMapCommand())
 		cmd.AddCommand(a.receiverMapJSONCommand())
 		cmd.AddCommand(a.receiverDeadbandCommand())
@@ -86,6 +87,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.osdSetGeneralJSONCommand())
 		cmd.AddCommand(a.osdSetCanvasCommand())
 		cmd.AddCommand(a.osdSetVideoSystemCommand())
+		cmd.AddCommand(a.osdSetVideoSystemJSONCommand())
 		cmd.AddCommand(a.osdSetPositionCommand())
 		cmd.AddCommand(a.osdSetPositionJSONCommand())
 		cmd.AddCommand(a.osdSetStatCommand())
@@ -124,6 +126,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.failsafeSetArmingJSONCommand())
 		cmd.AddCommand(a.failsafeSetConfigJSONCommand())
 		cmd.AddCommand(a.failsafeBoardAlignmentCommand())
+		cmd.AddCommand(a.failsafeBoardAlignmentJSONCommand())
 	}
 	return cmd
 }
@@ -534,6 +537,74 @@ func (a *app) receiverRSSIChannelCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) receiverRSSIChannelJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rssi-channel-json FILE",
+		Short: "Set RSSI channel from JSON through MSP_SET_RSSI_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			channel, err := parseRSSIChannelJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "RSSI channel changes receiver configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRSSIChannel(cmd.Context(), client, channel)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rssi_channel": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rssi_channel",
+					Command: "MSP_SET_RSSI_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseRSSIChannelJSON(data []byte) (uint8, error) {
+	var wrapped struct {
+		Channel     *uint8 `json:"channel"`
+		RSSIChannel *uint8 `json:"rssi_channel"`
+		Value       *uint8 `json:"value"`
+		Receiver    *struct {
+			Channel     *uint8 `json:"channel"`
+			RSSIChannel *uint8 `json:"rssi_channel"`
+		} `json:"receiver"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return 0, err
+	}
+	var channel *uint8
+	switch {
+	case wrapped.Channel != nil:
+		channel = wrapped.Channel
+	case wrapped.RSSIChannel != nil:
+		channel = wrapped.RSSIChannel
+	case wrapped.Value != nil:
+		channel = wrapped.Value
+	case wrapped.Receiver != nil && wrapped.Receiver.Channel != nil:
+		channel = wrapped.Receiver.Channel
+	case wrapped.Receiver != nil && wrapped.Receiver.RSSIChannel != nil:
+		channel = wrapped.Receiver.RSSIChannel
+	default:
+		return 0, fmt.Errorf("channel or rssi_channel is required")
+	}
+	if *channel > 18 {
+		return 0, fmt.Errorf("channel must be an integer in [0..18]")
+	}
+	return *channel, nil
 }
 
 func (a *app) receiverMapCommand() *cobra.Command {
@@ -1330,6 +1401,76 @@ func (a *app) osdSetVideoSystemCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) osdSetVideoSystemJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-video-system-json FILE",
+		Short: "Set OSD video system from JSON over MSP while preserving the other general OSD settings",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			videoSystem, err := parseOSDVideoSystemJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD video system changes can alter canvas and displayport behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDVideoSystem(cmd.Context(), client, videoSystem)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_video_system": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "osd_video_system",
+					Command: "MSP_SET_OSD_CONFIG",
+					Detail:  "OSD video system changed but not saved; firmware may resize canvas or change displayport mode when switching SD/HD",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseOSDVideoSystemJSON(data []byte) (uint8, error) {
+	var wrapped struct {
+		VideoSystem    *uint8 `json:"video_system"`
+		OSDVideoSystem *uint8 `json:"osd_video_system"`
+		Value          *uint8 `json:"value"`
+		Config         *struct {
+			VideoSystem *uint8 `json:"video_system"`
+		} `json:"config"`
+		OSD *struct {
+			VideoSystem *uint8 `json:"video_system"`
+		} `json:"osd"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return 0, err
+	}
+	var videoSystem *uint8
+	switch {
+	case wrapped.VideoSystem != nil:
+		videoSystem = wrapped.VideoSystem
+	case wrapped.OSDVideoSystem != nil:
+		videoSystem = wrapped.OSDVideoSystem
+	case wrapped.Value != nil:
+		videoSystem = wrapped.Value
+	case wrapped.Config != nil && wrapped.Config.VideoSystem != nil:
+		videoSystem = wrapped.Config.VideoSystem
+	case wrapped.OSD != nil && wrapped.OSD.VideoSystem != nil:
+		videoSystem = wrapped.OSD.VideoSystem
+	default:
+		return 0, fmt.Errorf("video_system is required")
+	}
+	if *videoSystem > 3 {
+		return 0, fmt.Errorf("video_system must be 0 (AUTO), 1 (PAL), 2 (NTSC), or 3 (HD)")
+	}
+	return *videoSystem, nil
 }
 
 func (a *app) osdSetPositionCommand() *cobra.Command {
@@ -2526,6 +2667,69 @@ func (a *app) failsafeBoardAlignmentCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) failsafeBoardAlignmentJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-board-alignment-json FILE",
+		Short: "Set board alignment from JSON through MSP_SET_BOARD_ALIGNMENT_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			alignment, err := parseBoardAlignmentJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "board alignment changes configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetBoardAlignment(cmd.Context(), client, alignment)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"board_alignment": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "board_alignment",
+					Command: "MSP_SET_BOARD_ALIGNMENT_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseBoardAlignmentJSON(data []byte) (bfcommands.BoardAlignment, error) {
+	var wrapped struct {
+		BoardAlignment *bfcommands.BoardAlignment `json:"board_alignment"`
+		Alignment      *bfcommands.BoardAlignment `json:"alignment"`
+		Config         *bfcommands.BoardAlignment `json:"config"`
+		Failsafe       *struct {
+			BoardAlignment *bfcommands.BoardAlignment `json:"board_alignment"`
+		} `json:"failsafe"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.BoardAlignment{}, err
+	}
+	switch {
+	case wrapped.BoardAlignment != nil:
+		return *wrapped.BoardAlignment, nil
+	case wrapped.Alignment != nil:
+		return *wrapped.Alignment, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	case wrapped.Failsafe != nil && wrapped.Failsafe.BoardAlignment != nil:
+		return *wrapped.Failsafe.BoardAlignment, nil
+	}
+	var alignment bfcommands.BoardAlignment
+	if err := json.Unmarshal(data, &alignment); err != nil {
+		return bfcommands.BoardAlignment{}, err
+	}
+	return alignment, nil
 }
 
 func (a *app) failsafeSetConfigJSONCommand() *cobra.Command {

@@ -183,7 +183,8 @@ Successful VTX config writes include a `vtx_config` side effect.
 Successful OSD canvas writes include an `osd_canvas` side effect.
 `osd set-general-json` returns an `osd_general_config` object with the requested patch, merged config, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
 Successful OSD general config writes include an `osd_general_config` side effect.
-`osd set-video-system` returns an `osd_video_system` object with requested video system value/name, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
+`osd set-video-system` and `osd set-video-system-json` return an `osd_video_system` object with requested video system value/name, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
+`osd set-video-system-json` accepts a JSON object with `video_system`, `osd_video_system`, `value`, `config.video_system`, or `osd.video_system`.
 Successful OSD video-system writes include an `osd_video_system` side effect.
 `osd set-position`, `osd set-stat`, and `osd set-timer` return `osd_position`, `osd_stat`, and `osd_timer` objects with the requested value, MSP command name/code, acknowledgement flag, and `save_required`.
 `osd set-position-json`, `osd set-stat-json`, and `osd set-timer-json` accept direct objects or objects with `osd_position`/`position`/`config`, `osd_stat`/`stat`/`config`, or `osd_timer`/`timer`/`config` and return the same output roots as their positional forms.
@@ -308,7 +309,8 @@ Successful RTC set responses include an `rtc_set` side effect.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, RC deadband values, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 `receiver set-config-json` returns a `receiver_config` object with the requested receiver config, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful receiver config writes include a `receiver_config` side effect.
-`receiver set-rssi-channel` returns an `rssi_channel` object with the channel, MSP command name/code, acknowledgement flag, and `save_required`.
+`receiver set-rssi-channel` and `receiver set-rssi-channel-json` return an `rssi_channel` object with the channel, MSP command name/code, acknowledgement flag, and `save_required`.
+`receiver set-rssi-channel-json` accepts a JSON object with `channel`, `rssi_channel`, `value`, `receiver.channel`, or `receiver.rssi_channel`.
 Successful RSSI channel writes include an `rssi_channel` side effect.
 `receiver set-rxfail` returns an `rx_fail` object with the written receiver failsafe channel, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful receiver failsafe writes include an `rx_fail` side effect.
@@ -362,7 +364,8 @@ The object includes arming configuration, failsafe stage and procedure configura
 Successful arming config writes include an `arming_config` side effect.
 `failsafe set-config-json` returns a `failsafe_config` object with the requested failsafe config, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful failsafe config writes include a `failsafe_config` side effect.
-`failsafe set-board-alignment` returns a `board_alignment` object with roll, pitch, yaw, MSP command name/code, acknowledgement flag, and `save_required`.
+`failsafe set-board-alignment` and `failsafe set-board-alignment-json` return a `board_alignment` object with roll, pitch, yaw, MSP command name/code, acknowledgement flag, and `save_required`.
+`failsafe set-board-alignment-json` accepts a direct board alignment object or an object with `board_alignment`, `alignment`, `config`, or `failsafe.board_alignment`.
 Successful board alignment writes include a `board_alignment` side effect.
 
 `sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP2_GYRO_SENSOR_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.

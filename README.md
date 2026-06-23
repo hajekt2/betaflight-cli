@@ -110,7 +110,7 @@ betaflight-cli rates list --port /dev/tty.usbmodem01
 betaflight-cli filters list --port /dev/tty.usbmodem01
 betaflight-cli receiver list --port /dev/tty.usbmodem01
 betaflight-cli receiver status --port /dev/tty.usbmodem01
-betaflight-cli receiver set-rssi-channel 8 --port /dev/tty.usbmodem01 --yes
+betaflight-cli receiver set-rssi-channel-json rssi.json --port /dev/tty.usbmodem01 --yes
 betaflight-cli receiver set-deadband 5 7 3 50 --port /dev/tty.usbmodem01 --yes
 betaflight-cli receiver rxfail 2 s 1100 --port /dev/tty.usbmodem01
 betaflight-cli vtx list --port /dev/tty.usbmodem01
@@ -123,7 +123,7 @@ betaflight-cli gps set-rescue 3200 100 50 1500 1200 1800 1450 1 8 500 150 1 2 30
 betaflight-cli gps set-rescue-pids 80 10 5 120 20 10 45 --port /dev/tty.usbmodem01 --yes
 betaflight-cli failsafe list --port /dev/tty.usbmodem01
 betaflight-cli failsafe status --port /dev/tty.usbmodem01
-betaflight-cli failsafe set-board-alignment -2 3 90 --port /dev/tty.usbmodem01 --yes
+betaflight-cli failsafe set-board-alignment-json alignment.json --port /dev/tty.usbmodem01 --yes
 betaflight-cli battery set-voltage-meter 10 110 10 1 --port /dev/tty.usbmodem01 --yes
 betaflight-cli battery set-current-meter 10 400 -10 --port /dev/tty.usbmodem01 --yes
 printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch plan
@@ -196,6 +196,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `osd set-canvas` writes OSD canvas columns and rows through `MSP_SET_OSD_CANVAS`, requires `--yes`, and reports that firmware may save and reboot when switching an HD target to MSP displayport.
 `osd set-general-json` accepts a partial JSON object for general OSD fields, merges it with the current `MSP_OSD_CONFIG` response, writes the resulting general config through `MSP_SET_OSD_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `osd set-video-system` reads the current general OSD config, changes only `video_system`, writes it back through `MSP_SET_OSD_CONFIG`, requires `--yes`, and reports that firmware may resize canvas or change displayport behavior when switching SD and HD modes.
+`osd set-video-system-json` accepts a JSON object with `video_system`, `osd_video_system`, `value`, `config.video_system`, or `osd.video_system`, writes through `MSP_SET_OSD_CONFIG`, requires `--yes`, and returns the same output root as the positional form.
 `osd set-position`, `osd set-stat`, and `osd set-timer` write individual OSD element positions, post-flight statistic flags, and timer values through `MSP_SET_OSD_CONFIG`, require `--yes`, and report that a separate `save` is still required to persist the change.
 `osd set-position-json`, `osd set-stat-json`, and `osd set-timer-json` accept direct OSD item objects or objects with `osd_position`/`position`/`config`, `osd_stat`/`stat`/`config`, or `osd_timer`/`timer`/`config`, require `--yes`, and return the same output roots as their positional forms.
 Betaflight 2025.12 declares `MSP_OSD_VIDEO_CONFIG` and `MSP_SET_OSD_VIDEO_CONFIG` constants, but the firmware source does not expose handler cases for them, so this tool uses the confirmed `MSP_SET_OSD_CONFIG` general-settings path.
@@ -221,6 +222,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `receiver set-rxfail` writes one receiver failsafe channel through `MSP_SET_RXFAIL_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-rxfail-json` writes receiver failsafe channel rows through `MSP_SET_RXFAIL_CONFIG`, accepts either a JSON array or an object with `rx_fail_table`, `channels`, `rx_fail`, `failsafe`, or `receiver.failsafe`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-rssi-channel` writes the RSSI channel through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`receiver set-rssi-channel-json` accepts a JSON object with `channel`, `rssi_channel`, `value`, `receiver.channel`, or `receiver.rssi_channel`, writes through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-map` writes the four-channel RC map through `MSP_SET_RX_MAP`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-map-json` writes the four-channel RC map through `MSP_SET_RX_MAP`, accepts either a JSON array or an object with `rc_map`, `map`, or `receiver.rc_map`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-deadband` writes RC deadband, yaw deadband, position-hold deadband, and 3D throttle deadband through `MSP_SET_RC_DEADBAND`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
@@ -244,6 +246,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `failsafe set-arming-json` writes auto-disarm delay, small-angle limit, and gyro-calibration-on-first-arm through `MSP_SET_ARMING_CONFIG`, accepts either an arming config object or an object with `arming_config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `failsafe set-config-json` writes failsafe delay, landing time, throttle, switch mode, throttle-low delay, and procedure through `MSP_SET_FAILSAFE_CONFIG`, accepts either a failsafe config object or an object with `failsafe_config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `failsafe set-board-alignment` writes roll, pitch, and yaw board alignment through `MSP_SET_BOARD_ALIGNMENT_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`failsafe set-board-alignment-json` accepts a direct board alignment object or an object with `board_alignment`, `alignment`, `config`, or `failsafe.board_alignment`, writes through `MSP_SET_BOARD_ALIGNMENT_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `pid status` reads active PID gain triplets, rate profile data, advanced PID tuning, and simplified tuning over MSP.
 `rates status` reads active rate profile fields and TPA settings over MSP.
 `filters status` reads loop timing, motor protocol, gyro, D-term, dynamic notch, and RPM filter configuration over MSP.

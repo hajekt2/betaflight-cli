@@ -363,6 +363,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
 		t.Fatalf("rssi channel capability = %+v", rssiChannel)
 	}
+	rxFail := byCommand["betaflight-cli receiver set-rxfail"]
+	if rxFail["operation"] != "write" || rxFail["confirmation"] != "--yes" || rxFail["requires_connection"] != true || rxFail["output_root"] != "rx_fail" || rxFail["runnable"] != true {
+		t.Fatalf("rx fail capability = %+v", rxFail)
+	}
 	rcMap := byCommand["betaflight-cli receiver set-map"]
 	if rcMap["operation"] != "write" || rcMap["confirmation"] != "--yes" || rcMap["requires_connection"] != true || rcMap["output_root"] != "rc_map" || rcMap["runnable"] != true {
 		t.Fatalf("rc map capability = %+v", rcMap)
@@ -4273,6 +4277,51 @@ func TestReceiverRXFailApplyWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "rxfail 2 s 1100" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestReceiverSetRXFailWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-rxfail", "2", "2", "1100", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["rx_fail"].(map[string]any)
+	channel := result["channel"].(map[string]any)
+	if channel["index"] != float64(2) || channel["mode_name"] != "SET" || channel["value"] != float64(1100) || result["save_required"] != true {
+		t.Fatalf("rx_fail = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_RXFAIL_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestReceiverSetRXFailRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-rxfail", "2", "2", "1100"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestReceiverSetRXFailValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-rxfail", "4", "0", "1000", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

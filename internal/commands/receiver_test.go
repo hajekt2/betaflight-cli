@@ -141,6 +141,14 @@ func TestDecodeRXFailConfig(t *testing.T) {
 	}
 }
 
+func TestEncodeRXFailChannel(t *testing.T) {
+	payload := EncodeRXFailChannel(RXFailChannel{Index: 2, Mode: 2, Value: 1100})
+	want := []byte{2, 2, 0x4c, 0x04}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodeRXFailConfigRejectsPartialRow(t *testing.T) {
 	if _, err := DecodeRXFailConfig([]byte{0, 1}); err == nil {
 		t.Fatal("DecodeRXFailConfig() error = nil, want partial row error")

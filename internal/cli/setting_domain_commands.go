@@ -60,6 +60,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "receiver" {
 		cmd.AddCommand(a.receiverStatusCommand())
 		cmd.AddCommand(a.receiverRXFailCommand())
+		cmd.AddCommand(a.receiverSetRXFailCommand())
 		cmd.AddCommand(a.receiverRSSIChannelCommand())
 		cmd.AddCommand(a.receiverMapCommand())
 		cmd.AddCommand(a.receiverDeadbandCommand())
@@ -160,6 +161,58 @@ func (a *app) receiverRXFailCommand() *cobra.Command {
 	}
 	addChangeFlags(cmd, &flags)
 	return cmd
+}
+
+func (a *app) receiverSetRXFailCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rxfail INDEX MODE VALUE",
+		Short: "Set one receiver failsafe channel through MSP_SET_RXFAIL_CONFIG",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if index >= 18 {
+				return validationFailureMessage(a, cmd, "index must be in [0..17]")
+			}
+			mode, err := parseUint8Arg("mode", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if mode > 2 {
+				return validationFailureMessage(a, cmd, "mode must be 0, 1, or 2")
+			}
+			if index >= 4 && mode == 0 {
+				return validationFailureMessage(a, cmd, "mode 0 is only valid for flight channels 0..3")
+			}
+			value, err := parseUint16Arg("value", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "receiver failsafe changes receiver configuration; pass --yes"))
+			}
+			channel := bfcommands.RXFailChannel{
+				Index: int(index),
+				Mode:  mode,
+				Value: value,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRXFailChannel(cmd.Context(), client, channel)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rx_fail": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rx_fail",
+					Command: "MSP_SET_RXFAIL_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) receiverRSSIChannelCommand() *cobra.Command {

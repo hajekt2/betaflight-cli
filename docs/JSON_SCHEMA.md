@@ -262,6 +262,8 @@ Successful `rtc set` responses include an `rtc_set` side effect.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, RC deadband values, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 `receiver set-rssi-channel` returns an `rssi_channel` object with the channel, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful RSSI channel writes include an `rssi_channel` side effect.
+`receiver set-rxfail` returns an `rx_fail` object with the written receiver failsafe channel, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful receiver failsafe writes include an `rx_fail` side effect.
 `receiver set-map` returns an `rc_map` object with numeric channel map indexes, decoded channel names, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful receiver map writes include an `rc_map` side effect.
 `receiver set-deadband` returns an `rc_deadband` object with deadband, yaw deadband, position-hold deadband, 3D throttle deadband, MSP command name/code, acknowledgement flag, and `save_required`.

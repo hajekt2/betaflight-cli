@@ -57,6 +57,14 @@ type RXFailChannel struct {
 	CLICommand    string `json:"cli_command,omitempty"`
 }
 
+type RXFailChannelSetResult struct {
+	Channel      RXFailChannel `json:"channel"`
+	MSPCode      uint16        `json:"msp_code"`
+	MSPName      string        `json:"msp_name"`
+	Acknowledged bool          `json:"acknowledged"`
+	SaveRequired bool          `json:"save_required"`
+}
+
 type RSSIChannelSetResult struct {
 	Channel      uint8  `json:"channel"`
 	MSPCode      uint16 `json:"msp_code"`
@@ -164,6 +172,25 @@ func SetRCMap(ctx context.Context, client *connection.Client, mapping []uint8) (
 
 func EncodeRCMap(mapping []uint8) []byte {
 	return append([]byte(nil), mapping...)
+}
+
+func SetRXFailChannel(ctx context.Context, client *connection.Client, channel RXFailChannel) (*RXFailChannelSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetRxfailConfig, EncodeRXFailChannel(channel)); err != nil {
+		return nil, fmt.Errorf("receiver failsafe request failed: %w", err)
+	}
+	normalized := rxFailChannel(channel.Index, channel.Mode, channel.Value)
+	return &RXFailChannelSetResult{
+		Channel:      normalized,
+		MSPCode:      msp.MSPSetRxfailConfig,
+		MSPName:      "MSP_SET_RXFAIL_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeRXFailChannel(channel RXFailChannel) []byte {
+	payload := []byte{byte(channel.Index), channel.Mode}
+	return appendU16Payload(payload, channel.Value)
 }
 
 func SetRCDeadband(ctx context.Context, client *connection.Client, config RCDeadband) (*RCDeadbandSetResult, error) {

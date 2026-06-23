@@ -3205,7 +3205,7 @@ func (a *app) mspCommand() *cobra.Command {
 				if err != nil {
 					return a.failure(commandPath(cmd), &target, err)
 				}
-				env := output.Success(commandPath(cmd), &target, map[string]any{
+				mspData := map[string]any{
 					"code":           frame.Code,
 					"code_name":      meta.Name,
 					"protocol":       frame.Version,
@@ -3215,6 +3215,9 @@ func (a *app) mspCommand() *cobra.Command {
 					"command_line":   meta.Line,
 					"payload_hex":    hex.EncodeToString(frame.Payload),
 					"length":         len(frame.Payload),
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"msp": mspData,
 				})
 				if op != connection.ReadOnly {
 					detail := "raw MSP write-like command sent"
@@ -3232,12 +3235,12 @@ func (a *app) mspCommand() *cobra.Command {
 						})
 					}
 					if supported {
-						env.Data.(map[string]any)["decoded"] = decoded
-						env.Data.(map[string]any)["decode_supported"] = true
-						env.Data.(map[string]any)["decode_requested"] = true
+						mspData["decoded"] = decoded
+						mspData["decode_supported"] = true
+						mspData["decode_requested"] = true
 					} else {
-						env.Data.(map[string]any)["decode_supported"] = false
-						env.Data.(map[string]any)["decode_requested"] = true
+						mspData["decode_supported"] = false
+						mspData["decode_requested"] = true
 					}
 				}
 				return env

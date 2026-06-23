@@ -772,7 +772,7 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 		t.Fatalf("vtx list capability = %+v", vtxList)
 	}
 	mspRequest := byCommand["betaflight-cli msp request"]
-	if mspRequest["operation"] != "read_only_or_write_or_dangerous" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "--yes for generated write-like commands and numeric commands without compiled metadata" || mspRequest["runnable"] != true {
+	if mspRequest["operation"] != "read_only_or_write_or_dangerous" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "--yes for generated write-like commands and numeric commands without compiled metadata" || mspRequest["output_root"] != "msp" || mspRequest["runnable"] != true {
 		t.Fatalf("msp request capability = %+v", mspRequest)
 	}
 	mspList := byCommand["betaflight-cli msp list"]
@@ -3151,7 +3151,7 @@ func TestMSPRequestByNameReturnsMetadata(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["code"].(float64) != float64(msp.MSPName) {
 		t.Fatalf("code = %+v", data["code"])
 	}
@@ -3177,7 +3177,7 @@ func TestMSPRequestNumericFallbackUsesCodeName(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["code"].(float64) != 65535 {
 		t.Fatalf("code = %+v", data["code"])
 	}
@@ -3200,7 +3200,7 @@ func TestMSPRequestWithDecodeReturnsStructuredPayload(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3220,7 +3220,7 @@ func TestMSPRequestWithDecodeUnsupportedCodeFallsBackToRaw(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != false {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3240,7 +3240,7 @@ func TestMSPRequestWithDecodeForBatteryProfile(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3264,7 +3264,7 @@ func TestMSPRequestWithDecodeForLEDStripConfig(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3289,7 +3289,7 @@ func TestMSPRequestWithDecodeForGPSRescue(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3313,7 +3313,7 @@ func TestMSPRequestWithDecodeForGPSHomeFromCompGPS(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3331,7 +3331,7 @@ func TestMSPRequestWithDecodeForGPSRescuePIDs(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3349,7 +3349,7 @@ func TestMSPRequestWithDecodeForDebugValues(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3367,7 +3367,7 @@ func TestMSPRequestWithDecodeForText(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3391,7 +3391,7 @@ func TestMSPRequestWithDecodeForGyroSensorsActive(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3416,7 +3416,7 @@ func TestMSPRequestWithDecodeForSensorConfigActive(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3434,7 +3434,7 @@ func TestMSPRequestWithDecodeForOSDWarnings(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3455,7 +3455,7 @@ func TestMSPRequestWithDecodeForServoAndMotorOutputOrder(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3471,7 +3471,7 @@ func TestMSPRequestWithDecodeForServoAndMotorOutputOrder(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data = env.Data.(map[string]any)
+	data = mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3489,7 +3489,7 @@ func TestMSPRequestWithDecodeForRawIMU(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3512,7 +3512,7 @@ func TestMSPRequestWithDecodeForDataflashErase(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3529,7 +3529,7 @@ func TestMSPRequestWithDecodeForReboot(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3551,7 +3551,7 @@ func TestMSPRequestWithDecodeForSensorConfig(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -3572,7 +3572,7 @@ func TestMSPRequestWithDecodeForRXMapUsesNumberArray(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["decode_supported"] != true {
 		t.Fatalf("decode_supported = %v", data["decode_supported"])
 	}
@@ -9845,6 +9845,16 @@ func containsAnyString(values []any, want string) bool {
 		}
 	}
 	return false
+}
+
+func mspResponseData(t *testing.T, env output.Envelope) map[string]any {
+	t.Helper()
+	data := env.Data.(map[string]any)
+	mspData, ok := data["msp"].(map[string]any)
+	if !ok {
+		t.Fatalf("data.msp = %T %+v", data["msp"], data["msp"])
+	}
+	return mspData
 }
 
 func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.Envelope, error) {

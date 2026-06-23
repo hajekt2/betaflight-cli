@@ -15,6 +15,18 @@ func TestDecodeAdvancedConfig(t *testing.T) {
 	}
 }
 
+func TestEncodeAdvancedConfig(t *testing.T) {
+	config, err := DecodeAdvancedConfig(advancedConfigTestPayload())
+	if err != nil {
+		t.Fatalf("DecodeAdvancedConfig() error = %v", err)
+	}
+	payload := EncodeAdvancedConfig(*config)
+	want := advancedConfigTestPayload()
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
 func TestDecodeFilterConfig(t *testing.T) {
 	config, err := DecodeFilterConfig(filterConfigTestPayload())
 	if err != nil {

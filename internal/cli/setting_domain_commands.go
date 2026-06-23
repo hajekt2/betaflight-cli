@@ -90,6 +90,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "filters" {
 		cmd.AddCommand(a.filtersStatusCommand())
+		cmd.AddCommand(a.filtersSetAdvancedJSONCommand())
 	}
 	if domain.use == "battery" {
 		cmd.AddCommand(a.batteryStatusCommand())
@@ -985,6 +986,57 @@ func (a *app) filtersStatusCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) filtersSetAdvancedJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-advanced-json FILE",
+		Short: "Set loop and motor advanced config from JSON through MSP_SET_ADVANCED_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseAdvancedConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "advanced loop and motor config changes affect flight behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetAdvancedConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"advanced_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "advanced_config",
+					Command: "MSP_SET_ADVANCED_CONFIG",
+					Detail:  "advanced config changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseAdvancedConfigJSON(data []byte) (bfcommands.AdvancedConfig, error) {
+	var config bfcommands.AdvancedConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		var wrapped struct {
+			AdvancedConfig bfcommands.AdvancedConfig `json:"advanced_config"`
+		}
+		if wrappedErr := json.Unmarshal(data, &wrapped); wrappedErr != nil {
+			return bfcommands.AdvancedConfig{}, err
+		}
+		config = wrapped.AdvancedConfig
+	}
+	if config.DebugModeCount != 0 && config.DebugMode >= config.DebugModeCount {
+		return bfcommands.AdvancedConfig{}, fmt.Errorf("debug_mode must be lower than debug_mode_count")
+	}
+	return config, nil
 }
 
 func (a *app) batteryStatusCommand() *cobra.Command {

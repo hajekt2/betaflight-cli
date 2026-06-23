@@ -205,6 +205,8 @@ Successful rate profile writes include a `rate_profile` side effect.
 
 `filters status` returns a `filters` object decoded from `MSP_ADVANCED_CONFIG` and `MSP_FILTER_CONFIG`.
 The object includes loop and motor protocol fields, gyro calibration and overflow settings, gyro and D-term lowpass filters, static notches, dynamic lowpass fields, dynamic notch fields, and RPM filter fields.
+`filters set-advanced-json` returns an `advanced_config` object with the requested loop and motor advanced config, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful advanced config writes include an `advanced_config` side effect.
 
 `modes active` returns a `modes` object decoded from `MSP_BOXNAMES`, `MSP_BOXIDS`, `MSP_MODE_RANGES`, and `MSP_MODE_RANGES_EXTRA`.
 The object includes a paged mode definition catalog and mode range rows with permanent IDs, names, AUX channel indexes, microsecond ranges, logic, and linked mode names when supplied by firmware.

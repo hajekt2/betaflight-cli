@@ -49,6 +49,14 @@ type AdvancedConfig struct {
 	TrailingBytesIgnored       int     `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type AdvancedConfigSetResult struct {
+	Config       AdvancedConfig `json:"advanced_config"`
+	MSPCode      uint16         `json:"msp_code"`
+	MSPName      string         `json:"msp_name"`
+	Acknowledged bool           `json:"acknowledged"`
+	SaveRequired bool           `json:"save_required"`
+}
+
 type FilterConfig struct {
 	LegacyGyroLowpassHz  uint8          `json:"legacy_gyro_lowpass_hz"`
 	GyroLPF1StaticHz     uint16         `json:"gyro_lpf1_static_hz"`
@@ -121,6 +129,41 @@ func ReadFilterStatus(ctx context.Context, client *connection.Client) (*FilterSt
 	status.FilterConfig = filterConfig
 	status.Sources["filter_config"] = "MSP_FILTER_CONFIG"
 	return status, warnings, nil
+}
+
+func SetAdvancedConfig(ctx context.Context, client *connection.Client, config AdvancedConfig) (*AdvancedConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetAdvancedConfig, EncodeAdvancedConfig(config)); err != nil {
+		return nil, fmt.Errorf("advanced config request failed: %w", err)
+	}
+	return &AdvancedConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetAdvancedConfig,
+		MSPName:      "MSP_SET_ADVANCED_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeAdvancedConfig(config AdvancedConfig) []byte {
+	payload := []byte{
+		config.GyroSyncDenom,
+		config.PIDProcessDenom,
+		config.UseUnsyncedPWM,
+		config.MotorProtocol,
+	}
+	payload = appendU16Payload(payload, config.MotorPWMRate)
+	payload = appendU16Payload(payload, config.MotorIdle)
+	payload = append(payload,
+		config.GyroUse32KHzDeprecated,
+		config.MotorPWMInversion,
+		config.GyroToUseDeprecated,
+		config.GyroHighFSR,
+		config.GyroMovementCalibThreshold,
+	)
+	payload = appendU16Payload(payload, config.GyroCalibDuration)
+	payload = appendU16Payload(payload, config.GyroOffsetYaw)
+	payload = append(payload, config.GyroCheckOverflow, config.DebugMode, config.DebugModeCount)
+	return payload
 }
 
 func DecodeAdvancedConfig(payload []byte) (*AdvancedConfig, error) {

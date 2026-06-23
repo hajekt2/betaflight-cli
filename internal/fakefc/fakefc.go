@@ -631,6 +631,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, fakePIDAdvancedPayload(), false))
 	case msp.MSPAdvancedConfig:
 		f.out.Write(response(frame.Code, fakeAdvancedConfigPayload(), false))
+	case msp.MSPSetAdvancedConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 20))
 	case msp.MSPFilterConfig:
 		f.out.Write(response(frame.Code, fakeFilterConfigPayload(), false))
 	case msp.MSPMotorConfig:

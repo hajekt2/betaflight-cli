@@ -403,6 +403,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rateProfile["operation"] != "write" || rateProfile["confirmation"] != "--yes" || rateProfile["requires_connection"] != true || rateProfile["output_root"] != "rate_profile" || rateProfile["runnable"] != true {
 		t.Fatalf("rate profile capability = %+v", rateProfile)
 	}
+	advancedConfig := byCommand["betaflight-cli filters set-advanced-json"]
+	if advancedConfig["operation"] != "write" || advancedConfig["confirmation"] != "--yes" || advancedConfig["requires_connection"] != true || advancedConfig["output_root"] != "advanced_config" || advancedConfig["runnable"] != true {
+		t.Fatalf("advanced config capability = %+v", advancedConfig)
+	}
 	motorConfig := byCommand["betaflight-cli motors set-config"]
 	if motorConfig["operation"] != "write" || motorConfig["confirmation"] != "--yes" || motorConfig["requires_connection"] != true || motorConfig["output_root"] != "motor_config" || motorConfig["runnable"] != true {
 		t.Fatalf("motor config capability = %+v", motorConfig)
@@ -5800,6 +5804,54 @@ func TestFiltersStatusWithFakeFC(t *testing.T) {
 	weights := rpmFilter["weights"].([]any)
 	if rpmFilter["harmonics"] != float64(3) || weights[2] != float64(60) {
 		t.Fatalf("rpm filter = %+v", rpmFilter)
+	}
+}
+
+func TestFiltersSetAdvancedJSONWithFakeFC(t *testing.T) {
+	input := `{"advanced_config":{"gyro_sync_denom":1,"pid_process_denom":4,"use_unsynced_pwm":0,"motor_protocol":7,"motor_pwm_rate":480,"motor_idle":550,"gyro_use_32khz_deprecated":0,"motor_pwm_inversion":1,"gyro_to_use_deprecated":0,"gyro_high_fsr":1,"gyro_movement_calib_threshold":32,"gyro_calib_duration":125,"gyro_offset_yaw":10,"gyro_check_overflow":2,"debug_mode":5,"debug_mode_count":80}}`
+	env, err := runTestCommandWithInput(t, []string{"filters", "set-advanced-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["advanced_config"].(map[string]any)
+	config := result["advanced_config"].(map[string]any)
+	if config["pid_process_denom"] != float64(4) || config["motor_protocol"] != float64(7) || result["save_required"] != true {
+		t.Fatalf("advanced_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_ADVANCED_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestFiltersSetAdvancedJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"advanced_config":{"debug_mode":5,"debug_mode_count":80}}`
+	env, err := runTestCommandWithInput(t, []string{"filters", "set-advanced-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestFiltersSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"advanced_config":{"debug_mode":80,"debug_mode_count":80}}`
+	env, err := runTestCommandWithInput(t, []string{"filters", "set-advanced-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid advanced config")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

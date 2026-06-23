@@ -199,6 +199,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `modes set-range` writes one AUX mode range through `MSP_SET_MODE_RANGE` using step values, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `pid set-gains-json` writes the complete five-row PID gain table through `MSP_SET_PID`, accepts either a JSON array or an object with `gains`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `rates set-profile-json` writes the active rate profile through `MSP_SET_RC_TUNING`, accepts either a rate profile object or an object with `rate_profile`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`filters set-advanced-json` writes loop and motor advanced configuration through `MSP_SET_ADVANCED_CONFIG`, accepts either an advanced config object or an object with `advanced_config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver status` reads receiver configuration, channel map, RSSI channel, RC deadband, RX failsafe rows, and live RC channels over MSP.
 `receiver set-rxfail` writes one receiver failsafe channel through `MSP_SET_RXFAIL_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `receiver set-rssi-channel` writes the RSSI channel through `MSP_SET_RSSI_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

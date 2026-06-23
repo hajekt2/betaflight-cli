@@ -3135,7 +3135,7 @@ func TestStorageEraseUsesDangerousOperation(t *testing.T) {
 		t.Fatalf("before=%+v after=%+v", before, after)
 	}
 	audit := plan["audit"].(map[string]any)
-	if audit["preflight_captured"] != true || audit["post_stop_captured"] != true || audit["freed_bytes"] != float64(262144) {
+	if audit["preflight_captured"] != true || audit["post_stop_captured"] != true || audit["freed_bytes"] != float64(262144) || audit["stop_attempted"] != false || audit["stop_succeeded"] != false {
 		t.Fatalf("audit = %+v", audit)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "dataflash_erase" {

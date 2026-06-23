@@ -120,7 +120,7 @@ func buildStorageEraseAudit(plan storageErasePlan) *storageEraseAudit {
 			PreflightCaptured:   plan.Before != nil,
 			PostActionCaptured:  plan.After != nil,
 			StopAttempted:       false,
-			StopSucceeded:       true,
+			StopSucceeded:       false,
 			WarningMessages:     append([]string(nil), plan.Warnings...),
 		},
 		FreedBytes: freed,

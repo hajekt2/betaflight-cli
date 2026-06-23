@@ -1,0 +1,57 @@
+package cli
+
+import (
+	"strings"
+	"testing"
+)
+
+func TestCapabilityMetadataUsesKnownOperations(t *testing.T) {
+	registry := capabilityMetadataRegistry()
+	allowed := map[string]bool{
+		"offline":                    true,
+		"offline_or_read_only_probe": true,
+		"offline_dangerous_plan":     true,
+		"read_only":                  true,
+		"read_only_or_write_or_dangerous": true,
+		"write":                      true,
+		"write_when_apply_is_set":    true,
+		"plan":                       true,
+		"plan_or_write":              true,
+		"dangerous":                  true,
+	}
+
+	for path, meta := range registry {
+		if meta.Operation == "" {
+			t.Fatalf("capability %q missing operation", path)
+		}
+		if !allowed[meta.Operation] {
+			t.Fatalf("capability %q has unknown operation %q", path, meta.Operation)
+		}
+	}
+}
+
+func TestCapabilityMetadataOperationSafetyContracts(t *testing.T) {
+	registry := capabilityMetadataRegistry()
+	yesRequired := map[string]bool{
+		"write":                      true,
+		"plan_or_write":              true,
+		"dangerous":                  true,
+		"write_when_apply_is_set":    true,
+	}
+
+	offlinedOperations := map[string]bool{
+		"offline":                true,
+		"offline_or_read_only_probe": true,
+		"offline_dangerous_plan": true,
+		"plan":                  true,
+	}
+
+	for path, meta := range registry {
+		if yesRequired[meta.Operation] && !strings.Contains(meta.Confirmation, "--yes") {
+			t.Fatalf("capability %q operation %q should require confirmation, got %q", path, meta.Operation, meta.Confirmation)
+		}
+		if offlinedOperations[meta.Operation] && meta.RequiresConnection {
+			t.Fatalf("capability %q is operation %q but requires_connection=%v", path, meta.Operation, meta.RequiresConnection)
+		}
+	}
+}

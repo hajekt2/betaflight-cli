@@ -962,6 +962,36 @@ func TestBlackboxInspectDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestBlackboxInspectOnboardLogIndexWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"blackbox", "inspect", "--log-index", "0"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["log_index"] != float64(0) {
+		t.Fatalf("data = %+v", data)
+	}
+	inspection := data["inspection"].(map[string]any)
+	if inspection["product"] == "" || inspection["firmware_revision"] == "" {
+		t.Fatalf("inspection = %+v", inspection)
+	}
+	storage := data["storage"].(map[string]any)
+	if storage["dataflash"] == nil {
+		t.Fatalf("storage = %+v", storage)
+	}
+}
+
+func TestBlackboxInspectRejectsOutOfRangeOnboardLogIndex(t *testing.T) {
+	env, err := runTestCommand(t, []string{"blackbox", "inspect", "--log-index", "99999"}, nil)
+	_ = err
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestBlackboxInspectReportsParseError(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "bad.bbl")
 	if err := os.WriteFile(path, []byte("not a blackbox log"), 0o600); err != nil {

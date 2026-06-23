@@ -20,7 +20,6 @@ import (
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
 	"github.com/hajekt2/betaflight-cli/internal/settings"
-	"github.com/hajekt2/betaflight-cli/pkg/blackbox"
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
@@ -158,36 +157,49 @@ func (a *app) blackboxCommand() *cobra.Command {
 			})
 		},
 	})
-	cmd.AddCommand(&cobra.Command{
+	inspectCmd := &cobra.Command{
 		Use:   "inspect FILE",
 		Short: "Inspect a Blackbox log file without connecting to hardware",
-		Args:  cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			path := args[0]
-			var reader io.Reader
-			if path == "-" {
-				reader = a.in
-				if reader == nil {
-					reader = os.Stdin
-				}
-			} else {
-				file, err := os.Open(path)
-				if err != nil {
-					return a.render(output.Failure(commandPath(cmd), nil, "file_error", err.Error()))
-				}
-				defer file.Close()
-				reader = file
-			}
-			inspection, err := blackbox.Inspect(reader)
+		Args: func(cmd *cobra.Command, args []string) error {
+			logIndex, err := cmd.Flags().GetInt("log-index")
 			if err != nil {
-				return a.render(output.Failure(commandPath(cmd), nil, "blackbox_parse_error", err.Error()))
+				return err
 			}
-			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
-				"file":       path,
-				"inspection": inspection,
-			}))
+			switch {
+			case logIndex >= 0 && len(args) != 0:
+				return fmt.Errorf("use either FILE or --log-index, not both")
+			case logIndex < 0 && len(args) != 1:
+				return fmt.Errorf("requires FILE or --log-index")
+			case logIndex >= 0 && len(args) == 0:
+				return nil
+			default:
+				return cobra.ExactArgs(1)(cmd, args)
+			}
 		},
-	})
+		RunE: func(cmd *cobra.Command, args []string) error {
+			logIndex, err := cmd.Flags().GetInt("log-index")
+			if err != nil {
+				return err
+			}
+			size, err := cmd.Flags().GetUint32("size")
+			if err != nil {
+				return err
+			}
+			blockSize, err := cmd.Flags().GetUint16("block-size")
+			if err != nil {
+				return err
+			}
+			if logIndex >= 0 {
+				return a.inspectOnboardBlackboxLog(cmd, logIndex, size, blockSize)
+			}
+			path := args[0]
+			return a.inspectBlackboxFile(cmd, path)
+		},
+	}
+	inspectCmd.Flags().Int("log-index", -1, "inspect one detected onboard Blackbox log by zero-based index")
+	inspectCmd.Flags().Uint32("size", 256*1024, "number of onboard bytes to scan when using --log-index")
+	inspectCmd.Flags().Uint16("block-size", 4096, "requested MSP_DATAFLASH_READ block size when using --log-index")
+	cmd.AddCommand(inspectCmd)
 	cmd.AddCommand(a.blackboxListCommand())
 	cmd.AddCommand(a.blackboxExportCommand())
 	return cmd

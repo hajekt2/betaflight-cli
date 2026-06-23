@@ -411,3 +411,65 @@ func (a *app) readDataflashBytes(cmd *cobra.Command, client *connection.Client, 
 func inspectBlackboxReader(reader io.Reader) (pkgblackbox.Inspection, error) {
 	return pkgblackbox.Inspect(reader)
 }
+
+func (a *app) inspectBlackboxFile(cmd *cobra.Command, path string) error {
+	var reader io.Reader
+	if path == "-" {
+		reader = a.in
+		if reader == nil {
+			reader = os.Stdin
+		}
+	} else {
+		file, err := os.Open(path)
+		if err != nil {
+			return a.render(output.Failure(commandPath(cmd), nil, "file_error", err.Error()))
+		}
+		defer file.Close()
+		reader = file
+	}
+	inspection, err := inspectBlackboxReader(reader)
+	if err != nil {
+		return a.render(output.Failure(commandPath(cmd), nil, "blackbox_parse_error", err.Error()))
+	}
+	return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+		"file":       path,
+		"inspection": inspection,
+	}))
+}
+
+func (a *app) inspectOnboardBlackboxLog(cmd *cobra.Command, logIndex int, size uint32, blockSize uint16) error {
+	return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+		config, err := bfcommands.ReadBlackboxConfig(cmd.Context(), client)
+		if err != nil {
+			return a.failure(commandPath(cmd), &target, err)
+		}
+		if blockSize == 0 {
+			return output.Failure(commandPath(cmd), &target, "validation_error", "--block-size must be positive")
+		}
+		data, storage, warnings, env := a.readDataflashBytes(cmd, client, &target, dataflashExportOptions{
+			Offset:    0,
+			Size:      size,
+			BlockSize: blockSize,
+		})
+		if env != nil {
+			return *env
+		}
+		logs, err := pkgblackbox.ListLogs(bytes.NewReader(data))
+		if err != nil {
+			return output.Failure(commandPath(cmd), &target, "blackbox_parse_error", err.Error())
+		}
+		if logIndex < 0 || logIndex >= len(logs) {
+			return output.Failure(commandPath(cmd), &target, "validation_error", fmt.Sprintf("--log-index %d is out of range for %d detected log(s)", logIndex, len(logs)))
+		}
+		selected := logs[logIndex]
+		inspection := selected.Inspection
+		envValue := output.Success(commandPath(cmd), &target, map[string]any{
+			"log_index":  logIndex,
+			"blackbox":   config,
+			"storage":    storage,
+			"inspection": inspection,
+		})
+		addStringWarnings(&envValue, warnings)
+		return envValue
+	})
+}

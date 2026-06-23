@@ -102,6 +102,23 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPLedColors:          decodeVia(commands.DecodeLEDColors),
 	msp.MSPLedStripModecolor:  decodeVia(commands.DecodeLEDModeColors),
 	msp.MSP2GetLedStripConfigValues: decodeVia(commands.DecodeLEDConfigValues),
+	msp.MSPReboot:             decodeVia(func(payload []byte) (map[string]any, error) {
+		out := map[string]any{
+			"payload_bytes": bytesAsJSONNumbers(payload),
+		}
+		if len(payload) > 0 {
+			out["boot_mode"] = float64(payload[0])
+		}
+		if len(payload) > 1 {
+			out["state"] = float64(payload[1])
+		}
+		return out, nil
+	}),
+	msp.MSPDataflashErase:     decodeVia(func(payload []byte) (map[string]any, error) {
+		return map[string]any{
+			"payload_bytes": bytesAsJSONNumbers(payload),
+		}, nil
+	}),
 	msp.MSPDisplayport:        decodeRawBytes,
 	msp.MSPTxInfo:             decodeRawBytes,
 }
@@ -189,6 +206,14 @@ func decodeMSP2Text(payload []byte) (any, error) {
 		"text_length": float64(len(text)),
 	}
 	return decoded, nil
+}
+
+func bytesAsJSONNumbers(payload []byte) []any {
+	out := make([]any, len(payload))
+	for i, raw := range payload {
+		out[i] = float64(raw)
+	}
+	return out
 }
 
 func decodeMSPPayload(code uint16, payload []byte) (any, bool, error) {

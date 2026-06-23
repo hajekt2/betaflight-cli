@@ -1779,6 +1779,45 @@ func TestMSPRequestWithDecodeForRawIMU(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForDataflashErase(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_DATAFLASH_ERASE", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	if _, ok := data["decoded"].(map[string]any); !ok {
+		t.Fatalf("decoded = %+v", data["decoded"])
+	}
+}
+
+func TestMSPRequestWithDecodeForReboot(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_REBOOT", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	payload, ok := decoded["payload_bytes"].([]any)
+	if !ok || len(payload) == 0 {
+		t.Fatalf("decoded payload_bytes = %+v", decoded["payload_bytes"])
+	}
+	if payload[0] != float64(0) {
+		t.Fatalf("decoded payload_bytes = %+v", payload)
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

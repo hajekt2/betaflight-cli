@@ -3138,9 +3138,11 @@ func (a *app) mspCommand() *cobra.Command {
 				})
 			}
 			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
-				"registry_version": msp.GeneratedMSPSourceVersion,
-				"count":            len(filtered),
-				"commands":         filtered,
+				"msp": map[string]any{
+					"registry_version": msp.GeneratedMSPSourceVersion,
+					"count":            len(filtered),
+					"commands":         filtered,
+				},
 			}))
 		},
 	}
@@ -3160,13 +3162,15 @@ func (a *app) mspCommand() *cobra.Command {
 				return err
 			}
 			env := output.Success(commandPath(cmd), nil, map[string]any{
-				"registry_version": msp.GeneratedMSPSourceVersion,
-				"code":             code,
-				"code_name":        meta.Name,
-				"protocol":         meta.Protocol,
-				"direction":        meta.Direction,
-				"source":           meta.Source,
-				"line":             meta.Line,
+				"msp": map[string]any{
+					"registry_version": msp.GeneratedMSPSourceVersion,
+					"code":             code,
+					"code_name":        meta.Name,
+					"protocol":         meta.Protocol,
+					"direction":        meta.Direction,
+					"source":           meta.Source,
+					"line":             meta.Line,
+				},
 			})
 			if meta.Source == "" {
 				env.Warnings = append(env.Warnings, output.Warning{Code: "unknown_command", Message: "command has no known metadata and may be unsupported"})

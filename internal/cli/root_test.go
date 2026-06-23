@@ -776,11 +776,11 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 		t.Fatalf("msp request capability = %+v", mspRequest)
 	}
 	mspList := byCommand["betaflight-cli msp list"]
-	if mspList["operation"] != "offline" || mspList["requires_connection"] != false || mspList["confirmation"] != "none" || mspList["runnable"] != true {
+	if mspList["operation"] != "offline" || mspList["requires_connection"] != false || mspList["confirmation"] != "none" || mspList["output_root"] != "msp" || mspList["runnable"] != true {
 		t.Fatalf("msp list capability = %+v", mspList)
 	}
 	mspMetadata := byCommand["betaflight-cli msp metadata"]
-	if mspMetadata["operation"] != "offline" || mspMetadata["requires_connection"] != false || mspMetadata["confirmation"] != "none" || mspMetadata["runnable"] != true {
+	if mspMetadata["operation"] != "offline" || mspMetadata["requires_connection"] != false || mspMetadata["confirmation"] != "none" || mspMetadata["output_root"] != "msp" || mspMetadata["runnable"] != true {
 		t.Fatalf("msp metadata capability = %+v", mspMetadata)
 	}
 	schema := byCommand["betaflight-cli schema"]
@@ -788,7 +788,7 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 		t.Fatalf("schema capability = %+v", schema)
 	}
 	capabilitiesCoverage := byCommand["betaflight-cli capabilities coverage"]
-	if capabilitiesCoverage["operation"] != "offline" || capabilitiesCoverage["requires_connection"] != false || capabilitiesCoverage["confirmation"] != "none" || capabilitiesCoverage["runnable"] != true {
+	if capabilitiesCoverage["operation"] != "offline" || capabilitiesCoverage["requires_connection"] != false || capabilitiesCoverage["confirmation"] != "none" || capabilitiesCoverage["output_root"] != "coverage" || capabilitiesCoverage["runnable"] != true {
 		t.Fatalf("capabilities coverage capability = %+v", capabilitiesCoverage)
 	}
 	transponderSetProvider := byCommand["betaflight-cli transponder set-provider"]
@@ -987,10 +987,7 @@ func TestMSPListDoesNotConnect(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
-	data, ok := env.Data.(map[string]any)
-	if !ok {
-		t.Fatalf("env.Data type = %T", env.Data)
-	}
+	data := mspResponseData(t, env)
 	if data["count"] == nil {
 		t.Fatalf("msp list payload = %+v", data)
 	}
@@ -1011,10 +1008,7 @@ func TestMSPMetadataDoesNotConnect(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
-	data, ok := env.Data.(map[string]any)
-	if !ok {
-		t.Fatalf("env.Data type = %T", env.Data)
-	}
+	data := mspResponseData(t, env)
 	if data["code"] == nil || data["code_name"] != "MSP_NAME" {
 		t.Fatalf("msp metadata payload = %+v", data)
 	}
@@ -3593,7 +3587,7 @@ func TestMSPMetadataByName(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["code"].(float64) != float64(msp.MSPName) {
 		t.Fatalf("code = %+v", data["code"])
 	}
@@ -3613,7 +3607,7 @@ func TestMSPListReturnsCommands(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	if data["count"].(float64) == 0 {
 		t.Fatalf("count = %+v", data["count"])
 	}
@@ -3635,7 +3629,7 @@ func TestMSPListCanFilterByProtocol(t *testing.T) {
 	if !env.OK {
 		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
 	}
-	data := env.Data.(map[string]any)
+	data := mspResponseData(t, env)
 	commands := data["commands"].([]any)
 	if len(commands) != 1 {
 		t.Fatalf("commands = %+v", data["commands"])

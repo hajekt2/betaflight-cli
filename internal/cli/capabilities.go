@@ -403,7 +403,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 	dangerous := capabilityMetadata{RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes", Tags: []string{"dangerous"}}
 	registry := map[string]capabilityMetadata{
 		"betaflight-cli capabilities":                    {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "capabilities", Tags: []string{"offline", "discovery"}},
-		"betaflight-cli capabilities coverage":           {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "capabilities", Tags: []string{"offline", "discovery"}},
+		"betaflight-cli capabilities coverage":           {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "coverage", Tags: []string{"offline", "discovery"}},
 		"betaflight-cli schema":                          {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "schema", Tags: []string{"offline", "metadata"}},
 		"betaflight-cli version":                         {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "version", Tags: []string{"offline", "metadata"}},
 		"betaflight-cli ports":                           {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "ports", Tags: []string{"offline", "ports"}},
@@ -487,8 +487,8 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli cli exec":                        {RequiresConnection: true, Operation: "read_only_or_write_or_dangerous", Confirmation: "--yes for writes and dangerous CLI lines", OutputRoot: "cli", Input: "one Betaflight CLI command line", Tags: []string{"cli", "passthrough"}},
 		"betaflight-cli cli interactive":                 dangerous,
 		"betaflight-cli firmware flash":                  {RequiresConnection: false, Operation: "plan_or_dangerous_execute", Confirmation: "--yes and --execute to run external flash tool; --reboot-first also connects to the Flight Controller", OutputRoot: "firmware_flash", Tags: []string{"firmware", "maintenance", "dangerous"}},
-		"betaflight-cli msp list":                        offline,
-		"betaflight-cli msp metadata":                    offline,
+		"betaflight-cli msp list":                        {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "msp", Tags: []string{"offline", "diagnostic"}},
+		"betaflight-cli msp metadata":                    {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "msp", Tags: []string{"offline", "diagnostic"}},
 		"betaflight-cli msp request":                     {RequiresConnection: true, Operation: "read_only_or_write_or_dangerous", Confirmation: "--yes for generated write-like commands and numeric commands without compiled metadata", Tags: []string{"msp", "raw"}},
 		"betaflight-cli settings set": {
 			RequiresConnection: true,

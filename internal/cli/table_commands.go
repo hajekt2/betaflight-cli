@@ -154,7 +154,7 @@ func (a *app) ledsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.ledValuesCommand(), a.ledColorsJSONCommand())
+	cmd.AddCommand(set, a.ledValuesCommand(), a.ledColorsJSONCommand(), a.ledModeColorCommand())
 	return cmd
 }
 
@@ -228,6 +228,45 @@ func (a *app) ledColorsJSONCommand() *cobra.Command {
 					Type:    "led_colors",
 					Command: "MSP_SET_LED_COLORS",
 					Detail:  "LED color table changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) ledModeColorCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-mode-color MODE DIRECTION COLOR",
+		Short: "Set one LED mode color row through MSP_SET_LED_STRIP_MODECOLOR",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mode, err := parseUint8Arg("mode", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			direction, err := parseUint8Arg("direction", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			color, err := parseUint8Arg("color", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "LED mode color changes configuration; pass --yes"))
+			}
+			modeColor := bfcommands.LEDModeColor{Mode: mode, Direction: direction, Color: color}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetLEDModeColor(cmd.Context(), client, modeColor)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"led_mode_color": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "led_mode_color",
+					Command: "MSP_SET_LED_STRIP_MODECOLOR",
+					Detail:  "LED mode color changed but not saved",
 				})
 				return env
 			})

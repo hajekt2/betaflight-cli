@@ -471,6 +471,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if ledColors["operation"] != "write" || ledColors["confirmation"] != "--yes" || ledColors["requires_connection"] != true || ledColors["output_root"] != "led_colors" || ledColors["runnable"] != true {
 		t.Fatalf("led colors capability = %+v", ledColors)
 	}
+	ledModeColor := byCommand["betaflight-cli leds set-mode-color"]
+	if ledModeColor["operation"] != "write" || ledModeColor["confirmation"] != "--yes" || ledModeColor["requires_connection"] != true || ledModeColor["output_root"] != "led_mode_color" || ledModeColor["runnable"] != true {
+		t.Fatalf("led mode color capability = %+v", ledModeColor)
+	}
 	servoConfig := byCommand["betaflight-cli servos set-config"]
 	if servoConfig["operation"] != "write" || servoConfig["confirmation"] != "--yes" || servoConfig["requires_connection"] != true || servoConfig["output_root"] != "servo_config" || servoConfig["runnable"] != true {
 		t.Fatalf("servo config capability = %+v", servoConfig)
@@ -5836,6 +5840,55 @@ func TestLEDSetColorsJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestLEDSetModeColorWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"leds", "set-mode-color", "1", "2", "5", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["led_mode_color"].(map[string]any)
+	modeColor := result["mode_color"].(map[string]any)
+	if modeColor["mode"] != float64(1) || modeColor["direction"] != float64(2) || modeColor["color"] != float64(5) || result["save_required"] != true {
+		t.Fatalf("led mode color = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "led_mode_color" || env.SideEffects[0].Command != "MSP_SET_LED_STRIP_MODECOLOR" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestLEDSetModeColorRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"leds", "set-mode-color", "1", "2", "5"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after LED mode color confirmation failure")
+	}
+}
+
+func TestLEDSetModeColorValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"leds", "set-mode-color", "1", "300", "5", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid LED mode color")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }

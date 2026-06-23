@@ -776,6 +776,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) == 0 || len(frame.Payload)%4 != 0))
 	case msp.MSPLedStripModecolor:
 		f.out.Write(response(frame.Code, []byte{0, 0, 3, 1, 2, 5}, false))
+	case msp.MSPSetLedStripModecolor:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 3))
 	case msp.MSP2GetLedStripConfigValues:
 		payload := []byte{50}
 		payload = appendU16(payload, 20)

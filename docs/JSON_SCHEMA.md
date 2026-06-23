@@ -374,6 +374,8 @@ Successful apply responses set `applied` and `stopped`, include read-only runtim
 The object includes LED layout rows, decoded CLI row syntax, HSV colors, mode colors, global brightness, rainbow delta, rainbow frequency, and source metadata.
 `leds set-colors-json` returns a `led_colors` object with the requested HSV color rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful LED color writes include a `led_colors` side effect.
+`leds set-mode-color` returns a `led_mode_color` object with mode, direction, color, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful LED mode color writes include a `led_mode_color` side effect.
 `leds set-values` returns a `led_values` object with brightness, rainbow delta, rainbow frequency, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful LED value writes include a `led_values` side effect.
 

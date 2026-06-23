@@ -72,6 +72,14 @@ type LEDModeColor struct {
 	Color     uint8 `json:"color"`
 }
 
+type LEDModeColorSetResult struct {
+	ModeColor    LEDModeColor `json:"mode_color"`
+	MSPCode      uint16       `json:"msp_code"`
+	MSPName      string       `json:"msp_name"`
+	Acknowledged bool         `json:"acknowledged"`
+	SaveRequired bool         `json:"save_required"`
+}
+
 type LEDConfigValues struct {
 	Brightness   uint8  `json:"brightness"`
 	RainbowDelta uint16 `json:"rainbow_delta"`
@@ -255,6 +263,19 @@ func SetLEDColors(ctx context.Context, client *connection.Client, colors []LEDCo
 	}, nil
 }
 
+func SetLEDModeColor(ctx context.Context, client *connection.Client, modeColor LEDModeColor) (*LEDModeColorSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetLedStripModecolor, EncodeLEDModeColor(modeColor)); err != nil {
+		return nil, fmt.Errorf("led mode color request failed: %w", err)
+	}
+	return &LEDModeColorSetResult{
+		ModeColor:    modeColor,
+		MSPCode:      msp.MSPSetLedStripModecolor,
+		MSPName:      "MSP_SET_LED_STRIP_MODECOLOR",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
 func ValidateLEDColors(colors []LEDColor) error {
 	if len(colors) == 0 {
 		return fmt.Errorf("led colors must contain at least one row")
@@ -284,6 +305,10 @@ func EncodeLEDColors(colors []LEDColor) []byte {
 		payload = append(payload, color.Sat, color.Val)
 	}
 	return payload
+}
+
+func EncodeLEDModeColor(modeColor LEDModeColor) []byte {
+	return []byte{modeColor.Mode, modeColor.Direction, modeColor.Color}
 }
 
 func readLEDColors(ctx context.Context, client *connection.Client) ([]LEDColor, error) {

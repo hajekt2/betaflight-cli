@@ -81,6 +81,14 @@ func TestEncodeLEDColors(t *testing.T) {
 	}
 }
 
+func TestEncodeLEDModeColor(t *testing.T) {
+	got := EncodeLEDModeColor(LEDModeColor{Mode: 1, Direction: 2, Color: 5})
+	want := []byte{1, 2, 5}
+	if string(got) != string(want) {
+		t.Fatalf("EncodeLEDModeColor() = %v, want %v", got, want)
+	}
+}
+
 func TestValidateLEDColors(t *testing.T) {
 	if err := ValidateLEDColors([]LEDColor{{Hue: 360, Sat: 0, Val: 255}}); err == nil {
 		t.Fatal("ValidateLEDColors() error = nil, want hue error")

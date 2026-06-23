@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/binary"
 	"fmt"
 	"strings"
 
@@ -35,8 +36,10 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPRtc:                decodeVia(commands.DecodeRTC),
 	msp.MSPDataflashSummary:    decodeVia(commands.DecodeDataflashSummary),
 	msp.MSPDataflashRead:      decodeVia(commands.DecodeDataflashReadChunk),
+	msp.MSP2BatteryProfile:     decodeVia(commands.DecodeBatteryProfile),
 	msp.MSPSdcardSummary:      decodeVia(commands.DecodeSDCardSummary),
 	msp.MSPBoxnames:           decodeStringSlice(commands.DecodeBoxNames),
+	msp.MSPBlackboxConfig:      decodeVia(commands.DecodeBlackboxConfig),
 	msp.MSPBoxids:             decodeByteSlice(commands.DecodeBoxIDs),
 	msp.MSPModeRanges:         decodeVia(commands.DecodeModeRanges),
 	msp.MSPModeRangesExtra:    decodeVia(commands.DecodeModeRangeExtras),
@@ -52,10 +55,12 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPArmingConfig:       decodeVia(commands.DecodeArmingConfig),
 	msp.MSPFailsafeConfig:     decodeVia(commands.DecodeFailsafeConfig),
 	msp.MSPBoardAlignmentConfig: decodeVia(commands.DecodeBoardAlignment),
+	msp.MSPAccTrim:            decodeRawAccTrim,
 	msp.MSPRXConfig:           decodeVia(commands.DecodeReceiverConfig),
 	msp.MSPRSSIConfig:         decodeRawBytes,
 	msp.MSPRXMap:              decodeByteSlice(commands.DecodeBoxIDs),
 	msp.MSPRxfailConfig:       decodeVia(commands.DecodeRXFailConfig),
+	msp.MSPMotor:              decodeVia(commands.DecodeU16Array),
 	msp.MSPGPSConfig:          decodeVia(commands.DecodeGPSConfig),
 	msp.MSPRawGPS:             decodeVia(commands.DecodeGPSPosition),
 	msp.MSPCompGPS:            decodeRawBytes,
@@ -78,6 +83,12 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPMixerConfig:        decodeVia(commands.DecodeMixerStatus),
 	msp.MSPBeeperConfig:       decodeVia(commands.DecodeBeeperConfig),
 	msp.MSPTransponderConfig:  decodeVia(commands.DecodeTransponderConfig),
+	msp.MSPLedStripConfig:     decodeVia(commands.DecodeLEDStripConfig),
+	msp.MSPLedColors:          decodeVia(commands.DecodeLEDColors),
+	msp.MSPLedStripModecolor:  decodeVia(commands.DecodeLEDModeColors),
+	msp.MSP2GetLedStripConfigValues: decodeVia(commands.DecodeLEDConfigValues),
+	msp.MSPDisplayport:        decodeRawBytes,
+	msp.MSPTxInfo:             decodeRawBytes,
 }
 
 var pidFallbackNames = []string{"ROLL", "PITCH", "YAW", "LEVEL", "MAG"}
@@ -129,6 +140,15 @@ func decodeMSPPIDPayload(payload []byte) (any, error) {
 
 func decodeRawBytes(payload []byte) (any, error) {
 	return append([]byte(nil), payload...)
+}
+
+func decodeRawAccTrim(payload []byte) (any, error) {
+	if len(payload) != 4 {
+		return nil, fmt.Errorf("payload is not 4 bytes: %d", len(payload))
+	}
+	roll := int16(binary.LittleEndian.Uint16(payload[:2]))
+	pitch := int16(binary.LittleEndian.Uint16(payload[2:4]))
+	return map[string]any{"roll": roll, "pitch": pitch}, nil
 }
 
 func decodeMSPPayload(code uint16, payload []byte) (any, bool, error) {

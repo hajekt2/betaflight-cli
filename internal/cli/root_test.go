@@ -1507,6 +1507,55 @@ func TestMSPRequestWithDecodeUnsupportedCodeFallsBackToRaw(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForBatteryProfile(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_BATTERY_PROFILE", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["index"] != float64(0) {
+		t.Fatalf("decoded index = %v", decoded["index"])
+	}
+	if decoded["capacity_mah"] != float64(420) {
+		t.Fatalf("decoded capacity_mah = %v", decoded["capacity_mah"])
+	}
+	if decoded["force_cell_count"] != float64(4) {
+		t.Fatalf("decoded force_cell_count = %v", decoded["force_cell_count"])
+	}
+}
+
+func TestMSPRequestWithDecodeForLEDStripConfig(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_LED_STRIP_CONFIG", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["profile"] != float64(3) {
+		t.Fatalf("decoded profile = %v", decoded["profile"])
+	}
+	if decoded["advanced_supported"] != true {
+		t.Fatalf("decoded advanced_supported = %v", decoded["advanced_supported"])
+	}
+	leds := decoded["leds"].([]any)
+	if len(leds) < 2 {
+		t.Fatalf("decoded leds = %+v", leds)
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

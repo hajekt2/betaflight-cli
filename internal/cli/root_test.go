@@ -924,6 +924,24 @@ func TestBackupCreateIncludesConfiguration(t *testing.T) {
 	}
 }
 
+func TestConfigurationDiffCommandIncludesParsedSettings(t *testing.T) {
+	env, err := runTestCommand(t, []string{"configuration", "diff"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["command"] != "diff all" {
+		t.Fatalf("command = %v", data["command"])
+	}
+	configuration := data["configuration"].(map[string]any)
+	if len(configuration["settings"].([]any)) < 1 {
+		t.Fatalf("configuration = %+v", configuration)
+	}
+}
+
 func TestBackupCreateRawCLI(t *testing.T) {
 	env, err := runTestCommand(t, []string{"backup", "create", "--raw-cli"}, nil)
 	if err != nil {

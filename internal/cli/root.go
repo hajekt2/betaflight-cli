@@ -559,6 +559,27 @@ func (a *app) configurationCommand() *cobra.Command {
 	cmd.AddCommand(a.configurationCompareCommand())
 	cmd.AddCommand(a.configurationExportCommand())
 	cmd.AddCommand(&cobra.Command{
+		Use:   "diff",
+		Short: "Read and parse configuration diff output",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				lines, err := client.ExecCLI(cmd.Context(), "diff all")
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				doc := bfconfig.Parse(lines, settings.DefaultRegistry)
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"command":           "diff all",
+					"lines":             lines,
+					"raw":               strings.Join(lines, "\n"),
+					"sections":          doc.Sections,
+					"configuration":      doc,
+					"raw_authoritative": true,
+				})
+			})
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
 		Use:   "status",
 		Short: "Read configuration state, profiles, arming blockers, and write guidance",
 		RunE: func(cmd *cobra.Command, _ []string) error {

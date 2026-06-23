@@ -260,7 +260,14 @@ func coverageDomains(commandSet map[string]bool) []coverageDomain {
 	domains := []coverageDomain{
 		implementedDomain("identity", commandSet, []string{"betaflight-cli info", "betaflight-cli firmware status", "betaflight-cli target status", "betaflight-cli text status"}, nil, nil, []string{"info", "firmware", "target", "text"}, "MSP identity, board, MCU, UID, build, support policy, and text metadata are typed."),
 		implementedDomain("connection-diagnostics", commandSet, []string{"betaflight-cli ports list", "betaflight-cli ports diagnose", "betaflight-cli doctor"}, nil, nil, []string{"ports", "diagnostics"}, "USB serial discovery is implemented; non-USB transports remain intentionally out of scope."),
-		implementedDomain("configuration-backup", commandSet, []string{"betaflight-cli backup create", "betaflight-cli backup diff", "betaflight-cli configuration snapshot", "betaflight-cli configuration export", "betaflight-cli configuration compare"}, nil, nil, []string{"configuration", "backup"}, "Raw CLI text remains authoritative and parsed inventories are available for agents."),
+		implementedDomain("configuration-backup", commandSet, []string{
+			"betaflight-cli backup create",
+			"betaflight-cli backup diff",
+			"betaflight-cli configuration snapshot",
+			"betaflight-cli configuration export",
+			"betaflight-cli configuration compare",
+			"betaflight-cli configuration diff",
+		}, nil, nil, []string{"configuration", "backup"}, "Raw CLI text remains authoritative and parsed inventories are available for agents."),
 		implementedDomain("configuration-restore", commandSet, []string{"betaflight-cli configuration validate", "betaflight-cli restore plan", "betaflight-cli presets plan", "betaflight-cli batch plan"}, []string{"betaflight-cli restore apply", "betaflight-cli presets apply", "betaflight-cli batch apply"}, []string{"betaflight-cli save"}, []string{"configuration_validation", "change_plan"}, "Plan/apply/save is implemented with explicit confirmation and defaults safeguards."),
 		implementedDomain("runtime-status", commandSet, []string{"betaflight-cli status", "betaflight-cli telemetry snapshot", "betaflight-cli system status", "betaflight-cli tasks status", "betaflight-cli debug status", "betaflight-cli environment status", "betaflight-cli rtc status"}, nil, nil, []string{"status", "telemetry", "system", "tasks", "debug", "environment", "rtc"}, "Core runtime, telemetry, scheduler, debug, environment, and clock reads are typed."),
 		implementedDomain("features", commandSet, []string{"betaflight-cli features list", "betaflight-cli features status"}, []string{"betaflight-cli features enable", "betaflight-cli features disable"}, nil, []string{"features", "change_plan"}, "Feature mask reads and CLI-backed feature plans are implemented."),
@@ -438,6 +445,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli configuration status",
 		"betaflight-cli configuration snapshot",
 		"betaflight-cli configuration compare",
+		"betaflight-cli configuration diff",
 		"betaflight-cli configuration export",
 		"betaflight-cli system status",
 		"betaflight-cli tasks status",
@@ -497,7 +505,11 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli failsafe status",
 	} {
 		registry[path] = readMSP
-		if strings.Contains(path, " list") || strings.Contains(path, "backup ") || strings.Contains(path, "configuration export") || strings.Contains(path, "configuration snapshot") {
+		if strings.Contains(path, " list") ||
+			strings.Contains(path, "backup ") ||
+			strings.Contains(path, "configuration export") ||
+			strings.Contains(path, "configuration snapshot") ||
+			strings.Contains(path, "configuration diff") {
 			meta := readCLI
 			registry[path] = meta
 		}

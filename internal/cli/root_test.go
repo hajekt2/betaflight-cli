@@ -12,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/fakefc"
 	"github.com/hajekt2/betaflight-cli/internal/output"
@@ -486,6 +488,31 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	}
 	if _, ok := byDomain["firmware-flashing"]; !ok {
 		t.Fatalf("missing firmware-flashing domain in coverage")
+	}
+}
+
+func TestRegistryCapabilityPathsMatchCommandTree(t *testing.T) {
+	root := (&app{}).rootCommand()
+	commandPaths := make(map[string]struct{})
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		if cmd.Hidden {
+			return
+		}
+		commandPaths[commandPath(cmd)] = struct{}{}
+		for _, child := range cmd.Commands() {
+			walk(child)
+		}
+	}
+	walk(root)
+
+	for path := range capabilityMetadataRegistry() {
+		if path == "betaflight-cli capabilities" {
+			continue
+		}
+		if _, ok := commandPaths[path]; !ok {
+			t.Fatalf("capability registry path %q is not present in the command tree", path)
+		}
 	}
 }
 

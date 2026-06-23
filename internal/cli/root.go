@@ -370,8 +370,57 @@ func (a *app) sensorsCommand() *cobra.Command {
 	})
 	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-accelerometer", "Calibrate the accelerometer over MSP", bfcommands.SensorCalibrationAccelerometer))
 	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-magnetometer", "Calibrate the magnetometer over MSP", bfcommands.SensorCalibrationMagnetometer))
+	cmd.AddCommand(a.sensorHardwareConfigCommand())
 	cmd.AddCommand(a.sensorCompassDeclinationCommand())
 	return cmd
+}
+
+func (a *app) sensorHardwareConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config ACC_HARDWARE BARO_HARDWARE MAG_HARDWARE RANGEFINDER_HARDWARE",
+		Short: "Set sensor hardware IDs through MSP_SET_SENSOR_CONFIG",
+		Args:  cobra.ExactArgs(4),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			acc, err := parseUint8Arg("acc_hardware", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			baro, err := parseUint8Arg("baro_hardware", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			mag, err := parseUint8Arg("mag_hardware", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			rangefinder, err := parseUint8Arg("rangefinder_hardware", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "sensor hardware configuration changes sensor settings; pass --yes"))
+			}
+			config := bfcommands.SensorHardwareConfig{
+				Accelerometer: acc,
+				Barometer:     baro,
+				Magnetometer:  mag,
+				Rangefinder:   rangefinder,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetSensorHardwareConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"sensor_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "sensor_config",
+					Command: "MSP_SET_SENSOR_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) sensorCompassDeclinationCommand() *cobra.Command {

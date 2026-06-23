@@ -540,6 +540,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte{2, 0, 12, 4, 45, 1, 24, 3, 39}, false))
 	case msp.MSPSensorConfig:
 		f.out.Write(response(frame.Code, []byte{1, 2, 3, 4, 5}, false))
+	case msp.MSPSetSensorConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 4))
 	case msp.MSP2SensorConfigActive:
 		f.out.Write(response(frame.Code, []byte{10, 11, 12, 13, 14, 15}, false))
 	case msp.MSP2GyroSensorActive:

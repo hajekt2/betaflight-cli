@@ -335,6 +335,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if accTrim["operation"] != "write" || accTrim["confirmation"] != "--yes" || accTrim["requires_connection"] != true || accTrim["output_root"] != "accelerometer_trim" || accTrim["runnable"] != true {
 		t.Fatalf("accelerometer trim capability = %+v", accTrim)
 	}
+	sensorConfig := byCommand["betaflight-cli sensors set-config"]
+	if sensorConfig["operation"] != "write" || sensorConfig["confirmation"] != "--yes" || sensorConfig["requires_connection"] != true || sensorConfig["output_root"] != "sensor_config" || sensorConfig["runnable"] != true {
+		t.Fatalf("sensor config capability = %+v", sensorConfig)
+	}
 	compassConfig := byCommand["betaflight-cli sensors set-compass-declination"]
 	if compassConfig["operation"] != "write" || compassConfig["confirmation"] != "--yes" || compassConfig["requires_connection"] != true || compassConfig["output_root"] != "compass_config" || compassConfig["runnable"] != true {
 		t.Fatalf("compass config capability = %+v", compassConfig)
@@ -3196,6 +3200,58 @@ func TestSensorsCalibrationWithFakeFC(t *testing.T) {
 		t.Fatalf("calibration = %+v", calibration)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_calibration" || env.SideEffects[0].Command != "MSP_MAG_CALIBRATION" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestSensorsSetConfigRejectsInvalidValueBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-config", "1", "2", "3", "300", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSensorsSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-config", "1", "2", "3", "4"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestSensorsSetConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "set-config", "1", "2", "3", "4", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["sensor_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["accelerometer"] != float64(1) || config["barometer"] != float64(2) || config["rangefinder"] != float64(4) {
+		t.Fatalf("config = %+v", config)
+	}
+	hardware := result["hardware"].([]any)
+	if len(hardware) != 4 || hardware[0].(map[string]any)["name"] != "accelerometer" || hardware[3].(map[string]any)["name"] != "rangefinder" {
+		t.Fatalf("hardware = %+v", hardware)
+	}
+	if result["msp_name"] != "MSP_SET_SENSOR_CONFIG" || result["save_required"] != true {
+		t.Fatalf("sensor config result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_config" || env.SideEffects[0].Command != "MSP_SET_SENSOR_CONFIG" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

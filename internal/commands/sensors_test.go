@@ -17,6 +17,18 @@ func TestDecodeSensorHardware(t *testing.T) {
 	}
 }
 
+func TestEncodeSensorHardwareConfig(t *testing.T) {
+	payload := EncodeSensorHardwareConfig(SensorHardwareConfig{
+		Accelerometer: 1,
+		Barometer:     2,
+		Magnetometer:  3,
+		Rangefinder:   4,
+	})
+	if !bytes.Equal(payload, []byte{1, 2, 3, 4}) {
+		t.Fatalf("payload = %v", payload)
+	}
+}
+
 func TestDecodeActiveGyros(t *testing.T) {
 	gyros, err := DecodeActiveGyros([]byte{2, 11, 19})
 	if err != nil {

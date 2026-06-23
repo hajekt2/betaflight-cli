@@ -27,6 +27,22 @@ type SensorHardware struct {
 	Available  bool   `json:"available"`
 }
 
+type SensorHardwareConfig struct {
+	Accelerometer uint8 `json:"accelerometer"`
+	Barometer     uint8 `json:"barometer"`
+	Magnetometer  uint8 `json:"magnetometer"`
+	Rangefinder   uint8 `json:"rangefinder"`
+}
+
+type SensorHardwareConfigSetResult struct {
+	Config       SensorHardwareConfig `json:"config"`
+	Hardware     []SensorHardware     `json:"hardware"`
+	MSPCode      uint16               `json:"msp_code"`
+	MSPName      string               `json:"msp_name"`
+	Acknowledged bool                 `json:"acknowledged"`
+	SaveRequired bool                 `json:"save_required"`
+}
+
 type ActiveGyros struct {
 	Source   string           `json:"source"`
 	Count    uint8            `json:"count"`
@@ -156,6 +172,29 @@ func SetCompassConfig(ctx context.Context, client *connection.Client, declinatio
 		Acknowledged: true,
 		SaveRequired: true,
 	}, nil
+}
+
+func SetSensorHardwareConfig(ctx context.Context, client *connection.Client, config SensorHardwareConfig) (*SensorHardwareConfigSetResult, error) {
+	payload := EncodeSensorHardwareConfig(config)
+	if _, err := client.Request(ctx, msp.MSPSetSensorConfig, payload); err != nil {
+		return nil, fmt.Errorf("sensor hardware config request failed: %w", err)
+	}
+	hardware, err := DecodeSensorHardware(payload, sensorOrder[1:])
+	if err != nil {
+		return nil, err
+	}
+	return &SensorHardwareConfigSetResult{
+		Config:       config,
+		Hardware:     hardware,
+		MSPCode:      msp.MSPSetSensorConfig,
+		MSPName:      "MSP_SET_SENSOR_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeSensorHardwareConfig(config SensorHardwareConfig) []byte {
+	return []byte{config.Accelerometer, config.Barometer, config.Magnetometer, config.Rangefinder}
 }
 
 func EncodeCompassConfig(declinationDeciDegrees int16) []byte {

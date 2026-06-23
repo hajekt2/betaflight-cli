@@ -257,15 +257,33 @@ func (c *Client) Target() TargetInfo {
 	return c.target
 }
 
-func (c *Client) Request(_ context.Context, code uint16, payload []byte) (msp.Frame, error) {
+func (c *Client) Request(ctx context.Context, code uint16, payload []byte) (msp.Frame, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return msp.Frame{}, mapContextError(err)
+	}
 	_ = c.port.ResetInputBuffer()
 	_ = c.port.ResetOutputBuffer()
+	if err := c.setReadTimeout(ctx); err != nil {
+		return msp.Frame{}, err
+	}
 	if _, err := c.port.Write(msp.EncodeRequest(code, payload)); err != nil {
 		return msp.Frame{}, &CodedError{Code: "transport_error", Message: err.Error()}
 	}
 	for {
+		if err := ctx.Err(); err != nil {
+			return msp.Frame{}, mapContextError(err)
+		}
+		if err := c.setReadTimeout(ctx); err != nil {
+			return msp.Frame{}, err
+		}
 		frame, err := msp.ReadFrame(c.port)
 		if err != nil {
+			if err == io.ErrNoProgress && ctx.Err() != nil {
+				return msp.Frame{}, mapContextError(ctx.Err())
+			}
 			code := "transport_error"
 			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrNoProgress) {
 				code = "msp_timeout"
@@ -279,6 +297,45 @@ func (c *Client) Request(_ context.Context, code uint16, payload []byte) (msp.Fr
 			return msp.Frame{}, &CodedError{Code: "unsupported_msp", Message: fmt.Sprintf("MSP command %d is unsupported by target", code)}
 		}
 		return frame, nil
+	}
+}
+
+func (c *Client) setReadTimeout(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if deadline, ok := ctx.Deadline(); ok {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return mapContextError(ctx.Err())
+		}
+		timeout := c.timeout
+		if remaining < timeout {
+			timeout = remaining
+		}
+		if timeout <= 0 {
+			timeout = time.Millisecond
+		}
+		if err := c.port.SetReadTimeout(timeout); err != nil {
+			return &CodedError{Code: "transport_error", Message: err.Error()}
+		}
+		return nil
+	}
+	if err := c.port.SetReadTimeout(c.timeout); err != nil {
+		return &CodedError{Code: "transport_error", Message: err.Error()}
+	}
+	return nil
+}
+
+func mapContextError(err error) *CodedError {
+	switch err {
+	case context.Canceled:
+		return &CodedError{Code: "context_canceled", Message: err.Error()}
+	default:
+		if errors.Is(err, context.DeadlineExceeded) {
+			return &CodedError{Code: "context_deadline_exceeded", Message: err.Error()}
+		}
+		return &CodedError{Code: "context_canceled", Message: err.Error()}
 	}
 }
 
@@ -356,22 +413,39 @@ func (c *Client) FCVersion(ctx context.Context) (string, error) {
 	return fmt.Sprintf("%d.%d.%d", major, minor, patch), nil
 }
 
-func (c *Client) ExecCLI(_ context.Context, command string) ([]string, error) {
+func (c *Client) ExecCLI(ctx context.Context, command string) ([]string, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, mapContextError(err)
+	}
 	_ = c.port.ResetInputBuffer()
 	_ = c.port.ResetOutputBuffer()
+	if err := c.setReadTimeout(ctx); err != nil {
+		return nil, err
+	}
 	wire := append([]byte{0x02}, []byte(command)...)
 	wire = append(wire, '\n', 0x03)
 	if _, err := c.port.Write(wire); err != nil {
 		return nil, &CodedError{Code: "transport_error", Message: err.Error()}
 	}
-	if err := c.readUntil(0x02); err != nil {
+	if err := c.readUntil(ctx, 0x02); err != nil {
+		var coded *CodedError
+		if errors.As(err, &coded) && (coded.Code == "context_canceled" || coded.Code == "context_deadline_exceeded") {
+			return nil, coded
+		}
 		return nil, &CodedError{Code: "cli_timeout", Message: err.Error()}
 	}
 	var lines []string
 	var line []byte
 	for {
-		b, err := c.readByte()
+		b, err := c.readByteWithContext(ctx)
 		if err != nil {
+			var coded *CodedError
+			if errors.As(err, &coded) {
+				return nil, coded
+			}
 			return nil, &CodedError{Code: "cli_timeout", Message: err.Error()}
 		}
 		switch b {
@@ -416,16 +490,43 @@ func (c *Client) RunInteractive(stdin io.Reader, stdout io.Writer) error {
 	return <-errCh
 }
 
-func (c *Client) readUntil(want byte) error {
-	deadline := time.Now().Add(c.timeout)
+func (c *Client) readUntil(ctx context.Context, want byte) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var deadline time.Time
+	if d, ok := ctx.Deadline(); ok {
+		deadline = d
+	} else {
+		deadline = time.Now().Add(c.timeout)
+	}
 	for time.Now().Before(deadline) {
-		b, err := c.readByte()
+		if err := c.setReadTimeout(ctx); err != nil {
+			return err
+		}
+		b, err := c.readByteWithContext(ctx)
 		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return err
+			}
+			if errors.Is(err, io.ErrNoProgress) {
+				if ctx.Err() != nil {
+					return mapContextError(ctx.Err())
+				}
+				continue
+			}
+			var coded *CodedError
+			if errors.As(err, &coded) {
+				return coded
+			}
 			return err
 		}
 		if b == want {
 			return nil
 		}
+	}
+	if ctx.Err() != nil {
+		return mapContextError(ctx.Err())
 	}
 	return fmt.Errorf("timed out waiting for byte 0x%02x", want)
 }
@@ -440,4 +541,21 @@ func (c *Client) readByte() (byte, error) {
 		return 0, io.ErrNoProgress
 	}
 	return b[0], err
+}
+
+func (c *Client) readByteWithContext(ctx context.Context) (byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return 0, mapContextError(err)
+	}
+	if err := c.setReadTimeout(ctx); err != nil {
+		return 0, err
+	}
+	b, err := c.readByte()
+	if err != nil {
+		return 0, err
+	}
+	return b, nil
 }

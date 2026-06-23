@@ -1364,6 +1364,10 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 	if plan["applied"] != true || plan["stopped"] != true || plan["command_preview"] != "motor 1 1050" || plan["stop_command_preview"] != "motor 1 1000" {
 		t.Fatalf("plan = %+v", plan)
 	}
+	preflight := plan["preflight"].(map[string]any)
+	if preflight["read_only"] != true || preflight["arming_blocked"] != true {
+		t.Fatalf("preflight = %+v", preflight)
+	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "motor_output" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}

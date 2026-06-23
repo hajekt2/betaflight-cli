@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
 )
@@ -27,11 +28,21 @@ type motorTestPlan struct {
 	CommandPreview        string              `json:"command_preview"`
 	StopCommandPreview    string              `json:"stop_command_preview"`
 	Stopped               bool                `json:"stopped"`
+	Preflight             *motorTestPreflight `json:"preflight,omitempty"`
 	ResponseLines         map[string][]string `json:"response_lines,omitempty"`
 	RequiredConfirmations []string            `json:"required_confirmations"`
 	SafetyChecks          []safetyCheck       `json:"safety_checks"`
 	RecommendedPreflight  []string            `json:"recommended_preflight"`
 	ApplyMessage          string              `json:"apply_message"`
+}
+
+type motorTestPreflight struct {
+	Source            string   `json:"source"`
+	ReadOnly          bool     `json:"read_only"`
+	ArmingBlocked     *bool    `json:"arming_blocked,omitempty"`
+	RebootRequired    *bool    `json:"reboot_required,omitempty"`
+	ActiveModes       []string `json:"active_modes,omitempty"`
+	ActiveArmingFlags []string `json:"active_arming_flags,omitempty"`
 }
 
 type safetyCheck struct {
@@ -90,6 +101,11 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "motor output requires --battery-aware"))
 	}
 	return a.withClient(cmd.Context(), commandPath(cmd), connection.Dangerous, func(client *connection.Client, target output.Target) output.Envelope {
+		preflight, err := readMotorTestPreflight(cmd.Context(), client)
+		if err != nil {
+			return a.failure(commandPath(cmd), &target, fmt.Errorf("motor preflight status unavailable: %w", err))
+		}
+		plan.Preflight = preflight
 		responses := map[string][]string{}
 		startLines, err := client.ExecCLI(cmd.Context(), plan.CommandPreview)
 		if err != nil {
@@ -122,6 +138,32 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 		}
 		return env
 	})
+}
+
+func readMotorTestPreflight(ctx context.Context, client *connection.Client) (*motorTestPreflight, error) {
+	status, err := bfcommands.ReadRuntimeStatus(ctx, client)
+	if err != nil {
+		return nil, err
+	}
+	preflight := &motorTestPreflight{
+		Source:   "runtime status",
+		ReadOnly: true,
+	}
+	if status.Health != nil {
+		preflight.ArmingBlocked = status.Health.ArmingBlocked
+		preflight.RebootRequired = status.Health.RebootRequired
+	}
+	if status.FlightModes != nil {
+		preflight.ActiveModes = append([]string(nil), status.FlightModes.ActiveNames...)
+	}
+	if status.Arming != nil {
+		for _, flag := range status.Arming.ActiveFlags {
+			if flag.Name != "" {
+				preflight.ActiveArmingFlags = append(preflight.ActiveArmingFlags, flag.Name)
+			}
+		}
+	}
+	return preflight, nil
 }
 
 func motorSafetyPassed(plan motorTestPlan, name string) bool {

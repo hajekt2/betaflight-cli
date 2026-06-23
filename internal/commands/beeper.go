@@ -3,6 +3,7 @@ package commands
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
@@ -32,6 +33,26 @@ var beeperModeNames = []string{
 	"CAM_CONNECTION_OPEN",
 	"CAM_CONNECTION_CLOSE",
 	"ARMING_GPS_NO_FIX",
+}
+
+// BeeperModeNames returns the known beeper condition names supported by this CLI's
+// BeeperConfig decoder.
+func BeeperModeNames() []string {
+	return append([]string(nil), beeperModeNames...)
+}
+
+// ValidateBeeperModeName validates and normalizes a beeper mode name.
+func ValidateBeeperModeName(name string) (string, error) {
+	if name == "" {
+		return "", fmt.Errorf("mode name must not be empty")
+	}
+	mode := strings.ToUpper(name)
+	for _, known := range beeperModeNames {
+		if mode == known {
+			return mode, nil
+		}
+	}
+	return "", fmt.Errorf("unknown beeper mode %q", name)
 }
 
 type BeeperConfig struct {

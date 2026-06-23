@@ -127,6 +127,8 @@ func New() *FC {
 			"set failsafe_procedure = DROP":         {"failsafe_procedure set to DROP"},
 			"feature GPS":                           {"Enabled GPS"},
 			"feature -GPS":                          {"Disabled GPS"},
+			"beeper ARMING":                        {"Beeper ARMING enabled"},
+			"beeper -ARMING":                       {"Beeper ARMING disabled"},
 			"get gyro_lpf1_static_hz":              {"gyro_lpf1_static_hz = 0"},
 			"serial UART1 64 115200 57600 0 115200": {"serial updated"},
 			"aux 0 0 0 1700 2100 0 0":               {"aux updated"},

@@ -284,6 +284,36 @@ func (a *app) beeperCommand() *cobra.Command {
 			})
 		},
 	})
+	var enableFlags changeFlags
+	enable := &cobra.Command{
+		Use:   "enable NAME",
+		Short: "Plan or enable one beeper condition",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mode, err := bfcommands.ValidateBeeperModeName(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			return a.planOrApplyCLI(cmd, []string{"beeper " + mode}, "beeper", enableFlags)
+		},
+	}
+	addChangeFlags(enable, &enableFlags)
+	cmd.AddCommand(enable)
+	var disableFlags changeFlags
+	disable := &cobra.Command{
+		Use:   "disable NAME",
+		Short: "Plan or disable one beeper condition",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			mode, err := bfcommands.ValidateBeeperModeName(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			return a.planOrApplyCLI(cmd, []string{"beeper -" + mode}, "beeper", disableFlags)
+		},
+	}
+	addChangeFlags(disable, &disableFlags)
+	cmd.AddCommand(disable)
 	return cmd
 }
 

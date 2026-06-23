@@ -105,6 +105,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if settingsDiff["operation"] != "read_only" || settingsDiff["requires_connection"] != true || settingsDiff["confirmation"] != "none" || settingsDiff["runnable"] != true {
 		t.Fatalf("settings diff capability = %+v", settingsDiff)
 	}
+	beeperEnable := byCommand["betaflight-cli beeper enable"]
+	if beeperEnable["operation"] != "plan_or_write" || beeperEnable["requires_connection"] != true || beeperEnable["confirmation"] != "--yes with --apply or --save" || beeperEnable["runnable"] != true {
+		t.Fatalf("beeper enable capability = %+v", beeperEnable)
+	}
+	beeperDisable := byCommand["betaflight-cli beeper disable"]
+	if beeperDisable["operation"] != "plan_or_write" || beeperDisable["requires_connection"] != true || beeperDisable["confirmation"] != "--yes with --apply or --save" || beeperDisable["runnable"] != true {
+		t.Fatalf("beeper disable capability = %+v", beeperDisable)
+	}
 	validate := byCommand["betaflight-cli configuration validate"]
 	if validate["operation"] != "offline" || validate["requires_connection"] != false || validate["output_root"] != "configuration_validation" {
 		t.Fatalf("validate capability = %+v", validate)
@@ -1586,6 +1594,68 @@ func TestBeeperConfigWithFakeFC(t *testing.T) {
 	disabled := beeper["disabled"].([]any)
 	if len(disabled) != 2 || disabled[0] != "RX_LOST" || disabled[1] != "ARMING" {
 		t.Fatalf("disabled = %+v", disabled)
+	}
+}
+
+func TestBeeperEnablePlanOnly(t *testing.T) {
+	env, err := runTestCommand(t, []string{"beeper", "enable", "ARMING"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)
+	if plan["kind"] != "beeper" || plan["applied"] != false {
+		t.Fatalf("plan = %+v", plan)
+	}
+	lines := plan["cli_lines"].([]any)
+	if len(lines) != 1 || lines[0] != "beeper ARMING" {
+		t.Fatalf("lines = %+v", lines)
+	}
+}
+
+func TestBeeperEnableRejectsUnknownMode(t *testing.T) {
+	env, err := runTestCommand(t, []string{"beeper", "enable", "NOT_A_MODE"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK {
+		t.Fatalf("expected failure: %+v", env)
+	}
+}
+
+func TestBeeperDisableApply(t *testing.T) {
+	var seenOp connection.OperationClass
+	connect := func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		seenOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	}
+	env, err := runTestCommandWithInput(t, []string{"beeper", "disable", "ARMING", "--apply", "--yes"}, "", connect)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if seenOp != connection.Write {
+		t.Fatalf("operation = %v, want Write", seenOp)
+	}
+	plan := env.Data.(map[string]any)
+	if plan["applied"] != true || plan["kind"] != "beeper" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if _, ok := plan["response_lines"]; !ok {
+		t.Fatalf("missing response_lines: %+v", plan)
 	}
 }
 

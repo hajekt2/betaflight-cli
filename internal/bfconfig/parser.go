@@ -16,6 +16,8 @@ type Document struct {
 	Serial    []Serial            `json:"serial"`
 	Aux       []AuxRange          `json:"aux"`
 	Resources []Resource          `json:"resources"`
+	Timers    []Command           `json:"timers"`
+	DMA       []Command           `json:"dma"`
 	Profiles  []Profile           `json:"profiles"`
 	VTXTable  []Command           `json:"vtx_table"`
 	VTX       *VTXTableSummary    `json:"vtx,omitempty"`
@@ -29,6 +31,9 @@ type Document struct {
 	Beeper    []Command           `json:"beeper"`
 	Beacon    []Command           `json:"beacon"`
 	Board     []Command           `json:"board"`
+	Mixer     []Command           `json:"mixer"`
+	MMix      []Command           `json:"mmix"`
+	RCMap     []Command           `json:"map"`
 	Batch     []Command           `json:"batch"`
 	Defaults  []Command           `json:"defaults"`
 	Save      []Command           `json:"save"`
@@ -169,6 +174,8 @@ func Parse(lines []string, registry settings.Registry) Document {
 			"modes":     {},
 			"features":  {},
 			"resources": {},
+			"timers":    {},
+			"dma":       {},
 			"vtx_table": {},
 			"osd":       {},
 			"leds":      {},
@@ -180,6 +187,9 @@ func Parse(lines []string, registry settings.Registry) Document {
 			"beeper":    {},
 			"beacon":    {},
 			"board":     {},
+			"mixer":     {},
+			"mmix":      {},
+			"map":       {},
 			"batch":     {},
 			"defaults":  {},
 			"save":      {},
@@ -250,6 +260,12 @@ func classify(doc *Document, line string, fields []string, registry settings.Reg
 	case fields[0] == "resource":
 		doc.Sections["resources"] = append(doc.Sections["resources"], line)
 		doc.Resources = append(doc.Resources, parseResource(line, fields))
+	case fields[0] == "timer":
+		doc.Sections["timers"] = append(doc.Sections["timers"], line)
+		doc.Timers = append(doc.Timers, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "dma":
+		doc.Sections["dma"] = append(doc.Sections["dma"], line)
+		doc.DMA = append(doc.DMA, Command{Kind: fields[0], Line: line, Args: fields[1:]})
 	case fields[0] == "vtxtable":
 		doc.Sections["vtx_table"] = append(doc.Sections["vtx_table"], line)
 		doc.VTXTable = append(doc.VTXTable, Command{Kind: fields[0], Line: line, Args: fields[1:]})
@@ -280,6 +296,15 @@ func classify(doc *Document, line string, fields []string, registry settings.Reg
 	case fields[0] == "board_name" || fields[0] == "manufacturer_id" || fields[0] == "mcu_id" || fields[0] == "signature":
 		doc.Sections["board"] = append(doc.Sections["board"], line)
 		doc.Board = append(doc.Board, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "mixer":
+		doc.Sections["mixer"] = append(doc.Sections["mixer"], line)
+		doc.Mixer = append(doc.Mixer, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "mmix":
+		doc.Sections["mmix"] = append(doc.Sections["mmix"], line)
+		doc.MMix = append(doc.MMix, Command{Kind: fields[0], Line: line, Args: fields[1:]})
+	case fields[0] == "map":
+		doc.Sections["map"] = append(doc.Sections["map"], line)
+		doc.RCMap = append(doc.RCMap, Command{Kind: fields[0], Line: line, Args: fields[1:]})
 	case fields[0] == "batch":
 		doc.Sections["batch"] = append(doc.Sections["batch"], line)
 		doc.Batch = append(doc.Batch, Command{Kind: fields[0], Line: line, Args: fields[1:]})

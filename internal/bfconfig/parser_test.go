@@ -24,6 +24,11 @@ func TestParseDocument(t *testing.T) {
 		"serial UART1 64 115200 57600 0 115200",
 		"aux 0 0 0 1700 2100 0 0",
 		"resource MOTOR 1 A00",
+		"timer B00 AF2",
+		"dma ADC 1 0",
+		"mixer QUADX",
+		"mmix reset",
+		"map AETR1234",
 		"vtxtable bands 5",
 		"vtxtable channels 8",
 		"vtxtable band 1 RACEBAND R FACTORY 5658 5695 5732 5769 5806 5843 5880 5917",
@@ -72,6 +77,12 @@ func TestParseDocument(t *testing.T) {
 	}
 	if len(doc.Resources) != 1 || doc.Resources[0].Kind != "MOTOR" || doc.Resources[0].Target != "A00" {
 		t.Fatalf("resources = %+v", doc.Resources)
+	}
+	if len(doc.Timers) != 1 || len(doc.DMA) != 1 {
+		t.Fatalf("timers/dma = %+v/%+v", doc.Timers, doc.DMA)
+	}
+	if len(doc.Mixer) != 1 || len(doc.MMix) != 1 || len(doc.RCMap) != 1 {
+		t.Fatalf("mixer/mmix/map = %+v/%+v/%+v", doc.Mixer, doc.MMix, doc.RCMap)
 	}
 	if len(doc.Profiles) != 2 {
 		t.Fatalf("profiles = %+v", doc.Profiles)

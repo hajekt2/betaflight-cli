@@ -195,12 +195,14 @@ The object includes port identifiers, decoded port names, function masks, decode
 `serial apply-config-json` returns a `serial_config` object with the applied full-table port rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful serial config writes include a `serial_config` side effect.
 
-`pid status` returns a `pid` object decoded from `MSP_PID`, `MSP_PIDNAMES`, `MSP_PID_CONTROLLER`, `MSP_RC_TUNING`, and `MSP_PID_ADVANCED`.
-The object includes active PID gain triplets, PID names, controller identity, the active rate profile, advanced PID tuning fields, and source metadata for each MSP message.
+`pid status` returns a `pid` object decoded from `MSP_PID`, `MSP_PIDNAMES`, `MSP_PID_CONTROLLER`, `MSP_RC_TUNING`, `MSP_PID_ADVANCED`, and `MSP_SIMPLIFIED_TUNING`.
+The object includes active PID gain triplets, PID names, controller identity, the active rate profile, advanced PID tuning fields, simplified tuning fields, and source metadata for each MSP message.
 `pid set-gains-json` returns a `pid_gains` object with the requested PID gain rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful PID gain writes include a `pid_gains` side effect.
 `pid set-advanced-json` returns a `pid_advanced` object with the requested PID advanced profile fields, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful PID advanced writes include a `pid_advanced` side effect.
+`pid set-simplified-json` returns a `simplified_tuning` object with requested simplified PID, D-term filter, and gyro filter tuning, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful simplified tuning writes include a `simplified_tuning` side effect.
 
 `rates status` returns a `rates` object decoded from `MSP_RC_TUNING` and `MSP_PID_ADVANCED`.
 The object includes per-axis RC rates, expo, super rate values, rate limits, throttle curve fields, rates type, throttle limit mode, and TPA settings.

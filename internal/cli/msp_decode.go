@@ -51,6 +51,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPPIDController:      decodeVia(commands.DecodePIDController),
 	msp.MSPRCTuning:           decodeVia(commands.DecodeRateProfile),
 	msp.MSPPIDAdvanced:        decodeVia(commands.DecodePIDAdvanced),
+	msp.MSPSimplifiedTuning:   decodeVia(commands.DecodeSimplifiedTuning),
 	msp.MSPFeatureConfig:      decodeVia(commands.DecodeFeatureStatus),
 	msp.MSPArmingConfig:       decodeVia(commands.DecodeArmingConfig),
 	msp.MSPFailsafeConfig:     decodeVia(commands.DecodeFailsafeConfig),

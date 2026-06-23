@@ -114,6 +114,58 @@ func TestValidatePIDAdvancedRejectsInvalidFeedforwardAveraging(t *testing.T) {
 	}
 }
 
+func TestDecodeAndEncodeSimplifiedTuning(t *testing.T) {
+	payload := simplifiedTuningTestPayload()
+	tuning, err := DecodeSimplifiedTuning(payload)
+	if err != nil {
+		t.Fatalf("DecodeSimplifiedTuning() error = %v", err)
+	}
+	if tuning.PIDs.Mode != 2 || tuning.PIDs.MasterMultiplier != 100 || !tuning.Dterm.Enabled || tuning.Dterm.LPF1DynamicMaxHz != 170 || tuning.Gyro.LPF2StaticHz != 250 {
+		t.Fatalf("tuning = %+v", tuning)
+	}
+	got := EncodeSimplifiedTuning(*tuning)
+	if string(got) != string(payload) {
+		t.Fatalf("EncodeSimplifiedTuning() = %v, want %v", got, payload)
+	}
+}
+
+func TestValidateSimplifiedTuning(t *testing.T) {
+	tuning, err := DecodeSimplifiedTuning(simplifiedTuningTestPayload())
+	if err != nil {
+		t.Fatalf("DecodeSimplifiedTuning() error = %v", err)
+	}
+	tuning.PIDs.Mode = 3
+	if err := ValidateSimplifiedTuning(*tuning); err == nil {
+		t.Fatal("ValidateSimplifiedTuning() error = nil, want mode error")
+	}
+	tuning.PIDs.Mode = 2
+	tuning.Gyro.Multiplier = 9
+	if err := ValidateSimplifiedTuning(*tuning); err == nil {
+		t.Fatal("ValidateSimplifiedTuning() error = nil, want gyro multiplier error")
+	}
+}
+
+func simplifiedTuningTestPayload() []byte {
+	payload := []byte{2, 100, 100, 100, 100, 100, 100, 100, 100}
+	payload = appendU32Test(payload, 0)
+	payload = appendU32Test(payload, 0)
+	payload = append(payload, 1, 100)
+	payload = appendU16Test(payload, 100)
+	payload = appendU16Test(payload, 150)
+	payload = appendU16Test(payload, 70)
+	payload = appendU16Test(payload, 170)
+	payload = appendU32Test(payload, 0)
+	payload = appendU32Test(payload, 0)
+	payload = append(payload, 1, 100)
+	payload = appendU16Test(payload, 150)
+	payload = appendU16Test(payload, 250)
+	payload = appendU16Test(payload, 75)
+	payload = appendU16Test(payload, 300)
+	payload = appendU32Test(payload, 0)
+	payload = appendU32Test(payload, 0)
+	return payload
+}
+
 func pidAdvancedTestPayload() []byte {
 	payload := appendU16Test(nil, 0)
 	payload = appendU16Test(payload, 0)

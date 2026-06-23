@@ -12,6 +12,7 @@ import (
 const (
 	rcTuningModernLength    = 24
 	pidAdvancedMinLength    = 61
+	simplifiedTuningLength  = 53
 	pidTripletLength        = 3
 	pidControllerBetaflight = 0
 )
@@ -32,6 +33,7 @@ type PIDStatus struct {
 	Gains       []PIDGain         `json:"gains,omitempty"`
 	RateProfile *RateProfile      `json:"rate_profile,omitempty"`
 	Advanced    *PIDAdvanced      `json:"advanced,omitempty"`
+	Simplified  *SimplifiedTuning `json:"simplified_tuning,omitempty"`
 	Sources     map[string]string `json:"sources,omitempty"`
 }
 
@@ -68,6 +70,46 @@ type PIDAdvancedSetResult struct {
 	MSPName      string      `json:"msp_name"`
 	Acknowledged bool        `json:"acknowledged"`
 	SaveRequired bool        `json:"save_required"`
+}
+
+type SimplifiedTuning struct {
+	PIDs                 SimplifiedPIDs   `json:"pids"`
+	Dterm                SimplifiedFilter `json:"dterm"`
+	Gyro                 SimplifiedFilter `json:"gyro"`
+	TrailingBytesIgnored int              `json:"trailing_bytes_ignored,omitempty"`
+}
+
+type SimplifiedPIDs struct {
+	Mode                    uint8  `json:"mode"`
+	MasterMultiplier        uint8  `json:"master_multiplier"`
+	RollPitchRatio          uint8  `json:"roll_pitch_ratio"`
+	IGain                   uint8  `json:"i_gain"`
+	DGain                   uint8  `json:"d_gain"`
+	PIGain                  uint8  `json:"pi_gain"`
+	DMaxGain                uint8  `json:"d_max_gain"`
+	FeedforwardGain         uint8  `json:"feedforward_gain"`
+	PitchPIGain             uint8  `json:"pitch_pi_gain"`
+	Reserved1               uint32 `json:"reserved_1,omitempty"`
+	Reserved2               uint32 `json:"reserved_2,omitempty"`
+}
+
+type SimplifiedFilter struct {
+	Enabled          bool   `json:"enabled"`
+	Multiplier       uint8  `json:"multiplier"`
+	LPF1StaticHz     uint16 `json:"lpf1_static_hz"`
+	LPF2StaticHz     uint16 `json:"lpf2_static_hz"`
+	LPF1DynamicMinHz uint16 `json:"lpf1_dynamic_min_hz"`
+	LPF1DynamicMaxHz uint16 `json:"lpf1_dynamic_max_hz"`
+	Reserved1        uint32 `json:"reserved_1,omitempty"`
+	Reserved2        uint32 `json:"reserved_2,omitempty"`
+}
+
+type SimplifiedTuningSetResult struct {
+	Tuning       SimplifiedTuning `json:"tuning"`
+	MSPCode      uint16           `json:"msp_code"`
+	MSPName      string           `json:"msp_name"`
+	Acknowledged bool             `json:"acknowledged"`
+	SaveRequired bool             `json:"save_required"`
 }
 
 type RateProfile struct {
@@ -209,6 +251,12 @@ func ReadPIDStatus(ctx context.Context, client *connection.Client) (*PIDStatus, 
 	} else {
 		warnings = append(warnings, err.Error())
 	}
+	if simplified, err := readSimplifiedTuning(ctx, client); err == nil {
+		status.Simplified = simplified
+		status.Sources["simplified_tuning"] = "MSP_SIMPLIFIED_TUNING"
+	} else {
+		warnings = append(warnings, err.Error())
+	}
 	return status, warnings, nil
 }
 
@@ -261,9 +309,56 @@ func SetPIDAdvanced(ctx context.Context, client *connection.Client, advanced PID
 	}, nil
 }
 
+func SetSimplifiedTuning(ctx context.Context, client *connection.Client, tuning SimplifiedTuning) (*SimplifiedTuningSetResult, error) {
+	if err := ValidateSimplifiedTuning(tuning); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetSimplifiedTuning, EncodeSimplifiedTuning(tuning)); err != nil {
+		return nil, fmt.Errorf("simplified tuning request failed: %w", err)
+	}
+	return &SimplifiedTuningSetResult{
+		Tuning:       tuning,
+		MSPCode:      msp.MSPSetSimplifiedTuning,
+		MSPName:      "MSP_SET_SIMPLIFIED_TUNING",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
 func ValidatePIDAdvanced(advanced PIDAdvanced) error {
 	if advanced.FeedforwardAveraging > 3 {
 		return fmt.Errorf("feedforward_averaging must be 0-3")
+	}
+	return nil
+}
+
+func ValidateSimplifiedTuning(tuning SimplifiedTuning) error {
+	if tuning.PIDs.Mode > 2 {
+		return fmt.Errorf("pids.mode must be 0, 1, or 2")
+	}
+	for name, value := range map[string]uint8{
+		"master_multiplier": tuning.PIDs.MasterMultiplier,
+		"roll_pitch_ratio":   tuning.PIDs.RollPitchRatio,
+		"i_gain":             tuning.PIDs.IGain,
+		"d_gain":             tuning.PIDs.DGain,
+		"pi_gain":            tuning.PIDs.PIGain,
+		"d_max_gain":         tuning.PIDs.DMaxGain,
+		"feedforward_gain":   tuning.PIDs.FeedforwardGain,
+		"pitch_pi_gain":      tuning.PIDs.PitchPIGain,
+	} {
+		if value > 200 {
+			return fmt.Errorf("pids.%s must be <= 200", name)
+		}
+	}
+	if err := validateSimplifiedFilter("dterm", tuning.Dterm); err != nil {
+		return err
+	}
+	return validateSimplifiedFilter("gyro", tuning.Gyro)
+}
+
+func validateSimplifiedFilter(name string, filter SimplifiedFilter) error {
+	if filter.Multiplier < 10 || filter.Multiplier > 200 {
+		return fmt.Errorf("%s.multiplier must be between 10 and 200", name)
 	}
 	return nil
 }
@@ -387,6 +482,35 @@ func EncodePIDAdvanced(advanced PIDAdvanced) []byte {
 	return payload
 }
 
+func EncodeSimplifiedTuning(tuning SimplifiedTuning) []byte {
+	payload := []byte{
+		tuning.PIDs.Mode,
+		tuning.PIDs.MasterMultiplier,
+		tuning.PIDs.RollPitchRatio,
+		tuning.PIDs.IGain,
+		tuning.PIDs.DGain,
+		tuning.PIDs.PIGain,
+		tuning.PIDs.DMaxGain,
+		tuning.PIDs.FeedforwardGain,
+		tuning.PIDs.PitchPIGain,
+	}
+	payload = appendU32Payload(payload, tuning.PIDs.Reserved1)
+	payload = appendU32Payload(payload, tuning.PIDs.Reserved2)
+	payload = appendSimplifiedFilter(payload, tuning.Dterm)
+	payload = appendSimplifiedFilter(payload, tuning.Gyro)
+	return payload
+}
+
+func appendSimplifiedFilter(payload []byte, filter SimplifiedFilter) []byte {
+	payload = append(payload, boolByte(filter.Enabled), filter.Multiplier)
+	payload = appendU16Payload(payload, filter.LPF1StaticHz)
+	payload = appendU16Payload(payload, filter.LPF2StaticHz)
+	payload = appendU16Payload(payload, filter.LPF1DynamicMinHz)
+	payload = appendU16Payload(payload, filter.LPF1DynamicMaxHz)
+	payload = appendU32Payload(payload, filter.Reserved1)
+	return appendU32Payload(payload, filter.Reserved2)
+}
+
 func DecodePIDGains(payload []byte, names []string) ([]PIDGain, error) {
 	if len(payload)%pidTripletLength != 0 {
 		return nil, fmt.Errorf("payload length %d is not a multiple of PID triplet size 3", len(payload))
@@ -433,6 +557,131 @@ func DecodePIDController(payload []byte) (*PIDController, error) {
 		name = "BETAFLIGHT"
 	}
 	return &PIDController{ID: id, Name: name}, nil
+}
+
+func DecodeSimplifiedTuning(payload []byte) (*SimplifiedTuning, error) {
+	if len(payload) < simplifiedTuningLength {
+		return nil, fmt.Errorf("payload length %d is shorter than MSP_SIMPLIFIED_TUNING size %d", len(payload), simplifiedTuningLength)
+	}
+	r := msp.NewPayloadReader(payload)
+	pids, err := readSimplifiedPIDs(r)
+	if err != nil {
+		return nil, err
+	}
+	dterm, err := readSimplifiedFilter(r, "dterm")
+	if err != nil {
+		return nil, err
+	}
+	gyro, err := readSimplifiedFilter(r, "gyro")
+	if err != nil {
+		return nil, err
+	}
+	return &SimplifiedTuning{PIDs: pids, Dterm: dterm, Gyro: gyro, TrailingBytesIgnored: r.Remaining()}, nil
+}
+
+func readSimplifiedPIDs(r *msp.PayloadReader) (SimplifiedPIDs, error) {
+	mode, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified PID mode")
+	}
+	master, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified master multiplier")
+	}
+	rollPitch, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified roll pitch ratio")
+	}
+	iGain, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified I gain")
+	}
+	dGain, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified D gain")
+	}
+	piGain, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified PI gain")
+	}
+	dMax, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified D max gain")
+	}
+	ff, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified feedforward gain")
+	}
+	pitchPI, err := r.U8()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified pitch PI gain")
+	}
+	reserved1, err := r.U32()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified PID reserved 1")
+	}
+	reserved2, err := r.U32()
+	if err != nil {
+		return SimplifiedPIDs{}, msp.RequireNoShort(err, "simplified PID reserved 2")
+	}
+	return SimplifiedPIDs{
+		Mode:             mode,
+		MasterMultiplier: master,
+		RollPitchRatio:   rollPitch,
+		IGain:            iGain,
+		DGain:            dGain,
+		PIGain:           piGain,
+		DMaxGain:         dMax,
+		FeedforwardGain:  ff,
+		PitchPIGain:      pitchPI,
+		Reserved1:        reserved1,
+		Reserved2:        reserved2,
+	}, nil
+}
+
+func readSimplifiedFilter(r *msp.PayloadReader, name string) (SimplifiedFilter, error) {
+	enabled, err := r.U8()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" filter enabled")
+	}
+	multiplier, err := r.U8()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" filter multiplier")
+	}
+	lpf1, err := r.U16()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" lpf1 static")
+	}
+	lpf2, err := r.U16()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" lpf2 static")
+	}
+	dynMin, err := r.U16()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" lpf1 dynamic min")
+	}
+	dynMax, err := r.U16()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" lpf1 dynamic max")
+	}
+	reserved1, err := r.U32()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" reserved 1")
+	}
+	reserved2, err := r.U32()
+	if err != nil {
+		return SimplifiedFilter{}, msp.RequireNoShort(err, "simplified "+name+" reserved 2")
+	}
+	return SimplifiedFilter{
+		Enabled:          enabled != 0,
+		Multiplier:       multiplier,
+		LPF1StaticHz:     lpf1,
+		LPF2StaticHz:     lpf2,
+		LPF1DynamicMinHz: dynMin,
+		LPF1DynamicMaxHz: dynMax,
+		Reserved1:        reserved1,
+		Reserved2:        reserved2,
+	}, nil
 }
 
 func DecodeRateProfile(payload []byte) (*RateProfile, error) {
@@ -744,6 +993,18 @@ func readPIDAdvanced(ctx context.Context, client *connection.Client) (*PIDAdvanc
 		return nil, fmt.Errorf("advanced pid decode failed: %w", err)
 	}
 	return advanced, nil
+}
+
+func readSimplifiedTuning(ctx context.Context, client *connection.Client) (*SimplifiedTuning, error) {
+	frame, err := client.Request(ctx, msp.MSPSimplifiedTuning, nil)
+	if err != nil {
+		return nil, fmt.Errorf("simplified tuning unavailable: %w", err)
+	}
+	tuning, err := DecodeSimplifiedTuning(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("simplified tuning decode failed: %w", err)
+	}
+	return tuning, nil
 }
 
 func rateAxis(axis string, rcRate, expo, rate uint8, limit uint16) RateAxis {

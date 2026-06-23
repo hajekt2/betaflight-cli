@@ -415,6 +415,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if pidAdvanced["operation"] != "write" || pidAdvanced["confirmation"] != "--yes" || pidAdvanced["requires_connection"] != true || pidAdvanced["output_root"] != "pid_advanced" || pidAdvanced["runnable"] != true {
 		t.Fatalf("pid advanced capability = %+v", pidAdvanced)
 	}
+	simplifiedTuning := byCommand["betaflight-cli pid set-simplified-json"]
+	if simplifiedTuning["operation"] != "write" || simplifiedTuning["confirmation"] != "--yes" || simplifiedTuning["requires_connection"] != true || simplifiedTuning["output_root"] != "simplified_tuning" || simplifiedTuning["runnable"] != true {
+		t.Fatalf("simplified tuning capability = %+v", simplifiedTuning)
+	}
 	rateProfile := byCommand["betaflight-cli rates set-profile-json"]
 	if rateProfile["operation"] != "write" || rateProfile["confirmation"] != "--yes" || rateProfile["requires_connection"] != true || rateProfile["output_root"] != "rate_profile" || rateProfile["runnable"] != true {
 		t.Fatalf("rate profile capability = %+v", rateProfile)
@@ -5798,6 +5802,15 @@ func TestPIDStatusWithFakeFC(t *testing.T) {
 	if rateProfile["rates_type_name"] != "ACTUAL" {
 		t.Fatalf("rate profile = %+v", rateProfile)
 	}
+	simplified := pid["simplified_tuning"].(map[string]any)
+	pids := simplified["pids"].(map[string]any)
+	if pids["mode"] != float64(2) || pids["master_multiplier"] != float64(100) {
+		t.Fatalf("simplified pids = %+v", pids)
+	}
+	dterm := simplified["dterm"].(map[string]any)
+	if dterm["enabled"] != true || dterm["lpf1_dynamic_max_hz"] != float64(170) {
+		t.Fatalf("simplified dterm = %+v", dterm)
+	}
 }
 
 func TestPIDSetGainsJSONWithFakeFC(t *testing.T) {
@@ -5887,6 +5900,55 @@ func TestPIDSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
 	input := `{"pid_advanced":{"feedforward_averaging":4}}`
 	env, err := runTestCommandWithInput(t, []string{"pid", "set-advanced-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called for invalid PID advanced config")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestPIDSetSimplifiedJSONWithFakeFC(t *testing.T) {
+	input := `{"simplified_tuning":{"pids":{"mode":2,"master_multiplier":100,"roll_pitch_ratio":100,"i_gain":100,"d_gain":100,"pi_gain":100,"d_max_gain":100,"feedforward_gain":100,"pitch_pi_gain":100},"dterm":{"enabled":true,"multiplier":100,"lpf1_static_hz":100,"lpf2_static_hz":150,"lpf1_dynamic_min_hz":70,"lpf1_dynamic_max_hz":170},"gyro":{"enabled":true,"multiplier":100,"lpf1_static_hz":150,"lpf2_static_hz":250,"lpf1_dynamic_min_hz":75,"lpf1_dynamic_max_hz":300}}}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-simplified-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["simplified_tuning"].(map[string]any)
+	tuning := result["tuning"].(map[string]any)
+	pids := tuning["pids"].(map[string]any)
+	if pids["mode"] != float64(2) || pids["master_multiplier"] != float64(100) || result["save_required"] != true {
+		t.Fatalf("simplified_tuning = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "simplified_tuning" || env.SideEffects[0].Command != "MSP_SET_SIMPLIFIED_TUNING" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestPIDSetSimplifiedJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"simplified_tuning":{"pids":{"mode":2,"master_multiplier":100,"roll_pitch_ratio":100,"i_gain":100,"d_gain":100,"pi_gain":100,"d_max_gain":100,"feedforward_gain":100,"pitch_pi_gain":100},"dterm":{"enabled":true,"multiplier":100},"gyro":{"enabled":true,"multiplier":100}}}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-simplified-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestPIDSetSimplifiedJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"simplified_tuning":{"pids":{"mode":3},"dterm":{"multiplier":100},"gyro":{"multiplier":100}}}`
+	env, err := runTestCommandWithInput(t, []string{"pid", "set-simplified-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid simplified tuning")
 		return nil, connection.TargetInfo{}, nil
 	})
 	if err != nil {

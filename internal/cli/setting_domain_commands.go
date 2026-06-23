@@ -85,6 +85,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.pidStatusCommand())
 		cmd.AddCommand(a.pidSetGainsJSONCommand())
 		cmd.AddCommand(a.pidSetAdvancedJSONCommand())
+		cmd.AddCommand(a.pidSetSimplifiedJSONCommand())
 	}
 	if domain.use == "rates" {
 		cmd.AddCommand(a.ratesStatusCommand())
@@ -961,6 +962,40 @@ func (a *app) pidSetAdvancedJSONCommand() *cobra.Command {
 	}
 }
 
+func (a *app) pidSetSimplifiedJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-simplified-json FILE",
+		Short: "Set simplified tuning from JSON through MSP_SET_SIMPLIFIED_TUNING",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			tuning, err := parseSimplifiedTuningJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "simplified tuning changes affect flight behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetSimplifiedTuning(cmd.Context(), client, tuning)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"simplified_tuning": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "simplified_tuning",
+					Command: "MSP_SET_SIMPLIFIED_TUNING",
+					Detail:  "simplified tuning changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
 func parsePIDGainsJSON(data []byte) ([]bfcommands.PIDGain, error) {
 	var gains []bfcommands.PIDGain
 	if err := json.Unmarshal(data, &gains); err != nil {
@@ -1005,6 +1040,36 @@ func parsePIDAdvancedJSON(data []byte) (bfcommands.PIDAdvanced, error) {
 		return bfcommands.PIDAdvanced{}, err
 	}
 	return advanced, nil
+}
+
+func parseSimplifiedTuningJSON(data []byte) (bfcommands.SimplifiedTuning, error) {
+	var wrapped struct {
+		SimplifiedTuning *bfcommands.SimplifiedTuning `json:"simplified_tuning"`
+		Tuning           *bfcommands.SimplifiedTuning `json:"tuning"`
+		PID              *struct {
+			SimplifiedTuning *bfcommands.SimplifiedTuning `json:"simplified_tuning"`
+		} `json:"pid"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.SimplifiedTuning{}, err
+	}
+	var tuning bfcommands.SimplifiedTuning
+	switch {
+	case wrapped.SimplifiedTuning != nil:
+		tuning = *wrapped.SimplifiedTuning
+	case wrapped.Tuning != nil:
+		tuning = *wrapped.Tuning
+	case wrapped.PID != nil && wrapped.PID.SimplifiedTuning != nil:
+		tuning = *wrapped.PID.SimplifiedTuning
+	default:
+		if err := json.Unmarshal(data, &tuning); err != nil {
+			return bfcommands.SimplifiedTuning{}, err
+		}
+	}
+	if err := bfcommands.ValidateSimplifiedTuning(tuning); err != nil {
+		return bfcommands.SimplifiedTuning{}, err
+	}
+	return tuning, nil
 }
 
 func (a *app) ratesStatusCommand() *cobra.Command {

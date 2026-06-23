@@ -83,6 +83,7 @@ betaflight-cli features enable GPS --port /dev/tty.usbmodem01 --apply --yes
 betaflight-cli serial list --port /dev/tty.usbmodem01
 betaflight-cli modes list --port /dev/tty.usbmodem01
 betaflight-cli modes active --port /dev/tty.usbmodem01
+betaflight-cli rtc set --timestamp 2026-06-23T12:34:56.789Z --port /dev/tty.usbmodem01 --yes
 betaflight-cli resources list --port /dev/tty.usbmodem01
 betaflight-cli profiles list --port /dev/tty.usbmodem01
 betaflight-cli profiles status --port /dev/tty.usbmodem01
@@ -150,6 +151,7 @@ It preserves extended flight-mode bytes so new Betaflight modes beyond the legac
 `debug status` reads live debug channels and accelerometer trims over MSP.
 `environment status` reads altitude, vario, rangefinder altitude, and legacy analog telemetry over MSP.
 `rtc status` reads the flight controller real-time clock over MSP and returns a normalized UTC timestamp when firmware supplies one.
+`rtc set` writes the flight controller real-time clock using `MSP_SET_RTC` with either `--timestamp` or `--now`, and requires `--yes`.
 Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch plan` validates without connecting.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.

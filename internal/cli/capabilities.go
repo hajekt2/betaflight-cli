@@ -272,7 +272,7 @@ func coverageDomains(commandSet map[string]bool) []coverageDomain {
 			"betaflight-cli configuration plan",
 		}, nil, nil, []string{"configuration", "backup"}, "Raw CLI text remains authoritative and parsed inventories are available for agents."),
 		implementedDomain("configuration-restore", commandSet, []string{"betaflight-cli configuration validate", "betaflight-cli restore plan", "betaflight-cli presets plan", "betaflight-cli batch plan", "betaflight-cli configuration plan"}, []string{"betaflight-cli restore apply", "betaflight-cli presets apply", "betaflight-cli presets fetch", "betaflight-cli batch apply", "betaflight-cli configuration apply"}, []string{"betaflight-cli save"}, []string{"configuration_validation", "change_plan"}, "Plan/apply/save is implemented with explicit confirmation and defaults safeguards."),
-		implementedDomain("runtime-status", commandSet, []string{"betaflight-cli status", "betaflight-cli telemetry snapshot", "betaflight-cli system status", "betaflight-cli tasks status", "betaflight-cli debug status", "betaflight-cli environment status", "betaflight-cli rtc status"}, nil, nil, []string{"status", "telemetry", "system", "tasks", "debug", "environment", "rtc"}, "Core runtime, telemetry, scheduler, debug, environment, and clock reads are typed."),
+		implementedDomain("runtime-status", commandSet, []string{"betaflight-cli status", "betaflight-cli telemetry snapshot", "betaflight-cli system status", "betaflight-cli tasks status", "betaflight-cli debug status", "betaflight-cli environment status", "betaflight-cli rtc status"}, []string{"betaflight-cli rtc set"}, nil, []string{"status", "telemetry", "system", "tasks", "debug", "environment", "rtc"}, "Core runtime, telemetry, scheduler, debug, environment, and clock reads are typed; RTC time sync is exposed as a confirmed MSP write."),
 		implementedDomain("features", commandSet, []string{"betaflight-cli features list", "betaflight-cli features status"}, []string{"betaflight-cli features enable", "betaflight-cli features disable"}, nil, []string{"features", "change_plan"}, "Feature mask reads and CLI-backed feature plans are implemented."),
 		implementedDomain("ports-and-modes", commandSet, []string{"betaflight-cli serial list", "betaflight-cli serial status", "betaflight-cli modes list", "betaflight-cli modes active"}, []string{"betaflight-cli serial set", "betaflight-cli modes set"}, nil, []string{"serial", "modes", "change_plan"}, "Serial rows and AUX modes have read, typed status, and plan/apply surfaces."),
 		implementedDomain("resources", commandSet, []string{"betaflight-cli resources list", "betaflight-cli resources status"}, []string{"betaflight-cli resources set"}, nil, []string{"resources", "change_plan"}, "Resource, timer, and DMA reads are implemented with resource assignment planning."),
@@ -432,6 +432,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 			OutputRoot:         "change_plan",
 			Tags:               []string{"settings", "write"},
 		},
+		"betaflight-cli rtc set": {RequiresConnection: true, Operation: "write", Confirmation: "--yes", OutputRoot: "rtc", Tags: []string{"rtc", "write"}},
 		"betaflight-cli save": dangerous,
 	}
 	for _, path := range []string{

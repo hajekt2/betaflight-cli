@@ -22,6 +22,13 @@ type RTCStatus struct {
 	Source    string `json:"source,omitempty"`
 }
 
+type RTCSetResult struct {
+	TimestampUTC string `json:"timestamp_utc"`
+	MSPCode      uint16 `json:"msp_code"`
+	MSPName      string `json:"msp_name"`
+	Acknowledged bool   `json:"acknowledged"`
+}
+
 func ReadRTCStatus(ctx context.Context, client *connection.Client) (*RTCStatus, []string, error) {
 	frame, err := client.Request(ctx, msp.MSPRtc, nil)
 	if err != nil {
@@ -37,6 +44,23 @@ func ReadRTCStatus(ctx context.Context, client *connection.Client) (*RTCStatus, 
 		warnings = append(warnings, "MSP_RTC returned no datetime; RTC is unavailable or not set")
 	}
 	return rtc, warnings, nil
+}
+
+func SetRTC(ctx context.Context, client *connection.Client, timestamp time.Time) (*RTCSetResult, error) {
+	utc := timestamp.UTC()
+	payload, err := EncodeRTC(utc)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetRtc, payload); err != nil {
+		return nil, fmt.Errorf("rtc set request failed: %w", err)
+	}
+	return &RTCSetResult{
+		TimestampUTC: utc.Format("2006-01-02T15:04:05.000Z"),
+		MSPCode:      msp.MSPSetRtc,
+		MSPName:      "MSP_SET_RTC",
+		Acknowledged: true,
+	}, nil
 }
 
 func DecodeRTC(payload []byte) (*RTCStatus, error) {
@@ -94,4 +118,18 @@ func DecodeRTC(payload []byte) (*RTCStatus, error) {
 		Millis:    millis,
 		ISOUTC:    t.Format("2006-01-02T15:04:05.000Z"),
 	}, nil
+}
+
+func EncodeRTC(timestamp time.Time) ([]byte, error) {
+	utc := timestamp.UTC()
+	year := utc.Year()
+	if year < 0 || year > 65535 {
+		return nil, fmt.Errorf("rtc year %d is outside uint16 range", year)
+	}
+	millis := utc.Nanosecond() / int(time.Millisecond)
+	payload := make([]byte, 0, 9)
+	payload = append(payload, byte(year), byte(year>>8))
+	payload = append(payload, byte(utc.Month()), byte(utc.Day()), byte(utc.Hour()), byte(utc.Minute()), byte(utc.Second()))
+	payload = append(payload, byte(millis), byte(millis>>8))
+	return payload, nil
 }

@@ -247,6 +247,8 @@ The object includes estimated altitude in centimeters/meters, vario, rangefinder
 `rtc status` returns an `rtc` object decoded from `MSP_RTC`.
 The object includes `available`, date/time components, milliseconds, the `MSP_RTC` source, and `iso_utc` when firmware returns a complete datetime.
 An empty payload is treated as a successful unavailable state because Betaflight returns no bytes when RTC time is not set.
+`rtc set` returns an `rtc` object with the UTC timestamp written, MSP command name/code, and acknowledgement flag.
+Successful `rtc set` responses include an `rtc_set` side effect.
 
 `receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.

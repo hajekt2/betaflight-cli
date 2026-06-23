@@ -327,6 +327,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if sensorCalibration["operation"] != "dangerous" || sensorCalibration["confirmation"] != "--yes" || sensorCalibration["requires_connection"] != true || sensorCalibration["output_root"] != "sensor_calibration" || sensorCalibration["runnable"] != true {
 		t.Fatalf("sensor calibration capability = %+v", sensorCalibration)
 	}
+	rtcSet := byCommand["betaflight-cli rtc set"]
+	if rtcSet["operation"] != "write" || rtcSet["confirmation"] != "--yes" || rtcSet["requires_connection"] != true || rtcSet["output_root"] != "rtc" || rtcSet["runnable"] != true {
+		t.Fatalf("rtc set capability = %+v", rtcSet)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -766,6 +770,58 @@ func TestRTCStatusWithFakeFC(t *testing.T) {
 	rtc := data["rtc"].(map[string]any)
 	if rtc["available"] != true || rtc["iso_utc"] != "2026-06-23T12:34:56.789Z" || rtc["millis"] != float64(789) {
 		t.Fatalf("rtc = %+v", rtc)
+	}
+}
+
+func TestRTCSetRequiresTimestampOrNow(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"rtc", "set", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after rtc set validation failure")
+	}
+}
+
+func TestRTCSetRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"rtc", "set", "--timestamp", "2026-06-23T12:34:56.789Z"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after rtc set confirmation failure")
+	}
+}
+
+func TestRTCSetWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"rtc", "set", "--timestamp", "2026-06-23T12:34:56.789Z", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	rtc := data["rtc"].(map[string]any)
+	if rtc["timestamp_utc"] != "2026-06-23T12:34:56.789Z" || rtc["msp_name"] != "MSP_SET_RTC" || rtc["acknowledged"] != true {
+		t.Fatalf("rtc = %+v", rtc)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "rtc_set" || env.SideEffects[0].Command != "MSP_SET_RTC" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

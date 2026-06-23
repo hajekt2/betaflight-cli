@@ -327,6 +327,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 6, 23, 12, 34, 56)
 		payload = appendU16(payload, 789)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetRtc:
+		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPAccCalibration, msp.MSPMagCalibration:
 		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPReboot:

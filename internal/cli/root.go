@@ -1279,6 +1279,44 @@ func (a *app) rtcCommand() *cobra.Command {
 			})
 		},
 	})
+	var timestamp string
+	var now bool
+	set := &cobra.Command{
+		Use:   "set",
+		Short: "Set RTC datetime over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if (timestamp == "") == !now {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", "use exactly one of --timestamp or --now"))
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "rtc set changes flight controller time; pass --yes"))
+			}
+			value := time.Now().UTC()
+			if timestamp != "" {
+				parsed, err := time.Parse(time.RFC3339Nano, timestamp)
+				if err != nil {
+					return a.render(output.Failure(commandPath(cmd), nil, "validation_error", fmt.Sprintf("invalid --timestamp: %v", err)))
+				}
+				value = parsed
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRTC(cmd.Context(), client, value)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rtc": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rtc_set",
+					Command: result.MSPName,
+					Detail:  "flight controller RTC updated",
+				})
+				return env
+			})
+		},
+	}
+	set.Flags().StringVar(&timestamp, "timestamp", "", "UTC timestamp to set, formatted as RFC3339/RFC3339Nano")
+	set.Flags().BoolVar(&now, "now", false, "set RTC to the local machine's current UTC time")
+	cmd.AddCommand(set)
 	return cmd
 }
 

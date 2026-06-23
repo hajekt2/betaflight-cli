@@ -1,6 +1,9 @@
 package commands
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestDecodeRTC(t *testing.T) {
 	payload := appendU16Test(nil, 2026)
@@ -47,5 +50,36 @@ func TestDecodeRTCRejectsInvalidDate(t *testing.T) {
 	payload = appendU16Test(payload, 789)
 	if _, err := DecodeRTC(payload); err == nil {
 		t.Fatal("DecodeRTC() error = nil, want invalid datetime error")
+	}
+}
+
+func TestEncodeRTC(t *testing.T) {
+	timestamp := time.Date(2026, 6, 23, 12, 34, 56, 789123000, time.UTC)
+	payload, err := EncodeRTC(timestamp)
+	if err != nil {
+		t.Fatalf("EncodeRTC() error = %v", err)
+	}
+	rtc, err := DecodeRTC(payload)
+	if err != nil {
+		t.Fatalf("DecodeRTC(EncodeRTC()) error = %v", err)
+	}
+	if rtc.ISOUTC != "2026-06-23T12:34:56.789Z" {
+		t.Fatalf("rtc = %+v", rtc)
+	}
+}
+
+func TestEncodeRTCNormalizesUTC(t *testing.T) {
+	location := time.FixedZone("test", 2*60*60)
+	timestamp := time.Date(2026, 6, 23, 14, 34, 56, 123000000, location)
+	payload, err := EncodeRTC(timestamp)
+	if err != nil {
+		t.Fatalf("EncodeRTC() error = %v", err)
+	}
+	rtc, err := DecodeRTC(payload)
+	if err != nil {
+		t.Fatalf("DecodeRTC(EncodeRTC()) error = %v", err)
+	}
+	if rtc.ISOUTC != "2026-06-23T12:34:56.123Z" {
+		t.Fatalf("rtc = %+v", rtc)
 	}
 }

@@ -1015,6 +1015,66 @@ func TestStorageStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestStorageEraseRequiresConfirmationBeforeConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"storage", "erase"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if called {
+		t.Fatal("connector was called before --yes confirmation")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestStorageEraseUsesDangerousOperation(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommand(t, []string{"storage", "erase", "--yes"}, func(ctx context.Context, cfg connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(ctx)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	plan := data["storage_erase"].(map[string]any)
+	if plan["applied"] != true || plan["dangerous"] != true || plan["command"] != "MSP_DATAFLASH_ERASE" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	before := plan["before"].(map[string]any)["dataflash"].(map[string]any)
+	after := plan["after"].(map[string]any)["dataflash"].(map[string]any)
+	if before["used_bytes"] != float64(262144) || after["used_bytes"] != float64(0) {
+		t.Fatalf("before=%+v after=%+v", before, after)
+	}
+	audit := plan["audit"].(map[string]any)
+	if audit["preflight_captured"] != true || audit["post_stop_captured"] != true || audit["freed_bytes"] != float64(262144) {
+		t.Fatalf("audit = %+v", audit)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "dataflash_erase" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestVTXConfigWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtx", "config"}, nil)
 	if err != nil {

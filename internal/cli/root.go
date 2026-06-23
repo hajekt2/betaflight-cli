@@ -209,6 +209,7 @@ func (a *app) storageCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(a.storageEraseCommand())
 	return cmd
 }
 

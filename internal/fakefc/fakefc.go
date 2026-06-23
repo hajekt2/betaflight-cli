@@ -13,13 +13,14 @@ import (
 )
 
 type FC struct {
-	mu          sync.Mutex
-	readTimeout time.Duration
-	closed      bool
-	out         bytes.Buffer
-	CLI         map[string][]string
-	Unsupported map[uint16]bool
-	SaveCloses  bool
+	mu                 sync.Mutex
+	readTimeout        time.Duration
+	closed             bool
+	out                bytes.Buffer
+	CLI                map[string][]string
+	Unsupported        map[uint16]bool
+	SaveCloses         bool
+	DataflashUsedBytes uint32
 }
 
 func New() *FC {
@@ -140,7 +141,8 @@ func New() *FC {
 			"battery_profile 1":                     {"battery_profile 1"},
 			"save":                                  {"Saving..."},
 		},
-		Unsupported: map[uint16]bool{},
+		Unsupported:        map[uint16]bool{},
+		DataflashUsedBytes: 262144,
 	}
 }
 
@@ -378,8 +380,11 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload := []byte{3}
 		payload = appendU32(payload, 16)
 		payload = appendU32(payload, 1048576)
-		payload = appendU32(payload, 262144)
+		payload = appendU32(payload, f.DataflashUsedBytes)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPDataflashErase:
+		f.DataflashUsedBytes = 0
+		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPSdcardSummary:
 		payload := []byte{1, 4, 0}
 		payload = appendU32(payload, 4096)

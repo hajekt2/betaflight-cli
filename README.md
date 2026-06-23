@@ -155,6 +155,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `reboot firmware`, `reboot bootloader`, `reboot bootloader-flash`, `reboot msc`, and `reboot msc-utc` send reviewed `MSP_REBOOT` requests and always require `--yes`.
 `blackbox config` reads current Blackbox configuration over MSP and returns decoded device, sample rate, and enabled or disabled field selections.
 `storage status` reads Dataflash and SD card summaries over MSP and returns capacity, usage, readiness, and state fields.
+`storage erase` sends `MSP_DATAFLASH_ERASE`, requires `--yes`, captures read-only before and after storage snapshots, emits a `dataflash_erase` side effect, and returns an audit summary with freed bytes.
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.

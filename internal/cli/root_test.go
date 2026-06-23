@@ -325,6 +325,34 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 	if contract["total_commands"] == nil {
 		t.Fatalf("command_contracts = %+v", contract)
 	}
+	if contract["runnable_commands"] == nil || contract["requires_connection_commands"] == nil {
+		t.Fatalf("command_contracts missing counts = %+v", contract)
+	}
+	operations := contract["operations"].([]any)
+	if len(operations) < 6 {
+		t.Fatalf("operations = %+v", operations)
+	}
+	operationCounts := contract["operation_counts"].(map[string]any)
+	if len(operationCounts) == 0 {
+		t.Fatalf("operation_counts = %+v", contract)
+	}
+	for key, total := range operationCounts {
+		if total == nil || total.(float64) <= 0 {
+			t.Fatalf("operation_counts[%s]=%v", key, total)
+		}
+	}
+	outputRoots := data["output_roots"].([]any)
+	if len(outputRoots) == 0 {
+		t.Fatalf("output_roots = %+v", outputRoots)
+	}
+	caps := data["capabilities"].(map[string]any)
+	coverage := caps["coverage"].(map[string]any)
+	if coverage["implemented_domains"] == nil || coverage["partial_domains"] == nil || coverage["domain_count"] == nil {
+		t.Fatalf("capabilities.coverage = %+v", coverage)
+	}
+	if gaps, ok := coverage["next_gaps"].([]any); !ok || len(gaps) == 0 {
+		t.Fatalf("capabilities.coverage.next_gaps = %+v", coverage["next_gaps"])
+	}
 }
 
 func TestFirmwareFlashPlanModeWorksOffline(t *testing.T) {

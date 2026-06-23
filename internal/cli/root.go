@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -148,6 +149,34 @@ func (a *app) schemaCommand() *cobra.Command {
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			capabilities := collectCapabilityCommands(cmd.Root())
 			commandCount := len(capabilities)
+			operationCounts := make(map[string]int)
+			outputRootSet := map[string]struct{}{}
+			runnableCount := 0
+			requiresConnectionCount := 0
+			for _, capability := range capabilities {
+				operationCounts[capability.Operation]++
+				if capability.OutputRoot != "" {
+					outputRootSet[capability.OutputRoot] = struct{}{}
+				}
+				if capability.Runnable {
+					runnableCount++
+				}
+				if capability.RequiresConnection {
+					requiresConnectionCount++
+				}
+			}
+			operations := make([]string, 0, len(operationCounts))
+			for operation := range operationCounts {
+				operations = append(operations, operation)
+			}
+			sort.Strings(operations)
+			outputRoots := make([]string, 0, len(outputRootSet))
+			for root := range outputRootSet {
+				outputRoots = append(outputRoots, root)
+			}
+			sort.Strings(outputRoots)
+
+			coverage := buildCoverageReport(cmd.Root())
 			envelopeFields := map[string]any{
 				"schema_version": map[string]any{
 					"type":        "string",
@@ -193,35 +222,21 @@ func (a *app) schemaCommand() *cobra.Command {
 				"envelope": envelopeFields,
 				"command_contracts": map[string]any{
 					"total_commands": commandCount,
+					"runnable_commands": runnableCount,
+					"requires_connection_commands": requiresConnectionCount,
+					"operation_counts": operationCounts,
+					"operations":       operations,
 					"requires_connection_default": "when command touches transport",
-					"operations": []string{
-						"read_only",
-						"plan_or_write",
-						"write",
-						"dangerous",
-						"offline",
-						"offline_or_read_only_probe",
-						"offline_dangerous_plan",
+				},
+				"capabilities": map[string]any{
+					"coverage": map[string]any{
+						"implemented_domains": coverage.Summary.ImplementedCount,
+						"partial_domains":     coverage.Summary.PartialCount,
+						"domain_count":        coverage.Summary.DomainCount,
+						"next_gaps":           coverage.NextGaps,
 					},
 				},
-				"output_roots": []string{
-					"status",
-					"configuration",
-					"telemetry",
-					"debug",
-					"system",
-					"tasks",
-					"environment",
-					"blackbox",
-					"storage",
-					"settings",
-					"change_plan",
-					"firmware_flash",
-					"firmware",
-					"target",
-					"cli",
-					"msp",
-				},
+				"output_roots": outputRoots,
 				"command_count": commandCount,
 			}))
 		},

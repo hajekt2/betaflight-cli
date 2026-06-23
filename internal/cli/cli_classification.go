@@ -76,6 +76,24 @@ func classifyCLI(command string) cliClass {
 	return cliWrite
 }
 
+func classifyCLISequence(command string) cliClass {
+	parts := splitCLISequence(command)
+	if len(parts) == 0 {
+		return cliReadOnly
+	}
+	class := cliReadOnly
+	for _, part := range parts {
+		partClass := classifyCLI(part)
+		if partClass == cliDangerous {
+			return cliDangerous
+		}
+		if partClass == cliWrite {
+			class = cliWrite
+		}
+	}
+	return class
+}
+
 func isKnownCLICommand(command string) bool {
 	fields := tokenizeCLI(command)
 	if len(fields) == 0 {
@@ -116,6 +134,20 @@ func isConfigurationRead(command string) bool {
 
 func tokenizeCLI(command string) []string {
 	return strings.Fields(strings.ToLower(strings.TrimSpace(command)))
+}
+
+func splitCLISequence(command string) []string {
+	fields := strings.FieldsFunc(command, func(r rune) bool {
+		return r == '\n' || r == '\r' || r == ';'
+	})
+	parts := make([]string, 0, len(fields))
+	for _, field := range fields {
+		field = strings.TrimSpace(field)
+		if field != "" {
+			parts = append(parts, field)
+		}
+	}
+	return parts
 }
 
 func classifyResourceCommand(fields []string) cliClass {

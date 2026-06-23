@@ -47,6 +47,24 @@ func TestClassifyCLI(t *testing.T) {
 	}
 }
 
+func TestClassifyCLISequence(t *testing.T) {
+	tests := []struct {
+		command string
+		want    cliClass
+	}{
+		{"diff all; status", cliReadOnly},
+		{"diff all; set small_angle = 25", cliWrite},
+		{"diff all; save", cliDangerous},
+		{"get small_angle\nmotor 0 1100", cliDangerous},
+		{" ; \n ", cliReadOnly},
+	}
+	for _, tt := range tests {
+		if got := classifyCLISequence(tt.command); got != tt.want {
+			t.Fatalf("classifyCLISequence(%q) = %v, want %v", tt.command, got, tt.want)
+		}
+	}
+}
+
 func isExitError(err error) bool {
 	_, ok := err.(exitError)
 	return ok
@@ -135,6 +153,34 @@ func TestCLIExecUnknownCommandIsWriteClassified(t *testing.T) {
 	}
 	if !env.OK {
 		t.Fatalf("expected OK with --yes, got errors: %+v", env.Errors)
+	}
+}
+
+func TestCLIExecClassifiesCommandSequencesBeforeConnect(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+	}{
+		{"semicolon", "diff all; save"},
+		{"newline", "get small_angle\nmotor 0 1100"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			called := false
+			env, err := runTestCommand(t, []string{"cli", "exec", tt.command}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+				called = true
+				return nil, connection.TargetInfo{}, nil
+			})
+			if err == nil {
+				t.Fatal("command error = nil, want non-zero exit")
+			}
+			if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+				t.Fatalf("unexpected envelope: %+v", env)
+			}
+			if called {
+				t.Fatal("cli exec sequence was allowed without --yes")
+			}
+		})
 	}
 }
 

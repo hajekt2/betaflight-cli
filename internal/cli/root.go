@@ -2790,7 +2790,7 @@ func firstNonEmpty(values ...string) string {
 func (a *app) cliCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "cli", Short: "Run Betaflight CLI commands"}
 	runCLIRaw := func(cmd *cobra.Command, raw string) error {
-		class := classifyCLI(raw)
+		class := classifyCLISequence(raw)
 		if class != cliReadOnly && !a.opts.yes {
 			reason := fmt.Sprintf("%q is classified as writable; pass --yes or use safer domain-specific commands", raw)
 			if class == cliDangerous {

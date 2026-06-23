@@ -677,6 +677,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 20)
 		payload = appendU16(payload, 120)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSP2SetLedStripConfigValues:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 5))
 	case msp.MSP2CommonSerialConfig:
 		payload := []byte{2}
 		payload = append(payload, 20)

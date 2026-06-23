@@ -62,6 +62,14 @@ func TestDecodeLEDColorsModeColorsAndValues(t *testing.T) {
 	}
 }
 
+func TestEncodeLEDConfigValues(t *testing.T) {
+	got := EncodeLEDConfigValues(LEDConfigValues{Brightness: 50, RainbowDelta: 20, RainbowFreq: 120})
+	want := []byte{50, 20, 0, 120, 0}
+	if string(got) != string(want) {
+		t.Fatalf("EncodeLEDConfigValues() = %v, want %v", got, want)
+	}
+}
+
 func testLEDConfigRaw(x, y, function uint8, overlays uint16, color, directions uint8) uint32 {
 	return uint32(y&0x0f) |
 		uint32(x&0x0f)<<4 |

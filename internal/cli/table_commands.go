@@ -64,8 +64,51 @@ func (a *app) ledsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set)
+	cmd.AddCommand(set, a.ledValuesCommand())
 	return cmd
+}
+
+func (a *app) ledValuesCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-values BRIGHTNESS RAINBOW_DELTA RAINBOW_FREQ",
+		Short: "Set LED strip brightness and rainbow values over MSP2",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			brightness, err := parseUint8Arg("brightness", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			rainbowDelta, err := parseUint16Arg("rainbow_delta", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			rainbowFreq, err := parseUint16Arg("rainbow_freq", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "LED values change configuration; pass --yes"))
+			}
+			values := bfcommands.LEDConfigValues{
+				Brightness:   brightness,
+				RainbowDelta: rainbowDelta,
+				RainbowFreq:  rainbowFreq,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetLEDConfigValues(cmd.Context(), client, values)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"led_values": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "led_values",
+					Command: "MSP2_SET_LED_STRIP_CONFIG_VALUES",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) servosCommand() *cobra.Command {

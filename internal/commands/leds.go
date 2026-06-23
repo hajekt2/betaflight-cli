@@ -78,6 +78,14 @@ type LEDConfigValues struct {
 	RainbowFreq  uint16 `json:"rainbow_freq"`
 }
 
+type LEDConfigValuesSetResult struct {
+	Values       LEDConfigValues `json:"values"`
+	MSPCode      uint16          `json:"msp_code"`
+	MSPName      string          `json:"msp_name"`
+	Acknowledged bool            `json:"acknowledged"`
+	SaveRequired bool            `json:"save_required"`
+}
+
 func ReadLEDStatus(ctx context.Context, client *connection.Client) (*LEDStatus, []string, error) {
 	status := &LEDStatus{Sources: map[string]string{}}
 	warnings := []string{}
@@ -208,6 +216,26 @@ func DecodeLEDConfigValues(payload []byte) (*LEDConfigValues, error) {
 		RainbowDelta: rainbowDelta,
 		RainbowFreq:  rainbowFreq,
 	}, nil
+}
+
+func SetLEDConfigValues(ctx context.Context, client *connection.Client, values LEDConfigValues) (*LEDConfigValuesSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSP2SetLedStripConfigValues, EncodeLEDConfigValues(values)); err != nil {
+		return nil, fmt.Errorf("led config values request failed: %w", err)
+	}
+	return &LEDConfigValuesSetResult{
+		Values:       values,
+		MSPCode:      msp.MSP2SetLedStripConfigValues,
+		MSPName:      "MSP2_SET_LED_STRIP_CONFIG_VALUES",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeLEDConfigValues(values LEDConfigValues) []byte {
+	payload := []byte{values.Brightness}
+	payload = append(payload, byte(values.RainbowDelta), byte(values.RainbowDelta>>8))
+	payload = append(payload, byte(values.RainbowFreq), byte(values.RainbowFreq>>8))
+	return payload
 }
 
 func readLEDColors(ctx context.Context, client *connection.Client) ([]LEDColor, error) {

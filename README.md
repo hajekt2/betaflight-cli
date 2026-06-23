@@ -94,6 +94,7 @@ betaflight-cli profiles copy pid 0 1 --port /dev/tty.usbmodem01 --yes
 betaflight-cli rateprofiles list --port /dev/tty.usbmodem01
 betaflight-cli vtxtable list --port /dev/tty.usbmodem01
 betaflight-cli leds list --port /dev/tty.usbmodem01
+betaflight-cli leds set-values 50 20 120 --port /dev/tty.usbmodem01 --yes
 betaflight-cli servos list --port /dev/tty.usbmodem01
 betaflight-cli adjustments list --port /dev/tty.usbmodem01
 betaflight-cli adjustments status --port /dev/tty.usbmodem01
@@ -195,6 +196,8 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `motors test-plan` builds an offline high-risk motor output plan with bounded value and duration, required confirmations, and preflight checks.
 It never connects to hardware.
 `motors test-apply` runs the same bounded single-motor plan, requires `--yes`, `--props-off`, and `--battery-aware`, records read-only runtime preflight state, sends a stop command after the requested duration, records a read-only post-stop motor snapshot, emits a `motor_output` side effect, and returns both a compact audit record and a preflight-to-post-stop summary.
+`leds status` reads LED strip rows, HSV colors, mode colors, and brightness/rainbow values over MSP.
+`leds set-values` writes LED strip brightness, rainbow delta, and rainbow frequency through `MSP2_SET_LED_STRIP_CONFIG_VALUES`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.
 `blackbox inspect FILE` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, decode-validated frame samples with common Betaflight predictors and field encodings applied, best-effort event summaries, and stream summaries for decoded fields.

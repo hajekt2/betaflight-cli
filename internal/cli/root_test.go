@@ -351,6 +351,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
 		t.Fatalf("rssi channel capability = %+v", rssiChannel)
 	}
+	ledValues := byCommand["betaflight-cli leds set-values"]
+	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
+		t.Fatalf("led values capability = %+v", ledValues)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -4390,6 +4394,62 @@ func TestLEDStatusWithFakeFC(t *testing.T) {
 	values := status["values"].(map[string]any)
 	if values["brightness"] != float64(50) || values["rainbow_freq"] != float64(120) {
 		t.Fatalf("values = %+v", values)
+	}
+}
+
+func TestLEDSetValuesRejectsOutOfRangeDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"leds", "set-values", "300", "20", "120", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after LED values validation failure")
+	}
+}
+
+func TestLEDSetValuesRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"leds", "set-values", "50", "20", "120"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after LED values confirmation failure")
+	}
+}
+
+func TestLEDSetValuesWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"leds", "set-values", "50", "20", "120", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["led_values"].(map[string]any)
+	values := result["values"].(map[string]any)
+	if values["brightness"] != float64(50) || values["rainbow_delta"] != float64(20) || values["rainbow_freq"] != float64(120) {
+		t.Fatalf("led values = %+v", result)
+	}
+	if result["msp_name"] != "MSP2_SET_LED_STRIP_CONFIG_VALUES" || result["save_required"] != true {
+		t.Fatalf("led values = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "led_values" || env.SideEffects[0].Command != "MSP2_SET_LED_STRIP_CONFIG_VALUES" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

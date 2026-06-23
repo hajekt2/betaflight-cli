@@ -573,6 +573,14 @@ func parseUint8Arg(name, value string) (uint8, error) {
 	return uint8(parsed), nil
 }
 
+func parseUint16Arg(name, value string) (uint16, error) {
+	parsed, err := strconv.ParseUint(value, 10, 16)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an unsigned 16-bit integer", name)
+	}
+	return uint16(parsed), nil
+}
+
 func parseProfileCopyKind(value string) (bfcommands.ProfileCopyKind, error) {
 	switch strings.ToLower(value) {
 	case string(bfcommands.ProfileCopyPID):

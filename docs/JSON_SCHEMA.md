@@ -293,6 +293,11 @@ The object includes the motor index, output value, duration, dangerous flag, com
 `motors test-apply` returns the same `motor_test_plan` object after running the bounded motor command and stop command.
 Successful apply responses set `applied` and `stopped`, include read-only runtime preflight state, include a read-only post-stop motor snapshot, include command response lines, emit a `motor_output` side effect, include an `audit` record summarizing confirmations, requested and observed elapsed timing, evidence capture, stop attempt, stop result, and warning messages, and include a `comparison` summary for quick post-stop interpretation.
 
+`leds status` returns a `leds` object decoded from `MSP_LED_STRIP_CONFIG`, `MSP_LED_COLORS`, `MSP_LED_STRIP_MODECOLOR`, and `MSP2_GET_LED_STRIP_CONFIG_VALUES`.
+The object includes LED layout rows, decoded CLI row syntax, HSV colors, mode colors, global brightness, rainbow delta, rainbow frequency, and source metadata.
+`leds set-values` returns a `led_values` object with brightness, rainbow delta, rainbow frequency, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful LED value writes include a `led_values` side effect.
+
 `servos status` returns a `servos` object decoded from `MSP_SERVO`, `MSP_SERVO_CONFIGURATIONS`, and `MSP_SERVO_MIX_RULES`.
 The object includes current servo outputs, servo configuration rows, and servo mix rules.
 

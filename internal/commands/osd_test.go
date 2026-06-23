@@ -117,6 +117,13 @@ func TestEncodeOSDVideoSystem(t *testing.T) {
 	}
 }
 
+func TestValidateOSDGeneralSetConfig(t *testing.T) {
+	videoSystem := uint8(4)
+	if err := ValidateOSDGeneralSetConfig(OSDGeneralSetConfig{VideoSystem: &videoSystem}); err == nil {
+		t.Fatal("ValidateOSDGeneralSetConfig() error = nil")
+	}
+}
+
 func TestDecodeOSDWarnings(t *testing.T) {
 	warnings, err := DecodeOSDWarnings([]byte{2, 11, 'L', 'O', 'W', ' ', 'B', 'A', 'T', 'T', 'E', 'R', 'Y'})
 	if err != nil {

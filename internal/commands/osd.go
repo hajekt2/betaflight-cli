@@ -143,6 +143,35 @@ type OSDTimerSetResult struct {
 	SaveRequired bool              `json:"save_required"`
 }
 
+type OSDGeneralSetConfig struct {
+	VideoSystem       *uint8             `json:"video_system,omitempty"`
+	Units             *uint8             `json:"units,omitempty"`
+	Alarms            *OSDAlarmSetConfig `json:"alarms,omitempty"`
+	EnabledWarnings   *uint32            `json:"enabled_warnings,omitempty"`
+	SelectedProfile   *uint8             `json:"selected_profile,omitempty"`
+	StickOverlayMode  *uint8             `json:"stick_overlay_mode,omitempty"`
+	CameraFrameWidth  *uint8             `json:"camera_frame_width,omitempty"`
+	CameraFrameHeight *uint8             `json:"camera_frame_height,omitempty"`
+}
+
+type OSDAlarmSetConfig struct {
+	RSSI        *uint8  `json:"rssi,omitempty"`
+	CapacityMAh *uint16 `json:"capacity_mah,omitempty"`
+	AltitudeM   *uint16 `json:"altitude_m,omitempty"`
+	LinkQuality *uint16 `json:"link_quality,omitempty"`
+	RSSIDBm     *int16  `json:"rssi_dbm,omitempty"`
+}
+
+type OSDGeneralSetResult struct {
+	Requested      OSDGeneralSetConfig `json:"requested"`
+	Config         OSDConfig           `json:"config"`
+	MSPCode        uint16              `json:"msp_code"`
+	MSPName        string              `json:"msp_name"`
+	Acknowledged   bool                `json:"acknowledged"`
+	SaveRequired   bool                `json:"save_required"`
+	RebootPossible bool                `json:"reboot_possible"`
+}
+
 type OSDVideoSystemSetConfig struct {
 	VideoSystem     uint8  `json:"video_system"`
 	VideoSystemName string `json:"video_system_name,omitempty"`
@@ -254,6 +283,40 @@ func EncodeOSDTimer(config OSDTimerSetConfig) []byte {
 	return appendU16Payload(payload, config.Value)
 }
 
+func SetOSDGeneralConfig(ctx context.Context, client *connection.Client, patch OSDGeneralSetConfig) (*OSDGeneralSetResult, error) {
+	if err := ValidateOSDGeneralSetConfig(patch); err != nil {
+		return nil, err
+	}
+	frame, err := client.Request(ctx, msp.MSPOSDConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("osd config unavailable before general config update: %w", err)
+	}
+	config, err := DecodeOSDConfig(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("osd config decode failed before general config update: %w", err)
+	}
+	previousVideoSystem := config.VideoSystem
+	if err := applyOSDGeneralPatch(config, patch); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetOSDConfig, EncodeOSDGeneralConfig(config)); err != nil {
+		return nil, fmt.Errorf("osd general config request failed: %w", err)
+	}
+	return &OSDGeneralSetResult{
+		Requested:      patch,
+		Config:         *config,
+		MSPCode:        msp.MSPSetOSDConfig,
+		MSPName:        "MSP_SET_OSD_CONFIG",
+		Acknowledged:   true,
+		SaveRequired:   true,
+		RebootPossible: config.VideoSystem == 3 || previousVideoSystem == 3,
+	}, nil
+}
+
+func EncodeOSDGeneralConfig(config *OSDConfig) []byte {
+	return encodeOSDGeneralConfig(config, config.VideoSystem)
+}
+
 func SetOSDVideoSystem(ctx context.Context, client *connection.Client, videoSystem uint8) (*OSDVideoSystemSetResult, error) {
 	if videoSystem > 3 {
 		return nil, fmt.Errorf("video_system must be 0 (AUTO), 1 (PAL), 2 (NTSC), or 3 (HD)")
@@ -281,6 +344,38 @@ func SetOSDVideoSystem(ctx context.Context, client *connection.Client, videoSyst
 }
 
 func EncodeOSDVideoSystem(config *OSDConfig, videoSystem uint8) []byte {
+	return encodeOSDGeneralConfig(config, videoSystem)
+}
+
+func ValidateOSDGeneralSetConfig(patch OSDGeneralSetConfig) error {
+	if patch.VideoSystem != nil && *patch.VideoSystem > 3 {
+		return fmt.Errorf("video_system must be 0 (AUTO), 1 (PAL), 2 (NTSC), or 3 (HD)")
+	}
+	if patch.Units != nil && *patch.Units > 2 {
+		return fmt.Errorf("units must be 0 (IMPERIAL), 1 (METRIC), or 2 (BRITISH)")
+	}
+	if patch.Alarms != nil {
+		alarms := patch.Alarms
+		if alarms.RSSI != nil && *alarms.RSSI > 100 {
+			return fmt.Errorf("alarms.rssi must be 0..100")
+		}
+		if alarms.CapacityMAh != nil && *alarms.CapacityMAh > 20000 {
+			return fmt.Errorf("alarms.capacity_mah must be 0..20000")
+		}
+		if alarms.AltitudeM != nil && *alarms.AltitudeM > 10000 {
+			return fmt.Errorf("alarms.altitude_m must be 0..10000")
+		}
+		if alarms.LinkQuality != nil && *alarms.LinkQuality > 100 {
+			return fmt.Errorf("alarms.link_quality must be 0..100")
+		}
+	}
+	if patch.StickOverlayMode != nil && (*patch.StickOverlayMode < 1 || *patch.StickOverlayMode > 4) {
+		return fmt.Errorf("stick_overlay_mode must be 1..4")
+	}
+	return nil
+}
+
+func encodeOSDGeneralConfig(config *OSDConfig, videoSystem uint8) []byte {
 	payload := []byte{255, videoSystem, config.Units, config.Alarms.RSSI}
 	payload = appendU16Payload(payload, config.Alarms.CapacityMAh)
 	payload = appendU16Payload(payload, 0)
@@ -290,6 +385,54 @@ func EncodeOSDVideoSystem(config *OSDConfig, videoSystem uint8) []byte {
 	payload = append(payload, config.SelectedProfile, config.StickOverlayMode, config.CameraFrameWidth, config.CameraFrameHeight)
 	payload = appendU16Payload(payload, config.Alarms.LinkQuality)
 	return appendU16Payload(payload, uint16(config.Alarms.RSSIDBm))
+}
+
+func applyOSDGeneralPatch(config *OSDConfig, patch OSDGeneralSetConfig) error {
+	if err := ValidateOSDGeneralSetConfig(patch); err != nil {
+		return err
+	}
+	if patch.VideoSystem != nil {
+		config.VideoSystem = *patch.VideoSystem
+		config.VideoSystemName = lookupVideoSystem(*patch.VideoSystem)
+	}
+	if patch.Units != nil {
+		config.Units = *patch.Units
+		config.UnitsName = lookupOSDUnits(*patch.Units)
+	}
+	if patch.Alarms != nil {
+		alarms := patch.Alarms
+		if alarms.RSSI != nil {
+			config.Alarms.RSSI = *alarms.RSSI
+		}
+		if alarms.CapacityMAh != nil {
+			config.Alarms.CapacityMAh = *alarms.CapacityMAh
+		}
+		if alarms.AltitudeM != nil {
+			config.Alarms.AltitudeM = *alarms.AltitudeM
+		}
+		if alarms.LinkQuality != nil {
+			config.Alarms.LinkQuality = *alarms.LinkQuality
+		}
+		if alarms.RSSIDBm != nil {
+			config.Alarms.RSSIDBm = *alarms.RSSIDBm
+		}
+	}
+	if patch.EnabledWarnings != nil {
+		config.EnabledWarnings = *patch.EnabledWarnings
+	}
+	if patch.SelectedProfile != nil {
+		config.SelectedProfile = *patch.SelectedProfile
+	}
+	if patch.StickOverlayMode != nil {
+		config.StickOverlayMode = *patch.StickOverlayMode
+	}
+	if patch.CameraFrameWidth != nil {
+		config.CameraFrameWidth = *patch.CameraFrameWidth
+	}
+	if patch.CameraFrameHeight != nil {
+		config.CameraFrameHeight = *patch.CameraFrameHeight
+	}
+	return nil
 }
 
 func DecodeOSDConfig(payload []byte) (*OSDConfig, error) {

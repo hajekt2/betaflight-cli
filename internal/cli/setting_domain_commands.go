@@ -76,6 +76,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
+		cmd.AddCommand(a.osdSetGeneralJSONCommand())
 		cmd.AddCommand(a.osdSetCanvasCommand())
 		cmd.AddCommand(a.osdSetVideoSystemCommand())
 		cmd.AddCommand(a.osdSetPositionCommand())
@@ -776,6 +777,72 @@ func (a *app) osdSetCanvasCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) osdSetGeneralJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-general-json FILE",
+		Short: "Patch general OSD config fields from JSON through MSP_SET_OSD_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			patch, err := parseOSDGeneralConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD general config changes can alter display behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDGeneralConfig(cmd.Context(), client, patch)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_general_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "osd_general_config",
+					Command: "MSP_SET_OSD_CONFIG",
+					Detail:  "OSD general config changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseOSDGeneralConfigJSON(data []byte) (bfcommands.OSDGeneralSetConfig, error) {
+	var wrapped struct {
+		OSDGeneralConfig *bfcommands.OSDGeneralSetConfig `json:"osd_general_config"`
+		OSD              *bfcommands.OSDGeneralSetConfig `json:"osd"`
+		Config           *bfcommands.OSDGeneralSetConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.OSDGeneralSetConfig{}, err
+	}
+	if wrapped.OSDGeneralConfig != nil {
+		return validateOSDGeneralConfigPatch(*wrapped.OSDGeneralConfig)
+	}
+	if wrapped.OSD != nil {
+		return validateOSDGeneralConfigPatch(*wrapped.OSD)
+	}
+	if wrapped.Config != nil {
+		return validateOSDGeneralConfigPatch(*wrapped.Config)
+	}
+	var patch bfcommands.OSDGeneralSetConfig
+	if err := json.Unmarshal(data, &patch); err != nil {
+		return bfcommands.OSDGeneralSetConfig{}, err
+	}
+	return validateOSDGeneralConfigPatch(patch)
+}
+
+func validateOSDGeneralConfigPatch(patch bfcommands.OSDGeneralSetConfig) (bfcommands.OSDGeneralSetConfig, error) {
+	if err := bfcommands.ValidateOSDGeneralSetConfig(patch); err != nil {
+		return bfcommands.OSDGeneralSetConfig{}, err
+	}
+	return patch, nil
 }
 
 func (a *app) osdSetVideoSystemCommand() *cobra.Command {

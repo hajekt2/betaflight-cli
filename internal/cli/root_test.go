@@ -551,6 +551,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if osdCanvas["operation"] != "write" || osdCanvas["confirmation"] != "--yes" || osdCanvas["requires_connection"] != true || osdCanvas["output_root"] != "osd_canvas" || osdCanvas["runnable"] != true {
 		t.Fatalf("osd canvas capability = %+v", osdCanvas)
 	}
+	osdGeneralConfig := byCommand["betaflight-cli osd set-general-json"]
+	if osdGeneralConfig["operation"] != "write" || osdGeneralConfig["confirmation"] != "--yes" || osdGeneralConfig["requires_connection"] != true || osdGeneralConfig["output_root"] != "osd_general_config" || osdGeneralConfig["runnable"] != true {
+		t.Fatalf("osd general config capability = %+v", osdGeneralConfig)
+	}
 	osdVideoSystem := byCommand["betaflight-cli osd set-video-system"]
 	if osdVideoSystem["operation"] != "write" || osdVideoSystem["confirmation"] != "--yes" || osdVideoSystem["requires_connection"] != true || osdVideoSystem["output_root"] != "osd_video_system" || osdVideoSystem["runnable"] != true {
 		t.Fatalf("osd video system capability = %+v", osdVideoSystem)
@@ -3615,6 +3619,53 @@ func TestOSDSetCanvasRequiresConfirmationBeforeConnect(t *testing.T) {
 
 func TestOSDSetCanvasValidationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"osd", "set-canvas", "300", "20", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetGeneralJSONWithFakeFC(t *testing.T) {
+	input := `{"osd_general_config":{"video_system":3,"units":1,"alarms":{"rssi":25,"capacity_mah":1600,"altitude_m":130,"link_quality":80,"rssi_dbm":-90},"enabled_warnings":7,"selected_profile":2,"stick_overlay_mode":1,"camera_frame_width":24,"camera_frame_height":18}}`
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-general-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["osd_general_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	alarms := config["alarms"].(map[string]any)
+	if config["video_system"] != float64(3) || config["units"] != float64(1) || alarms["capacity_mah"] != float64(1600) || result["save_required"] != true {
+		t.Fatalf("osd_general_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_OSD_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestOSDSetGeneralJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-general-json", "-"}, `{"units":1}`, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestOSDSetGeneralJSONValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"osd", "set-general-json", "-", "--yes"}, `{"video_system":4}`, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})

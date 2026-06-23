@@ -267,6 +267,13 @@ func (a *app) modeSetJSONCommand() *cobra.Command {
 }
 
 func parseModeRangeTableJSON(data []byte) (bfcommands.ModeRangeTableSetConfig, error) {
+	if isJSONArray(data) {
+		var ranges []bfcommands.ModeRange
+		if err := json.Unmarshal(data, &ranges); err != nil {
+			return bfcommands.ModeRangeTableSetConfig{}, err
+		}
+		return validateModeRangeTableConfig(bfcommands.ModeRangeTableSetConfig{Ranges: ranges})
+	}
 	var wrapped struct {
 		ModeRanges *bfcommands.ModeRangeTableSetConfig `json:"mode_ranges"`
 		Modes      *bfcommands.ModeRangeTableSetConfig `json:"modes"`
@@ -284,11 +291,19 @@ func parseModeRangeTableJSON(data []byte) (bfcommands.ModeRangeTableSetConfig, e
 	if wrapped.Ranges != nil {
 		return validateModeRangeTableConfig(bfcommands.ModeRangeTableSetConfig{Ranges: wrapped.Ranges})
 	}
-	var ranges []bfcommands.ModeRange
-	if err := json.Unmarshal(data, &ranges); err != nil {
-		return bfcommands.ModeRangeTableSetConfig{}, err
+	return bfcommands.ModeRangeTableSetConfig{}, fmt.Errorf("expected mode_ranges, modes, ranges, or a direct array of mode range rows")
+}
+
+func isJSONArray(data []byte) bool {
+	for _, b := range data {
+		switch b {
+		case ' ', '\t', '\r', '\n':
+			continue
+		default:
+			return b == '['
+		}
 	}
-	return validateModeRangeTableConfig(bfcommands.ModeRangeTableSetConfig{Ranges: ranges})
+	return false
 }
 
 func validateModeRangeTableConfig(config bfcommands.ModeRangeTableSetConfig) (bfcommands.ModeRangeTableSetConfig, error) {

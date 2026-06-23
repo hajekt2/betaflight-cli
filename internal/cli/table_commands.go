@@ -1152,6 +1152,13 @@ func (a *app) adjustmentSetJSONCommand() *cobra.Command {
 }
 
 func parseAdjustmentTableJSON(data []byte) (bfcommands.AdjustmentTableSetConfig, error) {
+	if isJSONArray(data) {
+		var ranges []bfcommands.AdjustmentRange
+		if err := json.Unmarshal(data, &ranges); err != nil {
+			return bfcommands.AdjustmentTableSetConfig{}, err
+		}
+		return validateAdjustmentTableConfig(bfcommands.AdjustmentTableSetConfig{Ranges: ranges})
+	}
 	var wrapped struct {
 		AdjustmentTable *bfcommands.AdjustmentTableSetConfig `json:"adjustment_table"`
 		Adjustments     *bfcommands.AdjustmentTableSetConfig `json:"adjustments"`
@@ -1169,11 +1176,7 @@ func parseAdjustmentTableJSON(data []byte) (bfcommands.AdjustmentTableSetConfig,
 	if wrapped.Ranges != nil {
 		return validateAdjustmentTableConfig(bfcommands.AdjustmentTableSetConfig{Ranges: wrapped.Ranges})
 	}
-	var ranges []bfcommands.AdjustmentRange
-	if err := json.Unmarshal(data, &ranges); err != nil {
-		return bfcommands.AdjustmentTableSetConfig{}, err
-	}
-	return validateAdjustmentTableConfig(bfcommands.AdjustmentTableSetConfig{Ranges: ranges})
+	return bfcommands.AdjustmentTableSetConfig{}, fmt.Errorf("expected adjustment_table, adjustments, ranges, or a direct array of adjustment ranges")
 }
 
 func validateAdjustmentTableConfig(config bfcommands.AdjustmentTableSetConfig) (bfcommands.AdjustmentTableSetConfig, error) {

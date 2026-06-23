@@ -682,6 +682,13 @@ func (a *app) receiverMapJSONCommand() *cobra.Command {
 }
 
 func parseRCMapJSON(data []byte) ([]uint8, error) {
+	if isJSONArray(data) {
+		var mapping []uint8
+		if err := json.Unmarshal(data, &mapping); err != nil {
+			return nil, err
+		}
+		return mapping, nil
+	}
 	var wrapped struct {
 		RCMap    []uint8 `json:"rc_map"`
 		Map      []uint8 `json:"map"`
@@ -700,11 +707,7 @@ func parseRCMapJSON(data []byte) ([]uint8, error) {
 	case wrapped.Receiver != nil && wrapped.Receiver.RCMap != nil:
 		return append([]uint8(nil), wrapped.Receiver.RCMap...), nil
 	}
-	var mapping []uint8
-	if err := json.Unmarshal(data, &mapping); err != nil {
-		return nil, err
-	}
-	return mapping, nil
+	return nil, fmt.Errorf("expected rc_map, map, receiver.rc_map, or a direct array of channel indexes")
 }
 
 func (a *app) receiverDeadbandCommand() *cobra.Command {
@@ -2412,8 +2415,8 @@ func (a *app) batteryVoltageMeterJSONCommand() *cobra.Command {
 
 func parseVoltageMeterConfigJSON(data []byte) (bfcommands.VoltageMeterConfig, error) {
 	var wrapped struct {
-		VoltageMeterConfig  *bfcommands.VoltageMeterConfig `json:"voltage_meter_config"`
-		Config              *bfcommands.VoltageMeterConfig `json:"config"`
+		VoltageMeterConfig  *bfcommands.VoltageMeterConfig  `json:"voltage_meter_config"`
+		Config              *bfcommands.VoltageMeterConfig  `json:"config"`
 		VoltageMeterConfigs []bfcommands.VoltageMeterConfig `json:"voltage_meter_configs"`
 		Battery             *struct {
 			VoltageMeterConfigs []bfcommands.VoltageMeterConfig `json:"voltage_meter_configs"`
@@ -2519,8 +2522,8 @@ func (a *app) batteryCurrentMeterJSONCommand() *cobra.Command {
 
 func parseCurrentMeterConfigJSON(data []byte) (bfcommands.CurrentMeterConfig, error) {
 	var wrapped struct {
-		CurrentMeterConfig  *bfcommands.CurrentMeterConfig `json:"current_meter_config"`
-		Config              *bfcommands.CurrentMeterConfig `json:"config"`
+		CurrentMeterConfig  *bfcommands.CurrentMeterConfig  `json:"current_meter_config"`
+		Config              *bfcommands.CurrentMeterConfig  `json:"config"`
 		CurrentMeterConfigs []bfcommands.CurrentMeterConfig `json:"current_meter_configs"`
 		Battery             *struct {
 			CurrentMeterConfigs []bfcommands.CurrentMeterConfig `json:"current_meter_configs"`

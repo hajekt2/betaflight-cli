@@ -3427,7 +3427,7 @@ func TestVTXSetConfigValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -3529,7 +3529,7 @@ func TestModesSetJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -3555,7 +3555,7 @@ func TestModesSetRangeValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -6942,7 +6942,7 @@ func TestAdjustmentsSetJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }

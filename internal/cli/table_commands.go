@@ -428,7 +428,7 @@ func (a *app) servosCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(reverse, &reverseFlags)
-	cmd.AddCommand(set, reverse, a.servoSetJSONCommand(), a.servoSetConfigCommand(), a.servoSetMixRuleCommand())
+	cmd.AddCommand(set, reverse, a.servoSetJSONCommand(), a.servoSetConfigCommand(), a.servoSetConfigJSONCommand(), a.servoSetMixRuleCommand(), a.servoSetMixRuleJSONCommand())
 	return cmd
 }
 
@@ -557,6 +557,71 @@ func (a *app) servoSetConfigCommand() *cobra.Command {
 	}
 }
 
+func (a *app) servoSetConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set one servo configuration row from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseServoConfigurationJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "servo configuration changes servo settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetServoConfiguration(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"servo_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "servo_config",
+					Command: "MSP_SET_SERVO_CONFIGURATION",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseServoConfigurationJSON(data []byte) (bfcommands.ServoConfiguration, error) {
+	var wrapped struct {
+		ServoConfig *bfcommands.ServoConfiguration `json:"servo_config"`
+		Servo       *bfcommands.ServoConfiguration `json:"servo"`
+		Config      *bfcommands.ServoConfiguration `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.ServoConfiguration{}, err
+	}
+	switch {
+	case wrapped.ServoConfig != nil:
+		return validateServoConfiguration(*wrapped.ServoConfig)
+	case wrapped.Servo != nil:
+		return validateServoConfiguration(*wrapped.Servo)
+	case wrapped.Config != nil:
+		return validateServoConfiguration(*wrapped.Config)
+	}
+	var config bfcommands.ServoConfiguration
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.ServoConfiguration{}, err
+	}
+	return validateServoConfiguration(config)
+}
+
+func validateServoConfiguration(config bfcommands.ServoConfiguration) (bfcommands.ServoConfiguration, error) {
+	if err := bfcommands.ValidateServoConfiguration(config); err != nil {
+		return bfcommands.ServoConfiguration{}, err
+	}
+	return config, nil
+}
+
 func (a *app) servoSetMixRuleCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-mix-rule INDEX TARGET_CHANNEL INPUT_SOURCE RATE SPEED MIN MAX BOX",
@@ -623,6 +688,71 @@ func (a *app) servoSetMixRuleCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) servoSetMixRuleJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-mix-rule-json FILE",
+		Short: "Set one servo mixer rule from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			rule, err := parseServoMixRuleJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "servo mix rule changes servo settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetServoMixRule(cmd.Context(), client, rule)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"servo_mix_rule": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "servo_mix_rule",
+					Command: "MSP_SET_SERVO_MIX_RULE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseServoMixRuleJSON(data []byte) (bfcommands.ServoMixRule, error) {
+	var wrapped struct {
+		ServoMixRule *bfcommands.ServoMixRule `json:"servo_mix_rule"`
+		MixRule      *bfcommands.ServoMixRule `json:"mix_rule"`
+		Rule         *bfcommands.ServoMixRule `json:"rule"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.ServoMixRule{}, err
+	}
+	switch {
+	case wrapped.ServoMixRule != nil:
+		return validateServoMixRule(*wrapped.ServoMixRule)
+	case wrapped.MixRule != nil:
+		return validateServoMixRule(*wrapped.MixRule)
+	case wrapped.Rule != nil:
+		return validateServoMixRule(*wrapped.Rule)
+	}
+	var rule bfcommands.ServoMixRule
+	if err := json.Unmarshal(data, &rule); err != nil {
+		return bfcommands.ServoMixRule{}, err
+	}
+	return validateServoMixRule(rule)
+}
+
+func validateServoMixRule(rule bfcommands.ServoMixRule) (bfcommands.ServoMixRule, error) {
+	if err := bfcommands.ValidateServoMixRule(rule); err != nil {
+		return bfcommands.ServoMixRule{}, err
+	}
+	return rule, nil
 }
 
 func (a *app) adjustmentsCommand() *cobra.Command {

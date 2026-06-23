@@ -384,6 +384,8 @@ Successful beeper config writes include a `beeper_config` side effect.
 `transponder config` returns a `transponder` object decoded from `MSP_TRANSPONDER_CONFIG`.
 The object includes provider requirements, the active provider ID and name, configured code bytes, uppercase hex data, native CLI commands, and decode warnings for unexpected disabled-provider data.
 `transponder set-config` returns a `transponder_config` object with provider, provider name, data bytes, uppercase hex data, MSP command name/code, acknowledgement flag, and `save_required`.
+`transponder set-config-json` accepts either a transponder config object or an object with `transponder_config`, `transponder`, or `config`.
+It accepts either `data` as a byte array or `data_hex` as hexadecimal bytes and returns the same `transponder_config` object as `transponder set-config`.
 Successful transponder config writes include a `transponder_config` side effect.
 
 `mixer status` returns a `mixer` object decoded from `MSP_MIXER_CONFIG`.

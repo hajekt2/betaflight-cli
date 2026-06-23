@@ -983,7 +983,7 @@ func (a *app) transponderCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(setData, &setDataFlags)
-	cmd.AddCommand(setData, a.transponderSetConfigCommand())
+	cmd.AddCommand(setData, a.transponderSetConfigCommand(), a.transponderSetConfigJSONCommand())
 	return cmd
 }
 
@@ -1025,6 +1025,82 @@ func (a *app) transponderSetConfigCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) transponderSetConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set transponder provider and data from JSON over MSP",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			raw, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			provider, data, err := parseTransponderConfigJSON(raw)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if provider == 0 && len(data) != 0 {
+				return validationFailureMessage(a, cmd, "provider 0 must not include transponder data")
+			}
+			if provider != 0 && len(data) == 0 {
+				return validationFailureMessage(a, cmd, "non-zero provider requires transponder data")
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "transponder configuration changes transponder settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetTransponderConfig(cmd.Context(), client, provider, data)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"transponder_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "transponder_config",
+					Command: "MSP_SET_TRANSPONDER_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseTransponderConfigJSON(data []byte) (uint8, []uint8, error) {
+	var wrapped struct {
+		TransponderConfig *bfcommands.TransponderConfig `json:"transponder_config"`
+		Transponder       *bfcommands.TransponderConfig `json:"transponder"`
+		Config            *bfcommands.TransponderConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return 0, nil, err
+	}
+	switch {
+	case wrapped.TransponderConfig != nil:
+		return transponderConfigFields(*wrapped.TransponderConfig)
+	case wrapped.Transponder != nil:
+		return transponderConfigFields(*wrapped.Transponder)
+	case wrapped.Config != nil:
+		return transponderConfigFields(*wrapped.Config)
+	}
+	var config bfcommands.TransponderConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return 0, nil, err
+	}
+	return transponderConfigFields(config)
+}
+
+func transponderConfigFields(config bfcommands.TransponderConfig) (uint8, []uint8, error) {
+	data := append([]uint8(nil), config.Data...)
+	if len(data) == 0 && strings.TrimSpace(config.DataHex) != "" {
+		decoded, err := hex.DecodeString(strings.TrimSpace(config.DataHex))
+		if err != nil {
+			return 0, nil, fmt.Errorf("data_hex must be hexadecimal bytes: %w", err)
+		}
+		data = decoded
+	}
+	return config.Provider, data, nil
 }
 
 func (a *app) mixerCommand() *cobra.Command {

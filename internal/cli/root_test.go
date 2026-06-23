@@ -331,6 +331,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if beeperConfigJSON["operation"] != "write" || beeperConfigJSON["confirmation"] != "--yes" || beeperConfigJSON["requires_connection"] != true || beeperConfigJSON["output_root"] != "beeper_config" || beeperConfigJSON["input"] == "" || beeperConfigJSON["runnable"] != true {
 		t.Fatalf("beeper config json capability = %+v", beeperConfigJSON)
 	}
+	transponderConfigJSON := byCommand["betaflight-cli transponder set-config-json"]
+	if transponderConfigJSON["operation"] != "write" || transponderConfigJSON["confirmation"] != "--yes" || transponderConfigJSON["requires_connection"] != true || transponderConfigJSON["output_root"] != "transponder_config" || transponderConfigJSON["input"] == "" || transponderConfigJSON["runnable"] != true {
+		t.Fatalf("transponder config json capability = %+v", transponderConfigJSON)
+	}
 	cliInteractive := byCommand["betaflight-cli cli interactive"]
 	if cliInteractive["operation"] != "dangerous" || cliInteractive["confirmation"] != "--yes" || cliInteractive["requires_connection"] != true || cliInteractive["runnable"] != true {
 		t.Fatalf("cli interactive capability = %+v", cliInteractive)
@@ -4648,8 +4652,42 @@ func TestTransponderSetConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestTransponderSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"transponder":{"provider":2,"data_hex":"123456789ABCDEF042"}}`
+	env, err := runTestCommandWithInput(t, []string{"transponder", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["transponder_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["provider"] != float64(2) || config["provider_name"] != "ARCITIMER" || config["data_hex"] != "123456789ABCDEF042" || result["save_required"] != true {
+		t.Fatalf("transponder_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "transponder_config" || env.SideEffects[0].Command != "MSP_SET_TRANSPONDER_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestTransponderSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"transponder", "set-config", "2", "18,52,86"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestTransponderSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"transponder_config":{"provider":2,"data":[18,52,86]}}`
+	env, err := runTestCommandWithInput(t, []string{"transponder", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})

@@ -392,6 +392,8 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 	dangerous := capabilityMetadata{RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes", Tags: []string{"dangerous"}}
 	registry := map[string]capabilityMetadata{
 		"betaflight-cli capabilities":           {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "capabilities", Tags: []string{"offline", "discovery"}},
+		"betaflight-cli capabilities coverage":   {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "capabilities", Tags: []string{"offline", "discovery"}},
+		"betaflight-cli schema":                 {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "schema", Tags: []string{"offline", "metadata"}},
 		"betaflight-cli version":                {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "version", Tags: []string{"offline", "metadata"}},
 		"betaflight-cli ports":                  {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "ports", Tags: []string{"offline", "ports"}},
 		"betaflight-cli ports list":             {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "ports", Tags: []string{"offline", "ports"}},
@@ -423,6 +425,9 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli cli exec":               {RequiresConnection: true, Operation: "read_only_or_write_or_dangerous", Confirmation: "--yes for writes and dangerous CLI lines", OutputRoot: "cli", Input: "one Betaflight CLI command line", Tags: []string{"cli", "passthrough"}},
 		"betaflight-cli cli interactive":        dangerous,
 		"betaflight-cli firmware flash":         {RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes and --execute", OutputRoot: "firmware_flash", Tags: []string{"firmware", "maintenance", "dangerous"}},
+		"betaflight-cli msp list":               offline,
+		"betaflight-cli msp metadata":           offline,
+		"betaflight-cli msp request":            {RequiresConnection: true, Operation: "read_only_or_write_or_dangerous", Confirmation: "read-only unless --code implies write; write commands require --yes", Tags: []string{"msp", "raw"}},
 		"betaflight-cli settings set": {
 			RequiresConnection: true,
 			Operation:          "write_when_apply_is_set",

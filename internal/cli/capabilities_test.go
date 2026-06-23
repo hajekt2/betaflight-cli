@@ -30,6 +30,32 @@ func TestCapabilityMetadataUsesKnownOperations(t *testing.T) {
 	}
 }
 
+func TestCapabilityMetadataOfflineCommandClassifications(t *testing.T) {
+	registry := capabilityMetadataRegistry()
+	for _, tt := range []struct {
+		path                string
+		requiresConnection  bool
+		operation           string
+	}{
+		{"betaflight-cli schema", false, "offline"},
+		{"betaflight-cli capabilities coverage", false, "offline"},
+		{"betaflight-cli msp list", false, "offline"},
+		{"betaflight-cli msp metadata", false, "offline"},
+		{"betaflight-cli msp request", true, "read_only_or_write_or_dangerous"},
+	} {
+		meta, ok := registry[tt.path]
+		if !ok {
+			t.Fatalf("missing metadata for %q", tt.path)
+		}
+		if meta.RequiresConnection != tt.requiresConnection {
+			t.Fatalf("metadata %q requires_connection = %v, want %v", tt.path, meta.RequiresConnection, tt.requiresConnection)
+		}
+		if meta.Operation != tt.operation {
+			t.Fatalf("metadata %q operation = %q, want %q", tt.path, meta.Operation, tt.operation)
+		}
+	}
+}
+
 func TestCapabilityMetadataOperationSafetyContracts(t *testing.T) {
 	registry := capabilityMetadataRegistry()
 	yesRequired := map[string]bool{

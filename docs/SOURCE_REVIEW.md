@@ -84,6 +84,12 @@ The names should be kept in sync with firmware `lookupTableGyroHardware`, becaus
 `MSP_TRANSPONDER_CONFIG` returns a provider count, one provider/data-length pair for each supported IR transponder provider, the active provider, and the active provider's data bytes.
 The provider enum is `NONE`, `ILAP`, `ARCITIMER`, and `ERLT`.
 
+`MSP_DATAFLASH_SUMMARY` returns flags, sector count, total bytes, and used bytes.
+Configurator treats flag bit 0 as ready and bit 1 as supported.
+
+`MSP_SDCARD_SUMMARY` returns flags, card/filesystem state, last filesystem error, free kilobytes, and total kilobytes.
+Configurator treats flag bit 0 as supported.
+
 ## Betaflight MCP Reference
 
 The Python reference uses a small MSP protocol layer and a higher-level command layer.

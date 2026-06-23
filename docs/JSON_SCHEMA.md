@@ -123,6 +123,9 @@ The `legacy_name` field is decoded from deprecated `MSP_NAME` for compatibility 
 `blackbox config` returns a `blackbox` object decoded from `MSP_BLACKBOX_CONFIG`.
 The object includes support status, device index and name, rate fields, optional sample-rate metadata, and optional enabled or disabled Blackbox field selections when the firmware supplies the mask.
 
+`storage status` returns a `storage` object decoded from `MSP_DATAFLASH_SUMMARY` and `MSP_SDCARD_SUMMARY`.
+The object includes Dataflash support and readiness flags, sector count, total/used/free byte counts, SD card support, state ID/name, last filesystem error, and free/total kilobytes.
+
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
 

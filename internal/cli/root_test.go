@@ -270,6 +270,26 @@ func TestBlackboxConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestStorageStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"storage", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	storage := data["storage"].(map[string]any)
+	dataflash := storage["dataflash"].(map[string]any)
+	if dataflash["ready"] != true || dataflash["free_bytes"] != float64(786432) {
+		t.Fatalf("dataflash = %+v", dataflash)
+	}
+	sdcard := storage["sdcard"].(map[string]any)
+	if sdcard["state_name"] != "READY" || sdcard["total_kilobytes"] != float64(32768) {
+		t.Fatalf("sdcard = %+v", sdcard)
+	}
+}
+
 func TestVTXConfigWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"vtx", "config"}, nil)
 	if err != nil {

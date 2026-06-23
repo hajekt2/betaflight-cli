@@ -125,6 +125,7 @@ Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosave` lines are included only with `--include-defaults`.
 `restore apply --include-defaults` and `presets apply --include-defaults` require `--yes` because defaults reset configuration before applying later lines.
 `blackbox config` reads current Blackbox configuration over MSP and returns decoded device, sample rate, and enabled or disabled field selections.
+`storage status` reads Dataflash and SD card summaries over MSP and returns capacity, usage, readiness, and state fields.
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.
 It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger than the legacy 32-item first page.

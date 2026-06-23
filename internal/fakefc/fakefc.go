@@ -301,6 +301,17 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 2)
 		payload = appendU32(payload, 0x1001)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPDataflashSummary:
+		payload := []byte{3}
+		payload = appendU32(payload, 16)
+		payload = appendU32(payload, 1048576)
+		payload = appendU32(payload, 262144)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSdcardSummary:
+		payload := []byte{1, 4, 0}
+		payload = appendU32(payload, 4096)
+		payload = appendU32(payload, 32768)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBoxnames:
 		f.out.Write(response(frame.Code, modeNamePage(frame.Payload), false))
 	case msp.MSPBoxids:

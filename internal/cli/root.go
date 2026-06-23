@@ -95,6 +95,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.restoreCommand())
 	root.AddCommand(a.presetsCommand())
 	root.AddCommand(a.blackboxCommand())
+	root.AddCommand(a.storageCommand())
 	root.AddCommand(a.sensorsCommand())
 	root.AddCommand(a.beeperCommand())
 	root.AddCommand(a.transponderCommand())
@@ -172,6 +173,27 @@ func (a *app) blackboxCommand() *cobra.Command {
 				"file":       path,
 				"inspection": inspection,
 			}))
+		},
+	})
+	return cmd
+}
+
+func (a *app) storageCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "storage", Short: "Inspect Dataflash and SD card storage"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read Dataflash and SD card summaries over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				storage, warnings, err := bfcommands.ReadStorageStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"storage":  storage,
+					"warnings": warnings,
+				})
+			})
 		},
 	})
 	return cmd

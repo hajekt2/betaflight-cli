@@ -170,7 +170,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.
-`blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, a capped candidate frame index, and capped decoded frame samples for simple variable-byte payloads.
+`blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, a capped candidate frame index, capped decoded frame samples for simple variable-byte payloads, and stream summaries for decoded fields.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.
 Network preset fetching is opt-in and must report source metadata.

@@ -64,17 +64,17 @@ func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
 		"H Field I encoding:1,1,1",
 		"H Field P predictor:0,10,0",
 		"H Field P encoding:1,1,1",
-		"I\x02\x04\x03P\x06\x08\x04E",
+		"I\x02\x04\x03P\x06\x08\x04P\x07\x0a\x06E",
 	}, "\n")
 	inspection, err := Inspect(strings.NewReader(log))
 	if err != nil {
 		t.Fatalf("Inspect() error = %v", err)
 	}
 	decoded := inspection.DecodedFrames
-	if decoded.AttemptedCount != 2 || decoded.DecodedCount != 2 || decoded.FailedCount != 0 {
+	if decoded.AttemptedCount != 3 || decoded.DecodedCount != 3 || decoded.FailedCount != 0 {
 		t.Fatalf("decoded = %+v", decoded)
 	}
-	if len(decoded.Samples) != 2 {
+	if len(decoded.Samples) != 3 {
 		t.Fatalf("samples = %+v", decoded.Samples)
 	}
 	first := decoded.Samples[0]
@@ -84,6 +84,18 @@ func TestInspectDecodesVariableByteFrameSamples(t *testing.T) {
 	second := decoded.Samples[1]
 	if second.Type != "P" || second.Values["loopIteration"] != 6 || second.Values["time"] != 8 || second.Values["axisP[0]"] != 2 {
 		t.Fatalf("second sample = %+v", second)
+	}
+	iTime := decoded.Streams["I.time"]
+	if iTime.Count != 1 || iTime.First != 4 || iTime.Last != 4 || !iTime.Monotonic {
+		t.Fatalf("I.time stream = %+v", iTime)
+	}
+	pAxis := decoded.Streams["P.axisP[0]"]
+	if pAxis.Count != 2 || pAxis.Min != 2 || pAxis.Max != 3 || pAxis.Delta != 1 {
+		t.Fatalf("P.axisP[0] stream = %+v", pAxis)
+	}
+	pTime := decoded.Streams["P.time"]
+	if pTime.Count != 2 || pTime.First != 8 || pTime.Last != 10 || pTime.Delta != 2 || !pTime.Monotonic {
+		t.Fatalf("P.time stream = %+v", pTime)
 	}
 }
 

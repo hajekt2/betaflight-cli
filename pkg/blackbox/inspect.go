@@ -66,6 +66,7 @@ type DecodedFrameSummary struct {
 	UnsupportedEncodings  map[string]int         `json:"unsupported_encodings,omitempty"`
 	UnsupportedFrameTypes map[string]int         `json:"unsupported_frame_types,omitempty"`
 	ByType                map[string]DecodedStat `json:"by_type"`
+	Streams               map[string]StreamStat  `json:"streams,omitempty"`
 	Samples               []DecodedFrame         `json:"samples,omitempty"`
 	Warnings              []string               `json:"warnings,omitempty"`
 }
@@ -82,6 +83,19 @@ type DecodedFrame struct {
 	DataOffset int64          `json:"data_offset"`
 	Values     map[string]int `json:"values,omitempty"`
 	Error      string         `json:"error,omitempty"`
+}
+
+type StreamStat struct {
+	Field      string `json:"field"`
+	FrameType  string `json:"frame_type"`
+	Count      int    `json:"count"`
+	First      int    `json:"first"`
+	Last       int    `json:"last"`
+	Min        int    `json:"min"`
+	Max        int    `json:"max"`
+	Delta      int    `json:"delta"`
+	Monotonic  bool   `json:"monotonic"`
+	LastOffset int64  `json:"last_offset"`
 }
 
 func Inspect(r io.Reader) (Inspection, error) {
@@ -281,6 +295,7 @@ func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDe
 		UnsupportedEncodings:  map[string]int{},
 		UnsupportedFrameTypes: map[string]int{},
 		ByType:                map[string]DecodedStat{},
+		Streams:               map[string]StreamStat{},
 	}
 	for i, candidate := range candidates.Candidates {
 		if candidate.BytesToNext == 0 || candidate.DataOffset < 0 || candidate.DataOffset >= int64(len(data)) {
@@ -320,6 +335,7 @@ func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDe
 		stat.Attempted++
 		stat.Decoded++
 		out.ByType[frameType] = stat
+		out.recordStreams(decoded)
 		out.Samples = append(out.Samples, decoded)
 		if i == len(candidates.Candidates)-1 && candidates.Truncated {
 			out.Truncated = true
@@ -332,6 +348,9 @@ func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDe
 	if len(out.UnsupportedFrameTypes) == 0 {
 		out.UnsupportedFrameTypes = nil
 	}
+	if len(out.Streams) == 0 {
+		out.Streams = nil
+	}
 	for frameType, stat := range out.ByType {
 		if stat.Failed > 0 {
 			out.Warnings = append(out.Warnings, fmt.Sprintf("failed to decode %d %s frame samples", stat.Failed, frameType))
@@ -339,6 +358,37 @@ func decodeFrames(data []byte, headerBytes int64, definitions map[string]FieldDe
 	}
 	sort.Strings(out.Warnings)
 	return out
+}
+
+func (out *DecodedFrameSummary) recordStreams(frame DecodedFrame) {
+	for field, value := range frame.Values {
+		key := frame.Type + "." + field
+		stat := out.Streams[key]
+		if stat.Count == 0 {
+			stat = StreamStat{
+				Field:     field,
+				FrameType: frame.Type,
+				First:     value,
+				Min:       value,
+				Max:       value,
+				Monotonic: true,
+			}
+		}
+		if value < stat.Min {
+			stat.Min = value
+		}
+		if value > stat.Max {
+			stat.Max = value
+		}
+		if stat.Count > 0 && value < stat.Last {
+			stat.Monotonic = false
+		}
+		stat.Count++
+		stat.Last = value
+		stat.Delta = stat.Last - stat.First
+		stat.LastOffset = frame.Offset
+		out.Streams[key] = stat
+	}
 }
 
 func (out *DecodedFrameSummary) recordFailed(frameType string, candidate FrameCandidate, message string) {

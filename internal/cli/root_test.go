@@ -945,6 +945,10 @@ func TestBlackboxInspectDoesNotConnect(t *testing.T) {
 	if decoded["decoded_count"] != float64(1) || len(decoded["samples"].([]any)) != 1 {
 		t.Fatalf("decoded frames = %+v", decoded)
 	}
+	streams := decoded["streams"].(map[string]any)
+	if streams["I.time"] == nil {
+		t.Fatalf("streams = %+v", streams)
+	}
 	if called {
 		t.Fatal("connector was called for offline blackbox inspect")
 	}

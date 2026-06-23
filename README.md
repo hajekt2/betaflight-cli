@@ -118,6 +118,7 @@ It also includes metadata-backed setting domains for PID, rates, filters, receiv
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.
 `profiles status` reads active PID, rate, and battery profile selections from `MSP_STATUS_EX` and returns the matching native CLI selector commands.
 `text status` reads pilot name, craft name, active profile names, build key, and release name from `MSP2_GET_TEXT`.
+`debug status` reads live debug channels and accelerometer trims over MSP.
 Batch plans can be supplied as plain CLI lines or JSON with `cli_lines`.
 `batch plan` validates without connecting.
 `batch apply` sends only supported configuration commands and rejects dangerous lines such as `save`, `defaults`, motor commands, reboot, bootloader, and erase.

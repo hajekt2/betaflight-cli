@@ -254,6 +254,16 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, 20)
 		payload = appendS16(payload, 180)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPDebug:
+		payload := appendS16(nil, -1)
+		payload = appendS16(payload, 2)
+		payload = appendS16(payload, -3)
+		payload = appendS16(payload, 4)
+		payload = appendS16(payload, -5)
+		payload = appendS16(payload, 6)
+		payload = appendS16(payload, -7)
+		payload = appendS16(payload, 8)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPBatteryState:
 		payload := []byte{4}
 		payload = appendU16(payload, 1300)
@@ -407,6 +417,10 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte{10, 11, 12, 13, 14, 15}, false))
 	case msp.MSP2GyroSensorActive:
 		f.out.Write(response(frame.Code, []byte{2, 11, 19}, false))
+	case msp.MSPAccTrim:
+		payload := appendS16(nil, -12)
+		payload = appendS16(payload, 34)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPRawImu:
 		payload := appendS16(nil, 2048)
 		payload = appendS16(payload, -1024)

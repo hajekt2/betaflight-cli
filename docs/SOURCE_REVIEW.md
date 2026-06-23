@@ -90,6 +90,12 @@ Configurator treats flag bit 0 as ready and bit 1 as supported.
 `MSP_SDCARD_SUMMARY` returns flags, card/filesystem state, last filesystem error, free kilobytes, and total kilobytes.
 Configurator treats flag bit 0 as supported.
 
+`MSP_DEBUG` returns signed 16-bit debug channels.
+Configurator reads eight values into `FC.SENSOR_DATA.debug`.
+
+`MSP_ACC_TRIM` returns signed pitch and roll accelerometer trims.
+Configurator stores those values as `accelerometerTrims`.
+
 ## Betaflight MCP Reference
 
 The Python reference uses a small MSP protocol layer and a higher-level command layer.

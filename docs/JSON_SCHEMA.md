@@ -151,6 +151,9 @@ The object includes active PID, rate, and battery profile indexes, profile count
 The object includes text fields for pilot name, craft name, active PID profile name, active rate profile name, active battery profile name, build key, and release name.
 The object also includes a `by_key` map for direct agent lookup and per-field warnings when custom firmware rejects one text type.
 
+`debug status` returns a `debug` object decoded from `MSP_DEBUG` and `MSP_ACC_TRIM`.
+The object includes signed debug channel values, signed accelerometer pitch/roll trims, source metadata, and per-message warnings when one optional request is unavailable.
+
 `receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
 The object includes receiver configuration, channel map indexes and names, RSSI channel, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 

@@ -81,6 +81,26 @@ func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestDebugStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"debug", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	debug := data["debug"].(map[string]any)
+	values := debug["debug_values"].([]any)
+	if len(values) != 8 || values[0] != float64(-1) || values[7] != float64(8) {
+		t.Fatalf("debug values = %+v", values)
+	}
+	trim := debug["accelerometer_trim"].(map[string]any)
+	if trim["pitch"] != float64(-12) || trim["roll"] != float64(34) {
+		t.Fatalf("trim = %+v", trim)
+	}
+}
+
 func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"info"}, nil)
 	if err != nil {

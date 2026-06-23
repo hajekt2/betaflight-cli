@@ -90,6 +90,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.infoCommand())
 	root.AddCommand(a.textCommand())
 	root.AddCommand(a.telemetryCommand())
+	root.AddCommand(a.debugCommand())
 	root.AddCommand(a.cliCommand())
 	root.AddCommand(a.backupCommand())
 	root.AddCommand(a.restoreCommand())
@@ -423,6 +424,27 @@ func (a *app) telemetryCommand() *cobra.Command {
 				env := output.Success(commandPath(cmd), &target, telemetry)
 				addStringWarnings(&env, warnings)
 				return env
+			})
+		},
+	})
+	return cmd
+}
+
+func (a *app) debugCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "debug", Short: "Inspect live debug channels and trim values"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read MSP debug values and accelerometer trims",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				debug, warnings, err := bfcommands.ReadDebugStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"debug":    debug,
+					"warnings": warnings,
+				})
 			})
 		},
 	})

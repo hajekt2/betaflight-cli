@@ -104,6 +104,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if configurationDiff["operation"] != "read_only" || configurationDiff["requires_connection"] != true || configurationDiff["confirmation"] != "none" || configurationDiff["runnable"] != true {
 		t.Fatalf("configuration diff capability = %+v", configurationDiff)
 	}
+	configurationPlan := byCommand["betaflight-cli configuration plan"]
+	if configurationPlan["operation"] != "offline" || configurationPlan["requires_connection"] != false || configurationPlan["confirmation"] != "none" || configurationPlan["runnable"] != true {
+		t.Fatalf("configuration plan capability = %+v", configurationPlan)
+	}
+	configurationApply := byCommand["betaflight-cli configuration apply"]
+	if configurationApply["operation"] != "plan_or_write" || configurationApply["requires_connection"] != true || configurationApply["confirmation"] != "--yes with --include-defaults or --save" || configurationApply["runnable"] != true {
+		t.Fatalf("configuration apply capability = %+v", configurationApply)
+	}
 	settingsDiff := byCommand["betaflight-cli settings diff"]
 	if settingsDiff["operation"] != "read_only" || settingsDiff["requires_connection"] != true || settingsDiff["confirmation"] != "none" || settingsDiff["runnable"] != true {
 		t.Fatalf("settings diff capability = %+v", settingsDiff)
@@ -428,6 +436,81 @@ func TestConfigurationValidateDoesNotConnect(t *testing.T) {
 	lines := plan["cli_lines"].([]any)
 	if len(lines) != 2 || lines[0] != "feature GPS" {
 		t.Fatalf("plan = %+v", plan)
+	}
+}
+
+func TestConfigurationPlanWithoutConnection(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"configuration", "plan"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)
+	if plan["kind"] != "configuration" || plan["source_format"] != "configuration_text" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	lines := plan["cli_lines"].([]any)
+	if len(lines) != 2 || lines[0] != "feature GPS" || lines[1] != "set gyro_lpf1_static_hz = 0" {
+		t.Fatalf("plan = %+v", plan)
+	}
+}
+
+func TestConfigurationPlanSkipsUnsupportedLines(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"configuration", "plan", "--include-defaults"}, "# version\nbatch start\ndefaults nosave\nfeature GPS\nset gyro_lpf1_static_hz = 0\nsave\nbatch end\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)
+	lines := plan["cli_lines"].([]any)
+	if len(lines) != 3 || lines[0] != "defaults nosave" || lines[1] != "feature GPS" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	skipped := plan["skipped_lines"].([]any)
+	if len(skipped) != 4 || skipped[0].(map[string]any)["reason"] == "" {
+		t.Fatalf("skipped = %+v", skipped)
+	}
+}
+
+func TestConfigurationApplyUsesWriteOperation(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommandWithInput(t, []string{"configuration", "apply"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		return nil, connection.TargetInfo{}, &connection.CodedError{Code: "test_stop", Message: "stop before hardware"}
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "test_stop" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if gotOp != connection.Write {
+		t.Fatalf("operation = %v, want Write", gotOp)
+	}
+	data := env.Data.(map[string]any)
+	if data["kind"] != "configuration" {
+		t.Fatalf("plan = %+v", data)
+	}
+}
+
+func TestConfigurationApplyIncludeDefaultsRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"configuration", "apply", "--include-defaults"}, "defaults nosave\nfeature GPS\n", func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatalf("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after configuration apply confirmation failure")
 	}
 }
 

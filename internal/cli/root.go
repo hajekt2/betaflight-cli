@@ -616,6 +616,8 @@ func (a *app) statusCommand() *cobra.Command {
 func (a *app) configurationCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "configuration", Short: "Inspect configuration state and write readiness"}
 	cmd.AddCommand(a.configurationValidateCommand())
+	cmd.AddCommand(a.configurationPlanCommand())
+	cmd.AddCommand(a.configurationApplyCommand())
 	cmd.AddCommand(a.configurationCompareCommand())
 	cmd.AddCommand(a.configurationExportCommand())
 	cmd.AddCommand(&cobra.Command{
@@ -669,6 +671,55 @@ func (a *app) configurationCommand() *cobra.Command {
 			})
 		},
 	})
+	return cmd
+}
+
+func (a *app) configurationPlanCommand() *cobra.Command {
+	var opts importCommandOptions
+	cmd := &cobra.Command{
+		Use:   "plan",
+		Short: "Validate and print a configuration change plan",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			imported, err := a.readImportPlan(opts, "configuration", "configuration_text")
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			env, ok := a.validateChangePlan(cmd, imported.Plan, planValidationOptions{allowDefaultsNoSave: opts.includeDefaults})
+			if !ok {
+				return a.render(env)
+			}
+			return a.render(output.Success(commandPath(cmd), nil, importPlanData(imported, opts, false)))
+		},
+	}
+	addImportFlags(cmd, &opts, false)
+	return cmd
+}
+
+func (a *app) configurationApplyCommand() *cobra.Command {
+	var opts importCommandOptions
+	cmd := &cobra.Command{
+		Use:   "apply",
+		Short: "Apply a validated configuration plan",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if opts.includeDefaults && !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "--include-defaults requires --yes because defaults nosave resets configuration before applying lines"))
+			}
+			imported, err := a.readImportPlan(opts, "configuration", "configuration_text")
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			env, ok := a.validateChangePlan(cmd, imported.Plan, planValidationOptions{allowDefaultsNoSave: opts.includeDefaults})
+			if !ok {
+				return a.render(env)
+			}
+			op := connection.Write
+			if opts.includeDefaults {
+				op = connection.Dangerous
+			}
+			return a.applyImportPlan(cmd, imported, opts, op)
+		},
+	}
+	addImportFlags(cmd, &opts, true)
 	return cmd
 }
 

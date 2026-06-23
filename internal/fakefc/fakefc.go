@@ -704,6 +704,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 5662)
 		payload = append(payload, 1, 5, 8, 3)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetVTXConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 11))
 	case msp.MSPLedStripConfig:
 		payload := appendU32(nil, fakeLEDConfigRaw(1, 2, 0, 1, 3, 0x03))
 		payload = appendU32(payload, fakeLEDConfigRaw(3, 4, 1, 1<<3, 5, 0x04))

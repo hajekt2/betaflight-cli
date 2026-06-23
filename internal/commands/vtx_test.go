@@ -35,3 +35,19 @@ func TestDecodeVTXConfigLegacyPayload(t *testing.T) {
 		t.Fatalf("config = %+v", config)
 	}
 }
+
+func TestEncodeVTXConfig(t *testing.T) {
+	payload := EncodeVTXConfig(VTXConfigSetConfig{
+		Band:             5,
+		Channel:          8,
+		Power:            2,
+		PitMode:          true,
+		FrequencyMHz:     5861,
+		LowPowerDisarm:   2,
+		PitModeFrequency: 5662,
+	})
+	want := []byte{0xe5, 0x16, 2, 1, 2, 0x1e, 0x16, 5, 8, 0xe5, 0x16}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

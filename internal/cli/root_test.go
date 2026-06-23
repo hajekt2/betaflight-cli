@@ -475,6 +475,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if transponderConfig["operation"] != "write" || transponderConfig["confirmation"] != "--yes" || transponderConfig["requires_connection"] != true || transponderConfig["output_root"] != "transponder_config" || transponderConfig["runnable"] != true {
 		t.Fatalf("transponder config capability = %+v", transponderConfig)
 	}
+	vtxConfig := byCommand["betaflight-cli vtx set-config"]
+	if vtxConfig["operation"] != "write" || vtxConfig["confirmation"] != "--yes" || vtxConfig["requires_connection"] != true || vtxConfig["output_root"] != "vtx_config" || vtxConfig["runnable"] != true {
+		t.Fatalf("vtx config capability = %+v", vtxConfig)
+	}
 	validate := byCommand["betaflight-cli configuration validate"]
 	if validate["operation"] != "offline" || validate["requires_connection"] != false || validate["output_root"] != "configuration_validation" {
 		t.Fatalf("validate capability = %+v", validate)
@@ -2902,6 +2906,51 @@ func TestVTXConfigWithFakeFC(t *testing.T) {
 	table := config["table"].(map[string]any)
 	if table["available"] != true || table["bands"] != float64(5) || table["channels"] != float64(8) || table["power_levels"] != float64(3) {
 		t.Fatalf("table = %+v", table)
+	}
+}
+
+func TestVTXSetConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtx", "set-config", "5", "8", "2", "true", "5861", "2", "5662", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["vtx_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["band"] != float64(5) || config["pit_mode"] != true || config["frequency_mhz"] != float64(5861) || result["save_required"] != true {
+		t.Fatalf("vtx_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_VTX_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestVTXSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtx", "set-config", "5", "8", "2", "true", "5861", "2", "5662"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestVTXSetConfigValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtx", "set-config", "5", "8", "2", "maybe", "5861", "2", "5662", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

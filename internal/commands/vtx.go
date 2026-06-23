@@ -29,12 +29,52 @@ type VTXTableSummary struct {
 	PowerLevels uint8 `json:"power_levels"`
 }
 
+type VTXConfigSetConfig struct {
+	Band             uint8  `json:"band"`
+	Channel          uint8  `json:"channel"`
+	Power            uint8  `json:"power"`
+	PitMode          bool   `json:"pit_mode"`
+	FrequencyMHz     uint16 `json:"frequency_mhz"`
+	LowPowerDisarm   uint8  `json:"low_power_disarm"`
+	PitModeFrequency uint16 `json:"pit_mode_frequency_mhz"`
+}
+
+type VTXConfigSetResult struct {
+	Config       VTXConfigSetConfig `json:"config"`
+	MSPCode      uint16             `json:"msp_code"`
+	MSPName      string             `json:"msp_name"`
+	Acknowledged bool               `json:"acknowledged"`
+	SaveRequired bool               `json:"save_required"`
+}
+
 func ReadVTXConfig(ctx context.Context, client *connection.Client) (*VTXConfig, error) {
 	frame, err := client.Request(ctx, msp.MSPVTXConfig, nil)
 	if err != nil {
 		return nil, fmt.Errorf("vtx config unavailable: %w", err)
 	}
 	return DecodeVTXConfig(frame.Payload)
+}
+
+func SetVTXConfig(ctx context.Context, client *connection.Client, config VTXConfigSetConfig) (*VTXConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetVTXConfig, EncodeVTXConfig(config)); err != nil {
+		return nil, fmt.Errorf("vtx config request failed: %w", err)
+	}
+	return &VTXConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetVTXConfig,
+		MSPName:      "MSP_SET_VTX_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeVTXConfig(config VTXConfigSetConfig) []byte {
+	payload := appendU16Payload(nil, config.FrequencyMHz)
+	payload = append(payload, config.Power, boolByte(config.PitMode), config.LowPowerDisarm)
+	payload = appendU16Payload(payload, config.PitModeFrequency)
+	payload = append(payload, config.Band, config.Channel)
+	payload = appendU16Payload(payload, config.FrequencyMHz)
+	return payload
 }
 
 func DecodeVTXConfig(payload []byte) (*VTXConfig, error) {

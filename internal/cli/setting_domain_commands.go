@@ -56,6 +56,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	cmd.AddCommand(set)
 	if domain.use == "vtx" {
 		cmd.AddCommand(a.vtxConfigCommand())
+		cmd.AddCommand(a.vtxSetConfigCommand())
 	}
 	if domain.use == "receiver" {
 		cmd.AddCommand(a.receiverStatusCommand())
@@ -134,6 +135,69 @@ func (a *app) receiverStatusCommand() *cobra.Command {
 					"receiver": receiver,
 					"warnings": warnings,
 				})
+			})
+		},
+	}
+}
+
+func (a *app) vtxSetConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config BAND CHANNEL POWER PIT_MODE FREQUENCY_MHZ LOW_POWER_DISARM PIT_MODE_FREQUENCY_MHZ",
+		Short: "Set VTX band, channel, power, pit mode, and frequencies over MSP",
+		Args:  cobra.ExactArgs(7),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			band, err := parseUint8Arg("band", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			channel, err := parseUint8Arg("channel", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			power, err := parseUint8Arg("power", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			pitMode, err := parseBoolArg("pit_mode", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			frequency, err := parseUint16Arg("frequency_mhz", args[4])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			lowPowerDisarm, err := parseUint8Arg("low_power_disarm", args[5])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			pitFrequency, err := parseUint16Arg("pit_mode_frequency_mhz", args[6])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "VTX configuration can change RF output; pass --yes"))
+			}
+			config := bfcommands.VTXConfigSetConfig{
+				Band:             band,
+				Channel:          channel,
+				Power:            power,
+				PitMode:          pitMode,
+				FrequencyMHz:     frequency,
+				LowPowerDisarm:   lowPowerDisarm,
+				PitModeFrequency: pitFrequency,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetVTXConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtx_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "vtx_config",
+					Command: "MSP_SET_VTX_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
 			})
 		},
 	}

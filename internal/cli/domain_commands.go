@@ -733,6 +733,17 @@ func parseUint8Arg(name, value string) (uint8, error) {
 	return uint8(parsed), nil
 }
 
+func parseBoolArg(name, value string) (bool, error) {
+	switch strings.ToLower(value) {
+	case "1", "true", "yes", "on":
+		return true, nil
+	case "0", "false", "no", "off":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be a boolean", name)
+	}
+}
+
 func parseInt8Arg(name, value string) (int8, error) {
 	parsed, err := strconv.ParseInt(value, 10, 8)
 	if err != nil {

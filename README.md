@@ -41,6 +41,7 @@ Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of sc
 betaflight-cli ports list
 betaflight-cli ports diagnose
 betaflight-cli capabilities
+betaflight-cli capabilities coverage
 betaflight-cli doctor
 betaflight-cli info --port /dev/tty.usbmodem01
 betaflight-cli firmware status --port /dev/tty.usbmodem01
@@ -120,6 +121,7 @@ If multiple Betaflight-compatible devices answer the handshake, the command shou
 Configurator parity should be exposed as focused command families rather than one giant command.
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
 `capabilities` prints the command tree plus curated workflow metadata so agents can discover command safety class, connection requirements, output roots, and recommended workflow sequences without scraping help text.
+`capabilities coverage` prints a non-graphical Configurator parity map by domain, including implemented commands and the next known gaps.
 `info` reads firmware, board, MCU, device UID, build, build option, configuration state, gyro sample rate, and legacy craft-name identity fields over MSP.
 `firmware status` reads firmware identity, target metadata, build metadata, support-policy status, and compiled settings metadata details over MSP.
 `target status` composes firmware identity, CLI system status, and resource/timer/DMA diagnostics into one hardware inventory payload.

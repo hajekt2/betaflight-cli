@@ -57,6 +57,45 @@ type capabilityMetadata struct {
 	Tags               []string
 }
 
+type coverageReport struct {
+	Source        string           `json:"source"`
+	SchemaVersion string           `json:"schema_version"`
+	Summary       coverageSummary  `json:"summary"`
+	Domains       []coverageDomain `json:"domains"`
+	NextGaps      []coverageGap    `json:"next_gaps"`
+}
+
+type coverageSummary struct {
+	DomainCount          int  `json:"domain_count"`
+	ImplementedCount     int  `json:"implemented_count"`
+	PartialCount         int  `json:"partial_count"`
+	PlannedCount         int  `json:"planned_count"`
+	ReadDomains          int  `json:"read_domains"`
+	WriteDomains         int  `json:"write_domains"`
+	DangerousDomains     int  `json:"dangerous_domains"`
+	BlackboxDomains      int  `json:"blackbox_domains"`
+	MaintenanceDomains   int  `json:"maintenance_domains"`
+	OfflineOnlyDomains   int  `json:"offline_only_domains"`
+	UnsupportedOldFWNote bool `json:"unsupported_old_firmware_note"`
+}
+
+type coverageDomain struct {
+	Domain            string   `json:"domain"`
+	Status            string   `json:"status"`
+	ReadCommands      []string `json:"read_commands,omitempty"`
+	WriteCommands     []string `json:"write_commands,omitempty"`
+	DangerousCommands []string `json:"dangerous_commands,omitempty"`
+	OutputRoots       []string `json:"output_roots,omitempty"`
+	Notes             []string `json:"notes,omitempty"`
+}
+
+type coverageGap struct {
+	Domain     string   `json:"domain"`
+	Reason     string   `json:"reason"`
+	NextSteps  []string `json:"next_steps"`
+	SafetyNote string   `json:"safety_note,omitempty"`
+}
+
 func (a *app) capabilitiesCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "capabilities",
@@ -69,6 +108,15 @@ func (a *app) capabilitiesCommand() *cobra.Command {
 			}))
 		},
 	}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "coverage",
+		Short: "Print non-graphical Configurator parity coverage by domain",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+				"coverage": buildCoverageReport(cmd.Root()),
+			}))
+		},
+	})
 	return cmd
 }
 
@@ -93,6 +141,53 @@ func buildCapabilityIndex(root *cobra.Command) capabilityIndex {
 		Commands:  collectCapabilityCommands(root),
 		Workflows: capabilityWorkflows(),
 	}
+}
+
+func buildCoverageReport(root *cobra.Command) coverageReport {
+	commandSet := map[string]bool{}
+	for _, command := range collectCapabilityCommands(root) {
+		if command.Runnable {
+			commandSet[command.Command] = true
+		}
+	}
+	domains := coverageDomains(commandSet)
+	report := coverageReport{
+		Source:        "curated non-graphical Configurator parity map checked against the Cobra command tree",
+		SchemaVersion: output.SchemaVersion,
+		Domains:       domains,
+		NextGaps:      coverageGaps(domains),
+	}
+	report.Summary.DomainCount = len(domains)
+	for _, domain := range domains {
+		switch domain.Status {
+		case "implemented":
+			report.Summary.ImplementedCount++
+		case "partial":
+			report.Summary.PartialCount++
+		case "planned":
+			report.Summary.PlannedCount++
+		}
+		if len(domain.ReadCommands) > 0 {
+			report.Summary.ReadDomains++
+		}
+		if len(domain.WriteCommands) > 0 {
+			report.Summary.WriteDomains++
+		}
+		if len(domain.DangerousCommands) > 0 {
+			report.Summary.DangerousDomains++
+		}
+		if domain.Domain == "blackbox" {
+			report.Summary.BlackboxDomains++
+		}
+		if domain.Domain == "firmware-maintenance" {
+			report.Summary.MaintenanceDomains++
+		}
+		if len(domain.ReadCommands) == 0 && len(domain.WriteCommands) == 0 && len(domain.DangerousCommands) == 0 {
+			report.Summary.OfflineOnlyDomains++
+		}
+	}
+	report.Summary.UnsupportedOldFWNote = true
+	return report
 }
 
 func collectCapabilityCommands(root *cobra.Command) []capabilityCommand {
@@ -159,6 +254,112 @@ func inferCapabilityMetadata(path string, runnable bool, meta capabilityMetadata
 		meta.Tags = defaultCapabilityTags(path)
 	}
 	return meta
+}
+
+func coverageDomains(commandSet map[string]bool) []coverageDomain {
+	domains := []coverageDomain{
+		implementedDomain("identity", commandSet, []string{"betaflight-cli info", "betaflight-cli firmware status", "betaflight-cli target status", "betaflight-cli text status"}, nil, nil, []string{"info", "firmware", "target", "text"}, "MSP identity, board, MCU, UID, build, support policy, and text metadata are typed."),
+		implementedDomain("connection-diagnostics", commandSet, []string{"betaflight-cli ports list", "betaflight-cli ports diagnose", "betaflight-cli doctor"}, nil, nil, []string{"ports", "diagnostics"}, "USB serial discovery is implemented; non-USB transports remain intentionally out of scope."),
+		implementedDomain("configuration-backup", commandSet, []string{"betaflight-cli backup create", "betaflight-cli backup diff", "betaflight-cli configuration snapshot", "betaflight-cli configuration export", "betaflight-cli configuration compare"}, nil, nil, []string{"configuration", "backup"}, "Raw CLI text remains authoritative and parsed inventories are available for agents."),
+		implementedDomain("configuration-restore", commandSet, []string{"betaflight-cli configuration validate", "betaflight-cli restore plan", "betaflight-cli presets plan", "betaflight-cli batch plan"}, []string{"betaflight-cli restore apply", "betaflight-cli presets apply", "betaflight-cli batch apply"}, []string{"betaflight-cli save"}, []string{"configuration_validation", "change_plan"}, "Plan/apply/save is implemented with explicit confirmation and defaults safeguards."),
+		implementedDomain("runtime-status", commandSet, []string{"betaflight-cli status", "betaflight-cli telemetry snapshot", "betaflight-cli system status", "betaflight-cli tasks status", "betaflight-cli debug status", "betaflight-cli environment status", "betaflight-cli rtc status"}, nil, nil, []string{"status", "telemetry", "system", "tasks", "debug", "environment", "rtc"}, "Core runtime, telemetry, scheduler, debug, environment, and clock reads are typed."),
+		implementedDomain("features", commandSet, []string{"betaflight-cli features list", "betaflight-cli features status"}, []string{"betaflight-cli features enable", "betaflight-cli features disable"}, nil, []string{"features", "change_plan"}, "Feature mask reads and CLI-backed feature plans are implemented."),
+		implementedDomain("ports-and-modes", commandSet, []string{"betaflight-cli serial list", "betaflight-cli serial status", "betaflight-cli modes list", "betaflight-cli modes active"}, []string{"betaflight-cli serial set", "betaflight-cli modes set"}, nil, []string{"serial", "modes", "change_plan"}, "Serial rows and AUX modes have read, typed status, and plan/apply surfaces."),
+		implementedDomain("resources", commandSet, []string{"betaflight-cli resources list", "betaflight-cli resources status"}, []string{"betaflight-cli resources set"}, nil, []string{"resources", "change_plan"}, "Resource, timer, and DMA reads are implemented with resource assignment planning."),
+		implementedDomain("profiles", commandSet, []string{"betaflight-cli profiles list", "betaflight-cli profiles status", "betaflight-cli rateprofiles list"}, []string{"betaflight-cli profiles select", "betaflight-cli profiles rate-select", "betaflight-cli profiles battery-select", "betaflight-cli rateprofiles select"}, nil, []string{"profiles", "change_plan"}, "PID, rate, and battery profile selectors are covered."),
+		implementedDomain("pid-rates-filters", commandSet, []string{"betaflight-cli pid list", "betaflight-cli pid status", "betaflight-cli rates list", "betaflight-cli rates status", "betaflight-cli filters list", "betaflight-cli filters status"}, []string{"betaflight-cli pid set", "betaflight-cli rates set", "betaflight-cli filters set"}, nil, []string{"pid", "rates", "filters", "change_plan"}, "Core tuning domains have metadata-backed setting lists, typed status, and setting plans."),
+		implementedDomain("receiver", commandSet, []string{"betaflight-cli receiver list", "betaflight-cli receiver status", "betaflight-cli rxrange list"}, []string{"betaflight-cli receiver rxfail", "betaflight-cli rxrange set"}, nil, []string{"receiver", "rxrange", "change_plan"}, "Receiver config, RC channels, RX failsafe rows, and channel ranges are covered."),
+		implementedDomain("gps", commandSet, []string{"betaflight-cli gps list", "betaflight-cli gps status"}, []string{"betaflight-cli gps set"}, nil, []string{"gps", "change_plan"}, "GPS config, position, rescue settings, PID terms, and satellite info are covered when firmware supplies them."),
+		implementedDomain("battery-failsafe", commandSet, []string{"betaflight-cli battery list", "betaflight-cli battery status", "betaflight-cli failsafe list", "betaflight-cli failsafe status"}, []string{"betaflight-cli battery set", "betaflight-cli failsafe set"}, nil, []string{"battery", "failsafe", "change_plan"}, "Battery and failsafe settings plus arming/failsafe status are covered."),
+		implementedDomain("vtx-osd-leds", commandSet, []string{"betaflight-cli vtx config", "betaflight-cli vtx list", "betaflight-cli osd list", "betaflight-cli osd status", "betaflight-cli vtxtable list", "betaflight-cli leds list", "betaflight-cli leds status"}, []string{"betaflight-cli vtx set", "betaflight-cli osd set", "betaflight-cli vtxtable set", "betaflight-cli leds set"}, nil, []string{"vtx", "osd", "vtxtable", "leds", "change_plan"}, "VTX, OSD, VTX table, and LED strip surfaces are implemented without graphical layout editing."),
+		implementedDomain("motors-servos-mixer", commandSet, []string{"betaflight-cli mixer status", "betaflight-cli motors status", "betaflight-cli servos list", "betaflight-cli servos status", "betaflight-cli adjustments list", "betaflight-cli adjustments status"}, []string{"betaflight-cli servos set", "betaflight-cli servos reverse", "betaflight-cli adjustments set"}, nil, []string{"mixer", "motors", "servos", "adjustments", "change_plan"}, "Motor and servo reads are implemented; motor output testing is deliberately not implemented yet."),
+		implementedDomain("storage-blackbox", commandSet, []string{"betaflight-cli storage status", "betaflight-cli blackbox config", "betaflight-cli blackbox inspect"}, nil, nil, []string{"storage", "blackbox", "inspection"}, "Storage summaries, Blackbox configuration, and initial offline log inspection are implemented."),
+		implementedDomain("beeper-transponder", commandSet, []string{"betaflight-cli beeper config", "betaflight-cli transponder config"}, nil, nil, []string{"beeper", "transponder"}, "Beeper and transponder configuration reads are covered."),
+		implementedDomain("raw-protocol-access", commandSet, []string{"betaflight-cli cli exec"}, nil, []string{"betaflight-cli cli interactive", "betaflight-cli msp request"}, []string{"cli", "msp"}, "Raw CLI and raw MSP access exist for unsupported gaps with safety gates."),
+		implementedDomain("firmware-maintenance", commandSet, nil, nil, []string{"betaflight-cli reboot firmware", "betaflight-cli reboot bootloader", "betaflight-cli reboot bootloader-flash", "betaflight-cli reboot msc", "betaflight-cli reboot msc-utc"}, []string{"reboot"}, "Reboot flows are implemented; firmware flashing remains outside this CLI for now."),
+	}
+	sort.Slice(domains, func(i, j int) bool {
+		return domains[i].Domain < domains[j].Domain
+	})
+	return domains
+}
+
+func implementedDomain(domain string, commandSet map[string]bool, readCommands, writeCommands, dangerousCommands, outputRoots []string, notes ...string) coverageDomain {
+	out := coverageDomain{
+		Domain:            domain,
+		Status:            "implemented",
+		ReadCommands:      existingCommands(commandSet, readCommands),
+		WriteCommands:     existingCommands(commandSet, writeCommands),
+		DangerousCommands: existingCommands(commandSet, dangerousCommands),
+		OutputRoots:       append([]string(nil), outputRoots...),
+		Notes:             append([]string(nil), notes...),
+	}
+	missing := missingCommands(commandSet, append(append(append([]string{}, readCommands...), writeCommands...), dangerousCommands...))
+	if len(missing) > 0 {
+		out.Status = "partial"
+		out.Notes = append(out.Notes, "missing runnable commands: "+strings.Join(missing, ", "))
+	}
+	sort.Strings(out.OutputRoots)
+	return out
+}
+
+func existingCommands(commandSet map[string]bool, commands []string) []string {
+	var out []string
+	for _, command := range commands {
+		if commandSet[command] {
+			out = append(out, command)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func missingCommands(commandSet map[string]bool, commands []string) []string {
+	var out []string
+	for _, command := range commands {
+		if !commandSet[command] {
+			out = append(out, command)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func coverageGaps(domains []coverageDomain) []coverageGap {
+	gaps := []coverageGap{
+		{
+			Domain:     "motor-testing",
+			Reason:     "Configurator exposes motor test workflows, but this CLI does not yet provide a dedicated motor output command.",
+			NextSteps:  []string{"add a motor test planning command", "require explicit props-off acknowledgement", "require --yes and a short duration limit", "record side effects in JSON"},
+			SafetyNote: "This must be dangerous by default because motors can spin.",
+		},
+		{
+			Domain:     "blackbox-decoding",
+			Reason:     "Offline Blackbox inspection currently reports headers and approximate frame markers, not full decoded log frames.",
+			NextSteps:  []string{"implement binary frame decoding", "add typed gyro, motor, RC, PID, and event streams", "add JSON summaries suitable for agents"},
+			SafetyNote: "Offline only.",
+		},
+		{
+			Domain:     "firmware-flashing",
+			Reason:     "Reboot-to-bootloader flows exist, but firmware flashing is not implemented.",
+			NextSteps:  []string{"decide whether flashing belongs in this CLI", "if accepted, add target validation and image provenance checks", "require explicit dangerous confirmation"},
+			SafetyNote: "Firmware flashing can brick hardware when misused.",
+		},
+	}
+	for _, domain := range domains {
+		if domain.Status == "partial" {
+			gaps = append(gaps, coverageGap{
+				Domain:     domain.Domain,
+				Reason:     "The curated parity map references commands that are not currently runnable.",
+				NextSteps:  []string{"inspect the domain notes", "add missing commands or update coverage metadata"},
+				SafetyNote: "Do not claim implemented parity for this domain until the command map is complete.",
+			})
+		}
+	}
+	sort.Slice(gaps, func(i, j int) bool {
+		return gaps[i].Domain < gaps[j].Domain
+	})
+	return gaps
 }
 
 func defaultOutputRoot(path string) string {

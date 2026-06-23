@@ -118,6 +118,53 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"capabilities", "coverage"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for capabilities coverage")
+	}
+	coverage := env.Data.(map[string]any)["coverage"].(map[string]any)
+	summary := coverage["summary"].(map[string]any)
+	if summary["domain_count"].(float64) < 15 || summary["implemented_count"].(float64) < 10 {
+		t.Fatalf("summary = %+v", summary)
+	}
+	domains := coverage["domains"].([]any)
+	byDomain := map[string]map[string]any{}
+	for _, item := range domains {
+		domain := item.(map[string]any)
+		byDomain[domain["domain"].(string)] = domain
+	}
+	backup := byDomain["configuration-backup"]
+	if backup["status"] != "implemented" || len(backup["read_commands"].([]any)) == 0 {
+		t.Fatalf("backup domain = %+v", backup)
+	}
+	maintenance := byDomain["firmware-maintenance"]
+	if maintenance["status"] != "implemented" || len(maintenance["dangerous_commands"].([]any)) == 0 {
+		t.Fatalf("maintenance domain = %+v", maintenance)
+	}
+	gaps := coverage["next_gaps"].([]any)
+	foundMotorTesting := false
+	for _, item := range gaps {
+		gap := item.(map[string]any)
+		if gap["domain"] == "motor-testing" {
+			foundMotorTesting = true
+		}
+	}
+	if !foundMotorTesting {
+		t.Fatalf("gaps = %+v", gaps)
+	}
+}
+
 func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"telemetry", "snapshot"}, nil)
 	if err != nil {

@@ -249,8 +249,8 @@ The basic settings flow is:
 Only a separate `save` command or explicit `--save` flag may persist changes.
 The default write path is CLI-backed.
 The command should show the exact CLI lines that would be sent before applying when the operation is not already obvious from the user input.
-Automatic port selection must be explicit for writes and dangerous actions.
-Even with `--auto-port`, writes and dangerous actions must fail when more than one Betaflight-compatible device responds.
+Automatic port selection is enabled by default for writes and dangerous actions when exactly one compatible USB target responds.
+Writes and dangerous actions must fail when more than one Betaflight-compatible device responds.
 Non-interactive commands must not block waiting for confirmation.
 They should return structured JSON explaining which explicit flag or confirmation token is missing.
 Prompting is allowed only in explicit interactive mode.

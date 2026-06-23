@@ -768,7 +768,7 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 		t.Fatalf("vtx list capability = %+v", vtxList)
 	}
 	mspRequest := byCommand["betaflight-cli msp request"]
-	if mspRequest["operation"] != "read_only_or_write_or_dangerous" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "read-only unless --code implies write; write commands require --yes" || mspRequest["runnable"] != true {
+	if mspRequest["operation"] != "read_only_or_write_or_dangerous" || mspRequest["requires_connection"] != true || mspRequest["confirmation"] != "--yes for generated write-like commands and numeric commands without compiled metadata" || mspRequest["runnable"] != true {
 		t.Fatalf("msp request capability = %+v", mspRequest)
 	}
 	mspList := byCommand["betaflight-cli msp list"]

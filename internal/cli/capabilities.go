@@ -489,7 +489,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli firmware flash":                  {RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes and --execute", OutputRoot: "firmware_flash", Tags: []string{"firmware", "maintenance", "dangerous"}},
 		"betaflight-cli msp list":                        offline,
 		"betaflight-cli msp metadata":                    offline,
-		"betaflight-cli msp request":                     {RequiresConnection: true, Operation: "read_only_or_write_or_dangerous", Confirmation: "read-only unless --code implies write; write commands require --yes", Tags: []string{"msp", "raw"}},
+		"betaflight-cli msp request":                     {RequiresConnection: true, Operation: "read_only_or_write_or_dangerous", Confirmation: "--yes for generated write-like commands and numeric commands without compiled metadata", Tags: []string{"msp", "raw"}},
 		"betaflight-cli settings set": {
 			RequiresConnection: true,
 			Operation:          "write_when_apply_is_set",

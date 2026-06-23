@@ -81,6 +81,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "failsafe" {
 		cmd.AddCommand(a.failsafeStatusCommand())
+		cmd.AddCommand(a.failsafeBoardAlignmentCommand())
 	}
 	return cmd
 }
@@ -308,6 +309,49 @@ func (a *app) failsafeStatusCommand() *cobra.Command {
 					"failsafe": safety,
 					"warnings": warnings,
 				})
+			})
+		},
+	}
+}
+
+func (a *app) failsafeBoardAlignmentCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-board-alignment ROLL_DEGREES PITCH_DEGREES YAW_DEGREES",
+		Short: "Set board alignment through MSP_SET_BOARD_ALIGNMENT_CONFIG",
+		Args:  cobra.ExactArgs(3),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			roll, err := parseInt16Arg("roll_degrees", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			pitch, err := parseInt16Arg("pitch_degrees", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			yaw, err := parseInt16Arg("yaw_degrees", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "board alignment changes configuration; pass --yes"))
+			}
+			alignment := bfcommands.BoardAlignment{
+				RollDegrees:  roll,
+				PitchDegrees: pitch,
+				YawDegrees:   yaw,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetBoardAlignment(cmd.Context(), client, alignment)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"board_alignment": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "board_alignment",
+					Command: "MSP_SET_BOARD_ALIGNMENT_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
 			})
 		},
 	}

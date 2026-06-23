@@ -37,6 +37,16 @@ func TestDecodeSafetyConfigs(t *testing.T) {
 	}
 }
 
+func TestEncodeBoardAlignment(t *testing.T) {
+	got := EncodeBoardAlignment(BoardAlignment{RollDegrees: -2, PitchDegrees: 3, YawDegrees: 90})
+	want := appendS16Test(nil, -2)
+	want = appendS16Test(want, 3)
+	want = appendS16Test(want, 90)
+	if string(got) != string(want) {
+		t.Fatalf("EncodeBoardAlignment() = %v, want %v", got, want)
+	}
+}
+
 func TestDecodeArmingDisableState(t *testing.T) {
 	count := uint8(len(armingDisableFlagNames))
 	flags := uint32(0x1234)

@@ -85,6 +85,14 @@ type BoardAlignment struct {
 	TrailingBytesIgnored int   `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type BoardAlignmentSetResult struct {
+	Alignment    BoardAlignment `json:"board_alignment"`
+	MSPCode      uint16         `json:"msp_code"`
+	MSPName      string         `json:"msp_name"`
+	Acknowledged bool           `json:"acknowledged"`
+	SaveRequired bool           `json:"save_required"`
+}
+
 type ArmingDisableState struct {
 	Source          string              `json:"source"`
 	Disabled        bool                `json:"disabled"`
@@ -238,6 +246,27 @@ func DecodeBoardAlignment(payload []byte) (*BoardAlignment, error) {
 		YawDegrees:           yaw,
 		TrailingBytesIgnored: r.Remaining(),
 	}, nil
+}
+
+func SetBoardAlignment(ctx context.Context, client *connection.Client, alignment BoardAlignment) (*BoardAlignmentSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetBoardAlignmentConfig, EncodeBoardAlignment(alignment)); err != nil {
+		return nil, fmt.Errorf("board alignment request failed: %w", err)
+	}
+	return &BoardAlignmentSetResult{
+		Alignment:    alignment,
+		MSPCode:      msp.MSPSetBoardAlignmentConfig,
+		MSPName:      "MSP_SET_BOARD_ALIGNMENT_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeBoardAlignment(alignment BoardAlignment) []byte {
+	payload := make([]byte, 0, boardAlignmentConfigLength)
+	payload = append(payload, byte(alignment.RollDegrees), byte(uint16(alignment.RollDegrees)>>8))
+	payload = append(payload, byte(alignment.PitchDegrees), byte(uint16(alignment.PitchDegrees)>>8))
+	payload = append(payload, byte(alignment.YawDegrees), byte(uint16(alignment.YawDegrees)>>8))
+	return payload
 }
 
 func DecodeArmingDisableState(status *Status) *ArmingDisableState {

@@ -387,6 +387,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, 3)
 		payload = appendS16(payload, 90)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetBoardAlignmentConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 6))
 	case msp.MSPBlackboxConfig:
 		payload := []byte{1, 2, 1, 4}
 		payload = appendU16(payload, 16)

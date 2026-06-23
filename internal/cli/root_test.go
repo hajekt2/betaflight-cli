@@ -343,6 +343,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if textSet["operation"] != "write" || textSet["confirmation"] != "--yes" || textSet["requires_connection"] != true || textSet["output_root"] != "text" || textSet["runnable"] != true {
 		t.Fatalf("text set capability = %+v", textSet)
 	}
+	boardAlignment := byCommand["betaflight-cli failsafe set-board-alignment"]
+	if boardAlignment["operation"] != "write" || boardAlignment["confirmation"] != "--yes" || boardAlignment["requires_connection"] != true || boardAlignment["output_root"] != "board_alignment" || boardAlignment["runnable"] != true {
+		t.Fatalf("board alignment capability = %+v", boardAlignment)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -4480,6 +4484,55 @@ func TestFailsafeStatusWithFakeFC(t *testing.T) {
 	activeNames := arming["active_names"].([]any)
 	if activeNames[0] != "RXLOSS" || activeNames[len(activeNames)-1] != "CALIB" {
 		t.Fatalf("active names = %+v", activeNames)
+	}
+}
+
+func TestFailsafeSetBoardAlignmentRequiresValidInt16(t *testing.T) {
+	env, err := runTestCommand(t, []string{"failsafe", "set-board-alignment", "0", "40000", "0", "--yes"}, nil)
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
+func TestFailsafeSetBoardAlignmentRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"failsafe", "set-board-alignment", "-2", "3", "90"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want confirmation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after board alignment confirmation failure")
+	}
+}
+
+func TestFailsafeSetBoardAlignmentWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"failsafe", "set-board-alignment", "-2", "3", "90", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["board_alignment"].(map[string]any)
+	alignment := result["board_alignment"].(map[string]any)
+	if alignment["roll_degrees"] != float64(-2) || alignment["pitch_degrees"] != float64(3) || alignment["yaw_degrees"] != float64(90) {
+		t.Fatalf("board alignment = %+v", result)
+	}
+	if result["msp_name"] != "MSP_SET_BOARD_ALIGNMENT_CONFIG" || result["save_required"] != true {
+		t.Fatalf("board alignment = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "board_alignment" || env.SideEffects[0].Command != "MSP_SET_BOARD_ALIGNMENT_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

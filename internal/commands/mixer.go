@@ -9,13 +9,13 @@ import (
 )
 
 type MixerStatus struct {
-	Source             string           `json:"source"`
-	Mixer              MixerMode        `json:"mixer"`
-	YawMotorsReversed  *bool            `json:"yaw_motors_reversed,omitempty"`
-	ReverseMotorDirRaw *uint8           `json:"reverse_motor_dir_raw,omitempty"`
-	CLICommands        []string         `json:"cli_commands"`
-	Catalog            []MixerMode      `json:"catalog"`
-	Warnings           []string         `json:"warnings,omitempty"`
+	Source             string      `json:"source"`
+	Mixer              MixerMode   `json:"mixer"`
+	YawMotorsReversed  *bool       `json:"yaw_motors_reversed,omitempty"`
+	ReverseMotorDirRaw *uint8      `json:"reverse_motor_dir_raw,omitempty"`
+	CLICommands        []string    `json:"cli_commands"`
+	Catalog            []MixerMode `json:"catalog"`
+	Warnings           []string    `json:"warnings,omitempty"`
 }
 
 type MixerMode struct {

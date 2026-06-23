@@ -1111,7 +1111,7 @@ func TestDebugSetAccelerometerTrimRequiresValidInt16(t *testing.T) {
 
 func TestDebugSetAccelerometerTrimRequiresYesDoesNotConnect(t *testing.T) {
 	called := false
-	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim", "-12", "34"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim", "--", "-12", "34"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -1148,7 +1148,7 @@ func TestDebugSetAccelerometerTrimJSONRequiresYesDoesNotConnect(t *testing.T) {
 }
 
 func TestDebugSetAccelerometerTrimWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"debug", "set-accelerometer-trim", "-12", "34", "--yes"}, nil)
+	env, err := runTestCommand(t, []string{"--yes", "debug", "set-accelerometer-trim", "--", "-12", "34"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3773,7 +3773,7 @@ func TestReceiverSetMapValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -3787,7 +3787,7 @@ func TestReceiverSetMapJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -3800,7 +3800,7 @@ func TestReceiverSetMapRejectsDuplicateValuesBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -4266,7 +4266,7 @@ func TestOSDSetCanvasValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -4313,7 +4313,7 @@ func TestOSDSetGeneralJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -4392,7 +4392,7 @@ func TestOSDSetVideoSystemValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -4557,7 +4557,7 @@ func TestOSDSetStatValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -4737,7 +4737,7 @@ func TestSensorsSetAlignmentRejectsPartialCustomAlignmentBeforeConnect(t *testin
 }
 
 func TestSensorsSetAlignmentRequiresConfirmationBeforeConnect(t *testing.T) {
-	env, err := runTestCommand(t, []string{"sensors", "set-alignment", "2", "3", "-10", "20", "900"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"sensors", "set-alignment", "--", "2", "3", "-10", "20", "900"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -4764,7 +4764,7 @@ func TestSensorsSetAlignmentJSONRequiresConfirmationBeforeConnect(t *testing.T) 
 }
 
 func TestSensorsSetAlignmentWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"sensors", "set-alignment", "2", "3", "-10", "20", "900", "--yes"}, nil)
+	env, err := runTestCommand(t, []string{"--yes", "sensors", "set-alignment", "--", "2", "3", "-10", "20", "900"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -4988,7 +4988,7 @@ func TestBeeperSetConfigValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -5152,7 +5152,7 @@ func TestTransponderSetConfigValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -5678,7 +5678,7 @@ func TestServosStatusWithFakeFC(t *testing.T) {
 }
 
 func TestServosSetConfigWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"servos", "set-config", "1", "1100", "1900", "1501", "-50", "2", "5", "--yes"}, nil)
+	env, err := runTestCommand(t, []string{"--yes", "servos", "set-config", "--", "1", "1100", "1900", "1501", "-50", "2", "5"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -5717,7 +5717,7 @@ func TestServosSetConfigJSONWithFakeFC(t *testing.T) {
 }
 
 func TestServosSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
-	env, err := runTestCommand(t, []string{"servos", "set-config", "1", "1100", "1900", "1501", "-50", "2", "5"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"servos", "set-config", "--", "1", "1100", "1900", "1501", "-50", "2", "5"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -5744,14 +5744,14 @@ func TestServosSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 }
 
 func TestServosSetConfigValidationBeforeConnect(t *testing.T) {
-	env, err := runTestCommand(t, []string{"servos", "set-config", "1", "1100", "1900", "1501", "-200", "2", "5", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"--yes", "servos", "set-config", "--", "1", "1100", "1900", "1501", "-200", "2", "5"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -5798,13 +5798,13 @@ func TestServosSetJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
 
 func TestServosSetMixRuleWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"servos", "set-mix-rule", "2", "1", "3", "-25", "10", "5", "95", "4", "--yes"}, nil)
+	env, err := runTestCommand(t, []string{"--yes", "servos", "set-mix-rule", "--", "2", "1", "3", "-25", "10", "5", "95", "4"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -5843,7 +5843,7 @@ func TestServosSetMixRuleJSONWithFakeFC(t *testing.T) {
 }
 
 func TestServosSetMixRuleRequiresConfirmationBeforeConnect(t *testing.T) {
-	env, err := runTestCommand(t, []string{"servos", "set-mix-rule", "2", "1", "3", "-25", "10", "5", "95", "4"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"servos", "set-mix-rule", "--", "2", "1", "3", "-25", "10", "5", "95", "4"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -5954,7 +5954,7 @@ func TestFeaturesSetMaskValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -6112,7 +6112,7 @@ func TestReceiverSetRXFailValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -6126,7 +6126,7 @@ func TestReceiverSetRXFailJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -6982,7 +6982,7 @@ func TestAdjustmentsSetRangeValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7059,7 +7059,7 @@ func TestSerialApplyConfigJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7299,7 +7299,7 @@ func TestLEDSetColorsJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7473,7 +7473,7 @@ func TestPIDSetGainsJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7521,7 +7521,7 @@ func TestPIDSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7570,7 +7570,7 @@ func TestPIDSetSimplifiedJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7689,7 +7689,7 @@ func TestRatesSetProfileJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7766,7 +7766,7 @@ func TestFiltersSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7814,7 +7814,7 @@ func TestFiltersSetFilterJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7900,7 +7900,7 @@ func TestBatterySetConfigJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -7952,7 +7952,7 @@ func TestBatterySetProfileJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -8056,7 +8056,7 @@ func TestBatterySetVoltageMeterJSONWithFakeFC(t *testing.T) {
 
 func TestBatterySetCurrentMeterRejectsOutOfRangeDoesNotConnect(t *testing.T) {
 	called := false
-	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "10", "40000", "-10", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"--yes", "battery", "set-current-meter", "--", "10", "40000", "-10"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -8073,7 +8073,7 @@ func TestBatterySetCurrentMeterRejectsOutOfRangeDoesNotConnect(t *testing.T) {
 
 func TestBatterySetCurrentMeterRequiresYesDoesNotConnect(t *testing.T) {
 	called := false
-	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "10", "400", "-10"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "--", "10", "400", "-10"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -8107,7 +8107,7 @@ func TestBatterySetCurrentMeterJSONRequiresYesDoesNotConnect(t *testing.T) {
 }
 
 func TestBatterySetCurrentMeterWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"battery", "set-current-meter", "10", "400", "-10", "--yes"}, nil)
+	env, err := runTestCommand(t, []string{"--yes", "battery", "set-current-meter", "--", "10", "400", "-10"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -8271,7 +8271,7 @@ func TestFailsafeSetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
 
 func TestFailsafeSetBoardAlignmentRequiresYesDoesNotConnect(t *testing.T) {
 	called := false
-	env, err := runTestCommand(t, []string{"failsafe", "set-board-alignment", "-2", "3", "90"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"failsafe", "set-board-alignment", "--", "-2", "3", "90"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -8305,7 +8305,7 @@ func TestFailsafeSetBoardAlignmentJSONRequiresYesDoesNotConnect(t *testing.T) {
 }
 
 func TestFailsafeSetBoardAlignmentWithFakeFC(t *testing.T) {
-	env, err := runTestCommand(t, []string{"failsafe", "set-board-alignment", "-2", "3", "90", "--yes"}, nil)
+	env, err := runTestCommand(t, []string{"--yes", "failsafe", "set-board-alignment", "--", "-2", "3", "90"}, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -8494,7 +8494,7 @@ func TestVTXTableSetJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -8548,7 +8548,7 @@ func TestVTXTableSetPowerValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }
@@ -8700,7 +8700,7 @@ func TestRXRangeSetJSONValidationBeforeConnect(t *testing.T) {
 	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if env.OK || env.Errors[0].Code != "validation_failed" {
+	if env.OK || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("env = %+v", env)
 	}
 }

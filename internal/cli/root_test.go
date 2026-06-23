@@ -323,6 +323,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if cliInteractive["operation"] != "dangerous" || cliInteractive["confirmation"] != "--yes" || cliInteractive["requires_connection"] != true || cliInteractive["runnable"] != true {
 		t.Fatalf("cli interactive capability = %+v", cliInteractive)
 	}
+	sensorCalibration := byCommand["betaflight-cli sensors calibrate-accelerometer"]
+	if sensorCalibration["operation"] != "dangerous" || sensorCalibration["confirmation"] != "--yes" || sensorCalibration["requires_connection"] != true || sensorCalibration["output_root"] != "sensor_calibration" || sensorCalibration["runnable"] != true {
+		t.Fatalf("sensor calibration capability = %+v", sensorCalibration)
+	}
 	cliExec := byCommand["betaflight-cli cli exec"]
 	if cliExec["operation"] != "read_only_or_write_or_dangerous" || cliExec["confirmation"] != "--yes for writes and dangerous CLI lines" || cliExec["requires_connection"] != true || cliExec["runnable"] != true {
 		t.Fatalf("cli exec capability = %+v", cliExec)
@@ -2788,6 +2792,41 @@ func TestSensorsStatusWithFakeFC(t *testing.T) {
 	compass := sensors["compass"].(map[string]any)
 	if compass["declination_degrees"] != 12.3 {
 		t.Fatalf("compass = %+v", compass)
+	}
+}
+
+func TestSensorsCalibrationRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"sensors", "calibrate-accelerometer"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after calibration confirmation failure")
+	}
+}
+
+func TestSensorsCalibrationWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"sensors", "calibrate-magnetometer", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	calibration := data["sensor_calibration"].(map[string]any)
+	if calibration["kind"] != "magnetometer" || calibration["msp_name"] != "MSP_MAG_CALIBRATION" || calibration["acknowledged"] != true {
+		t.Fatalf("calibration = %+v", calibration)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "sensor_calibration" || env.SideEffects[0].Command != "MSP_MAG_CALIBRATION" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }
 

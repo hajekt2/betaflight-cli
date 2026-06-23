@@ -368,7 +368,34 @@ func (a *app) sensorsCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-accelerometer", "Calibrate the accelerometer over MSP", bfcommands.SensorCalibrationAccelerometer))
+	cmd.AddCommand(a.sensorCalibrationCommand("calibrate-magnetometer", "Calibrate the magnetometer over MSP", bfcommands.SensorCalibrationMagnetometer))
 	return cmd
+}
+
+func (a *app) sensorCalibrationCommand(use, short string, kind bfcommands.SensorCalibrationKind) *cobra.Command {
+	return &cobra.Command{
+		Use:   use,
+		Short: short,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", fmt.Sprintf("%s changes sensor calibration state; pass --yes", commandPath(cmd))))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Dangerous, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.CalibrateSensor(cmd.Context(), client, kind)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"sensor_calibration": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "sensor_calibration",
+					Command: result.MSPName,
+					Detail:  fmt.Sprintf("%s calibration requested", result.Kind),
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) beeperCommand() *cobra.Command {

@@ -66,6 +66,8 @@ betaflight-cli presets apply --file preset.cli --port /dev/tty.usbmodem01 --yes
 betaflight-cli blackbox config --port /dev/tty.usbmodem01
 betaflight-cli blackbox inspect flight.bbl
 betaflight-cli sensors status --port /dev/tty.usbmodem01
+betaflight-cli sensors calibrate-accelerometer --port /dev/tty.usbmodem01 --yes
+betaflight-cli sensors calibrate-magnetometer --port /dev/tty.usbmodem01 --yes
 betaflight-cli beeper config --port /dev/tty.usbmodem01
 betaflight-cli mixer status --port /dev/tty.usbmodem01
 betaflight-cli motors status --port /dev/tty.usbmodem01
@@ -173,6 +175,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `rates status` reads active rate profile fields and TPA settings over MSP.
 `filters status` reads loop timing, motor protocol, gyro, D-term, dynamic notch, and RPM filter configuration over MSP.
 `sensors status` reads configured sensor hardware, active sensor hardware, active gyro hardware, raw IMU data, sensor alignment, active sensor flags, and compass declination over MSP.
+`sensors calibrate-accelerometer` and `sensors calibrate-magnetometer` send typed MSP calibration requests, require `--yes`, and report the calibration side effect.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
 `transponder config` reads IR transponder provider requirements, active provider, code bytes, hex data, and native CLI commands over MSP.
 `mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.

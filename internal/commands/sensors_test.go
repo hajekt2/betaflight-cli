@@ -1,6 +1,10 @@
 package commands
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
+)
 
 func TestDecodeSensorHardware(t *testing.T) {
 	hardware, err := DecodeSensorHardware([]byte{1, 0xff}, []string{"gyro", "barometer"})
@@ -88,5 +92,25 @@ func TestActiveSensorNames(t *testing.T) {
 	names := activeSensorNames(0b0100001)
 	if len(names) != 2 || names[0] != "accelerometer" || names[1] != "gyro" {
 		t.Fatalf("names = %+v", names)
+	}
+}
+
+func TestSensorCalibrationCommand(t *testing.T) {
+	code, name, err := sensorCalibrationCommand(SensorCalibrationAccelerometer)
+	if err != nil {
+		t.Fatalf("sensorCalibrationCommand(accelerometer) error = %v", err)
+	}
+	if code != msp.MSPAccCalibration || name != "MSP_ACC_CALIBRATION" {
+		t.Fatalf("accelerometer command = %d %s", code, name)
+	}
+	code, name, err = sensorCalibrationCommand(SensorCalibrationMagnetometer)
+	if err != nil {
+		t.Fatalf("sensorCalibrationCommand(magnetometer) error = %v", err)
+	}
+	if code != msp.MSPMagCalibration || name != "MSP_MAG_CALIBRATION" {
+		t.Fatalf("magnetometer command = %d %s", code, name)
+	}
+	if _, _, err := sensorCalibrationCommand("barometer"); err == nil {
+		t.Fatal("sensorCalibrationCommand(barometer) error = nil, want error")
 	}
 }

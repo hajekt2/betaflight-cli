@@ -61,6 +61,20 @@ type CompassConfig struct {
 	DeclinationDegrees     float64 `json:"declination_degrees"`
 }
 
+type SensorCalibrationKind string
+
+const (
+	SensorCalibrationAccelerometer SensorCalibrationKind = "accelerometer"
+	SensorCalibrationMagnetometer  SensorCalibrationKind = "magnetometer"
+)
+
+type SensorCalibrationResult struct {
+	Kind         SensorCalibrationKind `json:"kind"`
+	MSPCode      uint16                `json:"msp_code"`
+	MSPName      string                `json:"msp_name"`
+	Acknowledged bool                  `json:"acknowledged"`
+}
+
 func ReadSensorStatus(ctx context.Context, client *connection.Client) (*SensorStatus, []string, error) {
 	status := &SensorStatus{}
 	warnings := []string{}
@@ -105,6 +119,33 @@ func ReadSensorStatus(ctx context.Context, client *connection.Client) (*SensorSt
 		warnings = append(warnings, err.Error())
 	}
 	return status, warnings, nil
+}
+
+func CalibrateSensor(ctx context.Context, client *connection.Client, kind SensorCalibrationKind) (*SensorCalibrationResult, error) {
+	code, name, err := sensorCalibrationCommand(kind)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, code, nil); err != nil {
+		return nil, fmt.Errorf("%s calibration request failed: %w", kind, err)
+	}
+	return &SensorCalibrationResult{
+		Kind:         kind,
+		MSPCode:      code,
+		MSPName:      name,
+		Acknowledged: true,
+	}, nil
+}
+
+func sensorCalibrationCommand(kind SensorCalibrationKind) (uint16, string, error) {
+	switch kind {
+	case SensorCalibrationAccelerometer:
+		return msp.MSPAccCalibration, "MSP_ACC_CALIBRATION", nil
+	case SensorCalibrationMagnetometer:
+		return msp.MSPMagCalibration, "MSP_MAG_CALIBRATION", nil
+	default:
+		return 0, "", fmt.Errorf("unsupported sensor calibration kind %q", kind)
+	}
 }
 
 func DecodeSensorHardware(payload []byte, names []string) ([]SensorHardware, error) {

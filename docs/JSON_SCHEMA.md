@@ -262,6 +262,8 @@ The object includes arming configuration, failsafe stage and procedure configura
 
 `sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP2_GYRO_SENSOR_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.
 The object includes configured hardware IDs, active hardware IDs, active gyro hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
+`sensors calibrate-accelerometer` and `sensors calibrate-magnetometer` return a `sensor_calibration` object with the calibration kind, MSP command name/code, and acknowledgement flag.
+Successful calibration commands also include a `sensor_calibration` side effect.
 
 `beeper config` returns a `beeper` object decoded from `MSP_BEEPER_CONFIG`.
 The object includes raw disable masks, decoded disabled beeper condition names, DShot beacon tone, and decoded DShot beacon disabled condition names.

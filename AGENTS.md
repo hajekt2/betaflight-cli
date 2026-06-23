@@ -42,3 +42,17 @@ For protocol code, include unit tests with captured MSP frames.
 For generated code, run `go generate ./...` and verify the generated diff is intentional.
 For CLI behavior, run command-level tests where possible.
 
+## Project Notes for AI Agents
+
+This runbook is for in-repo agents and tooling.
+This CLI remains AI-agent first.
+JSON is the default output for non-interactive commands.
+`--format text` is optional and should be explicit.
+
+- Scope focus is Betaflight 2025.12+ and USB serial transport first.
+- Keep behavior safe by default:
+  - read-only commands are not destructive.
+  - config writes are explicit.
+  - save/reboot/bootloader/erase are separate high-risk actions.
+- Use `go.bug.st/serial` and keep protocol, connection, command, and output layers separate.
+- Prefer generated registries from upstream references and test every parity-sensitive update path.

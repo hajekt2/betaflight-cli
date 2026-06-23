@@ -190,6 +190,16 @@ By default, `doctor` lists ports without opening them.
 It should only send `MSP_API_VERSION` probes when `--probe` is passed.
 When probing succeeds, `doctor --probe` returns target identity, firmware support status, and compiled settings metadata details for each responding port.
 
+### Quick build
+
+The project uses Go and Cobra and produces a single native binary for each target.
+
+- `make build` builds one local binary (`betaflight-cli`).
+- `make build-release` builds single-file binaries for Linux, macOS, and Windows targets.
+- `make build-static` uses `CGO_ENABLED=0` for static-friendly releases on Unix-like targets.
+
+For AI-agent-first usage, JSON is always the default output format unless `--format text` is explicitly selected.
+
 ## Proposed Project Structure
 
 ```text

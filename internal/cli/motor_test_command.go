@@ -19,23 +19,24 @@ const (
 )
 
 type motorTestPlan struct {
-	Kind                  string              `json:"kind"`
-	Applied               bool                `json:"applied"`
-	Dangerous             bool                `json:"dangerous"`
-	MotorIndex            int                 `json:"motor_index"`
-	Value                 int                 `json:"value"`
-	DurationMS            int64               `json:"duration_ms"`
-	CommandPreview        string              `json:"command_preview"`
-	StopCommandPreview    string              `json:"stop_command_preview"`
-	Stopped               bool                `json:"stopped"`
-	Preflight             *motorTestPreflight `json:"preflight,omitempty"`
-	PostStop              *motorTestPostStop  `json:"post_stop,omitempty"`
-	Audit                 *motorTestAudit     `json:"audit,omitempty"`
-	ResponseLines         map[string][]string `json:"response_lines,omitempty"`
-	RequiredConfirmations []string            `json:"required_confirmations"`
-	SafetyChecks          []safetyCheck       `json:"safety_checks"`
-	RecommendedPreflight  []string            `json:"recommended_preflight"`
-	ApplyMessage          string              `json:"apply_message"`
+	Kind                  string               `json:"kind"`
+	Applied               bool                 `json:"applied"`
+	Dangerous             bool                 `json:"dangerous"`
+	MotorIndex            int                  `json:"motor_index"`
+	Value                 int                  `json:"value"`
+	DurationMS            int64                `json:"duration_ms"`
+	CommandPreview        string               `json:"command_preview"`
+	StopCommandPreview    string               `json:"stop_command_preview"`
+	Stopped               bool                 `json:"stopped"`
+	Preflight             *motorTestPreflight  `json:"preflight,omitempty"`
+	PostStop              *motorTestPostStop   `json:"post_stop,omitempty"`
+	Comparison            *motorTestComparison `json:"comparison,omitempty"`
+	Audit                 *motorTestAudit      `json:"audit,omitempty"`
+	ResponseLines         map[string][]string  `json:"response_lines,omitempty"`
+	RequiredConfirmations []string             `json:"required_confirmations"`
+	SafetyChecks          []safetyCheck        `json:"safety_checks"`
+	RecommendedPreflight  []string             `json:"recommended_preflight"`
+	ApplyMessage          string               `json:"apply_message"`
 }
 
 type motorTestPreflight struct {
@@ -54,6 +55,19 @@ type motorTestPostStop struct {
 	TelemetryRPM    []uint32 `json:"telemetry_rpm,omitempty"`
 	OutputOrder     []uint8  `json:"output_order,omitempty"`
 	WarningMessages []string `json:"warning_messages,omitempty"`
+}
+
+type motorTestComparison struct {
+	Source               string   `json:"source"`
+	ReadOnly             bool     `json:"read_only"`
+	PreflightCaptured    bool     `json:"preflight_captured"`
+	PostStopCaptured     bool     `json:"post_stop_captured"`
+	OutputCount          int      `json:"output_count"`
+	NonMinCommandOutputs int      `json:"non_min_command_outputs"`
+	MaxOutput            uint16   `json:"max_output,omitempty"`
+	MinOutput            uint16   `json:"min_output,omitempty"`
+	TelemetrySampleCount int      `json:"telemetry_sample_count"`
+	Notes                []string `json:"notes,omitempty"`
 }
 
 type motorTestAudit struct {
@@ -160,6 +174,7 @@ func (a *app) applyMotorTestPlan(cmd *cobra.Command, plan motorTestPlan) error {
 			postStopWarnings = append(postStopWarnings, fmt.Sprintf("post-stop motor status unavailable: %v", postStopErr))
 		} else {
 			plan.PostStop = postStop
+			plan.Comparison = buildMotorTestComparison(plan.Preflight, postStop)
 		}
 		plan.Audit = buildMotorTestAudit(plan, elapsedMS, stopErr, postStopWarnings)
 		env := output.Success(commandPath(cmd), &target, map[string]any{
@@ -225,6 +240,42 @@ func readMotorTestPostStop(ctx context.Context, client *connection.Client) (*mot
 		}
 	}
 	return post, nil
+}
+
+func buildMotorTestComparison(preflight *motorTestPreflight, postStop *motorTestPostStop) *motorTestComparison {
+	if preflight == nil || postStop == nil {
+		return nil
+	}
+	comparison := &motorTestComparison{
+		Source:               "preflight to post-stop summary",
+		ReadOnly:             true,
+		PreflightCaptured:    preflight != nil,
+		PostStopCaptured:     postStop != nil,
+		OutputCount:          len(postStop.Outputs),
+		TelemetrySampleCount: len(postStop.TelemetryRPM),
+	}
+	if len(postStop.Outputs) > 0 {
+		comparison.MinOutput = postStop.Outputs[0]
+		comparison.MaxOutput = postStop.Outputs[0]
+		for _, value := range postStop.Outputs {
+			if value != minMotorTestValue {
+				comparison.NonMinCommandOutputs++
+			}
+			if value < comparison.MinOutput {
+				comparison.MinOutput = value
+			}
+			if value > comparison.MaxOutput {
+				comparison.MaxOutput = value
+			}
+		}
+		if comparison.NonMinCommandOutputs == 0 {
+			comparison.Notes = append(comparison.Notes, "all post-stop outputs are at min command or lower")
+		}
+	}
+	if len(postStop.WarningMessages) > 0 {
+		comparison.Notes = append(comparison.Notes, postStop.WarningMessages...)
+	}
+	return comparison
 }
 
 func motorSafetyPassed(plan motorTestPlan, name string) bool {

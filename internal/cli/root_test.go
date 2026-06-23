@@ -1372,6 +1372,10 @@ func TestMotorsTestApplyUsesDangerousOperation(t *testing.T) {
 	if postStop["read_only"] != true || len(postStop["outputs"].([]any)) == 0 || len(postStop["telemetry_rpm"].([]any)) == 0 {
 		t.Fatalf("post stop = %+v", postStop)
 	}
+	comparison := plan["comparison"].(map[string]any)
+	if comparison["read_only"] != true || comparison["preflight_captured"] != true || comparison["post_stop_captured"] != true || comparison["output_count"].(float64) == 0 {
+		t.Fatalf("comparison = %+v", comparison)
+	}
 	audit := plan["audit"].(map[string]any)
 	if audit["safety_passed"] != true || audit["preflight_captured"] != true || audit["post_stop_captured"] != true || audit["stop_succeeded"] != true {
 		t.Fatalf("audit = %+v", audit)

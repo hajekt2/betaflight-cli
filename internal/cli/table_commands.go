@@ -1014,6 +1014,90 @@ func (a *app) rxRangeCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set)
+	cmd.AddCommand(set, a.rxRangeSetJSONCommand())
 	return cmd
+}
+
+func (a *app) rxRangeSetJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Plan or set receiver channel range rows from JSON",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			rows, err := parseRXRangeRowsJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			lines := make([]string, 0, len(rows))
+			for _, row := range rows {
+				lines = append(lines, fmt.Sprintf("rxrange %d %d %d", row.Channel, row.Min, row.Max))
+			}
+			return a.planOrApplyCLI(cmd, lines, "rxrange", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+type rxRangeSetRow struct {
+	Channel int `json:"channel"`
+	Min     int `json:"min"`
+	Max     int `json:"max"`
+}
+
+func parseRXRangeRowsJSON(data []byte) ([]rxRangeSetRow, error) {
+	var wrapped struct {
+		RXRanges []rxRangeSetRow `json:"rxranges"`
+		Ranges   []rxRangeSetRow `json:"ranges"`
+		RXRange  *rxRangeSetRow  `json:"rxrange"`
+		Range    *rxRangeSetRow  `json:"range"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	switch {
+	case wrapped.RXRanges != nil:
+		return validateRXRangeRows(wrapped.RXRanges)
+	case wrapped.Ranges != nil:
+		return validateRXRangeRows(wrapped.Ranges)
+	case wrapped.RXRange != nil:
+		return validateRXRangeRows([]rxRangeSetRow{*wrapped.RXRange})
+	case wrapped.Range != nil:
+		return validateRXRangeRows([]rxRangeSetRow{*wrapped.Range})
+	}
+	var rows []rxRangeSetRow
+	if err := json.Unmarshal(data, &rows); err == nil {
+		return validateRXRangeRows(rows)
+	}
+	var row rxRangeSetRow
+	if err := json.Unmarshal(data, &row); err != nil {
+		return nil, err
+	}
+	return validateRXRangeRows([]rxRangeSetRow{row})
+}
+
+func validateRXRangeRows(rows []rxRangeSetRow) ([]rxRangeSetRow, error) {
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("at least one rxrange row is required")
+	}
+	for i, row := range rows {
+		if row.Channel < 0 || row.Channel > 255 {
+			return nil, fmt.Errorf("rows[%d].channel must be 0..255", i)
+		}
+		if row.Min < 0 || row.Min > 2500 {
+			return nil, fmt.Errorf("rows[%d].min must be 0..2500", i)
+		}
+		if row.Max < 0 || row.Max > 2500 {
+			return nil, fmt.Errorf("rows[%d].max must be 0..2500", i)
+		}
+		if row.Min > row.Max {
+			return nil, fmt.Errorf("rows[%d].min must be less than or equal to max", i)
+		}
+	}
+	return rows, nil
 }

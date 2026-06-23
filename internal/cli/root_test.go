@@ -419,6 +419,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rcDeadbandJSON["operation"] != "write" || rcDeadbandJSON["confirmation"] != "--yes" || rcDeadbandJSON["requires_connection"] != true || rcDeadbandJSON["output_root"] != "rc_deadband" || rcDeadbandJSON["runnable"] != true {
 		t.Fatalf("rc deadband JSON capability = %+v", rcDeadbandJSON)
 	}
+	rxrangeJSON := byCommand["betaflight-cli rxrange set-json"]
+	if rxrangeJSON["operation"] != "plan_or_write" || rxrangeJSON["confirmation"] != "--yes with --apply or --save" || rxrangeJSON["requires_connection"] != true || rxrangeJSON["output_root"] != "change_plan" || rxrangeJSON["input"] == "" || rxrangeJSON["runnable"] != true {
+		t.Fatalf("rxrange JSON capability = %+v", rxrangeJSON)
+	}
 	gpsConfig := byCommand["betaflight-cli gps set-config"]
 	if gpsConfig["operation"] != "write" || gpsConfig["confirmation"] != "--yes" || gpsConfig["requires_connection"] != true || gpsConfig["output_root"] != "gps_config" || gpsConfig["runnable"] != true {
 		t.Fatalf("gps config capability = %+v", gpsConfig)
@@ -7989,6 +7993,61 @@ func TestTableDomainSetApplyWithFakeFC(t *testing.T) {
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "rxrange 0 1000 2000" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestRXRangeSetJSONPlansDoNotConnect(t *testing.T) {
+	input := `{"rxranges":[{"channel":0,"min":1000,"max":2000},{"channel":1,"min":1010,"max":1990}]}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"rxrange", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if data["applied"] != false || len(lines) != 2 || lines[0] != "rxrange 0 1000 2000" || lines[1] != "rxrange 1 1010 1990" {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for rxrange JSON plan")
+	}
+}
+
+func TestRXRangeSetJSONApplyWithFakeFC(t *testing.T) {
+	input := `{"range":{"channel":0,"min":1000,"max":2000}}`
+	env, err := runTestCommandWithInput(t, []string{"rxrange", "set-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "rxrange 0 1000 2000" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestRXRangeSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"rxrange":{"channel":0,"min":2000,"max":1000}}`
+	env, err := runTestCommandWithInput(t, []string{"rxrange", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid rxrange JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

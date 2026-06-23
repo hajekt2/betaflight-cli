@@ -319,6 +319,8 @@ It returns the same `rc_map` object as `receiver set-map`.
 Successful RC deadband writes include an `rc_deadband` side effect.
 `receiver set-deadband-json` accepts either a deadband object or an object with `rc_deadband`, `deadband`, `config`, or `receiver.deadband`.
 It returns the same `rc_deadband` object as `receiver set-deadband`.
+`rxrange set-json` accepts either an array of receiver range rows or an object with `rxranges`, `ranges`, `rxrange`, or `range`.
+It returns a `change_plan` object with native `rxrange` CLI lines and supports the same dry-run, `--apply`, and `--save` behavior as `rxrange set`.
 
 `gps status` returns a `gps` object decoded from `MSP_GPS_CONFIG`, `MSP_RAW_GPS`, `MSP_COMP_GPS`, `MSP_GPS_RESCUE`, `MSP_GPS_RESCUE_PIDS`, and `MSP_GPSSVINFO`.
 The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.

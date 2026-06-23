@@ -679,6 +679,10 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPServoMixRules:
 		f.out.Write(response(frame.Code, []byte{0, 1, 100, 10, 0, 100, 2, 0, 0, 0, 0, 0, 0, 0}, false))
+	case msp.MSPSetServoConfiguration:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 13))
+	case msp.MSPSetServoMixRule:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 8))
 	case msp.MSPVTXConfig:
 		payload := []byte{3, 5, 8, 2, 1}
 		payload = appendU16(payload, 5861)

@@ -84,6 +84,14 @@ type ServoConfiguration struct {
 	ReversedSourcesMask uint32 `json:"reversed_sources_mask"`
 }
 
+type ServoConfigurationSetResult struct {
+	Config       ServoConfiguration `json:"config"`
+	MSPCode      uint16             `json:"msp_code"`
+	MSPName      string             `json:"msp_name"`
+	Acknowledged bool               `json:"acknowledged"`
+	SaveRequired bool               `json:"save_required"`
+}
+
 type ServoMixRule struct {
 	Index         int   `json:"index"`
 	TargetChannel uint8 `json:"target_channel"`
@@ -94,6 +102,14 @@ type ServoMixRule struct {
 	Max           uint8 `json:"max"`
 	Box           uint8 `json:"box"`
 	Active        bool  `json:"active"`
+}
+
+type ServoMixRuleSetResult struct {
+	Rule         ServoMixRule `json:"rule"`
+	MSPCode      uint16       `json:"msp_code"`
+	MSPName      string       `json:"msp_name"`
+	Acknowledged bool         `json:"acknowledged"`
+	SaveRequired bool         `json:"save_required"`
 }
 
 func ReadMotorStatus(ctx context.Context, client *connection.Client) (*MotorStatus, []string, error) {
@@ -197,8 +213,62 @@ func EncodeMotor3DConfig(config Motor3DConfig) []byte {
 	return payload
 }
 
+func SetServoConfiguration(ctx context.Context, client *connection.Client, config ServoConfiguration) (*ServoConfigurationSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetServoConfiguration, EncodeServoConfiguration(config)); err != nil {
+		return nil, fmt.Errorf("servo configuration request failed: %w", err)
+	}
+	return &ServoConfigurationSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetServoConfiguration,
+		MSPName:      "MSP_SET_SERVO_CONFIGURATION",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeServoConfiguration(config ServoConfiguration) []byte {
+	payload := []byte{byte(config.Index)}
+	payload = appendU16Payload(payload, config.Min)
+	payload = appendU16Payload(payload, config.Max)
+	payload = appendU16Payload(payload, config.Middle)
+	payload = append(payload, byte(config.Rate), config.ForwardFromChannel)
+	payload = appendU32Payload(payload, config.ReversedSourcesMask)
+	return payload
+}
+
+func SetServoMixRule(ctx context.Context, client *connection.Client, rule ServoMixRule) (*ServoMixRuleSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetServoMixRule, EncodeServoMixRule(rule)); err != nil {
+		return nil, fmt.Errorf("servo mix rule request failed: %w", err)
+	}
+	rule.Active = rule.TargetChannel != 0 || rule.InputSource != 0 || rule.Rate != 0 || rule.Speed != 0 || rule.Min != 0 || rule.Max != 0 || rule.Box != 0
+	return &ServoMixRuleSetResult{
+		Rule:         rule,
+		MSPCode:      msp.MSPSetServoMixRule,
+		MSPName:      "MSP_SET_SERVO_MIX_RULE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeServoMixRule(rule ServoMixRule) []byte {
+	return []byte{
+		byte(rule.Index),
+		rule.TargetChannel,
+		rule.InputSource,
+		byte(rule.Rate),
+		rule.Speed,
+		rule.Min,
+		rule.Max,
+		rule.Box,
+	}
+}
+
 func appendU16Payload(dst []byte, value uint16) []byte {
 	return append(dst, byte(value), byte(value>>8))
+}
+
+func appendU32Payload(dst []byte, value uint32) []byte {
+	return append(dst, byte(value), byte(value>>8), byte(value>>16), byte(value>>24))
 }
 
 func motorBoolByte(value bool) byte {

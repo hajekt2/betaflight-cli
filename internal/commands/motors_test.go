@@ -100,3 +100,36 @@ func TestDecodeServoConfigurationAndRules(t *testing.T) {
 		t.Fatalf("rules = %+v", rules)
 	}
 }
+
+func TestEncodeServoConfiguration(t *testing.T) {
+	payload := EncodeServoConfiguration(ServoConfiguration{
+		Index:               1,
+		Min:                 1100,
+		Max:                 1900,
+		Middle:              1501,
+		Rate:                -50,
+		ForwardFromChannel:  2,
+		ReversedSourcesMask: 0x05,
+	})
+	want := []byte{1, 0x4c, 0x04, 0x6c, 0x07, 0xdd, 0x05, 0xce, 2, 5, 0, 0, 0}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}
+
+func TestEncodeServoMixRule(t *testing.T) {
+	payload := EncodeServoMixRule(ServoMixRule{
+		Index:         2,
+		TargetChannel: 1,
+		InputSource:   3,
+		Rate:          -25,
+		Speed:         10,
+		Min:           5,
+		Max:           95,
+		Box:           4,
+	})
+	want := []byte{2, 1, 3, 231, 10, 5, 95, 4}
+	if string(payload) != string(want) {
+		t.Fatalf("payload = %v, want %v", payload, want)
+	}
+}

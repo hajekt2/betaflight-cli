@@ -391,6 +391,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
 		t.Fatalf("led values capability = %+v", ledValues)
 	}
+	servoConfig := byCommand["betaflight-cli servos set-config"]
+	if servoConfig["operation"] != "write" || servoConfig["confirmation"] != "--yes" || servoConfig["requires_connection"] != true || servoConfig["output_root"] != "servo_config" || servoConfig["runnable"] != true {
+		t.Fatalf("servo config capability = %+v", servoConfig)
+	}
+	servoMixRule := byCommand["betaflight-cli servos set-mix-rule"]
+	if servoMixRule["operation"] != "write" || servoMixRule["confirmation"] != "--yes" || servoMixRule["requires_connection"] != true || servoMixRule["output_root"] != "servo_mix_rule" || servoMixRule["runnable"] != true {
+		t.Fatalf("servo mix rule capability = %+v", servoMixRule)
+	}
 	voltageMeter := byCommand["betaflight-cli battery set-voltage-meter"]
 	if voltageMeter["operation"] != "write" || voltageMeter["confirmation"] != "--yes" || voltageMeter["requires_connection"] != true || voltageMeter["output_root"] != "voltage_meter_config" || voltageMeter["runnable"] != true {
 		t.Fatalf("voltage meter capability = %+v", voltageMeter)
@@ -3949,6 +3957,83 @@ func TestServosStatusWithFakeFC(t *testing.T) {
 	rule := rules[0].(map[string]any)
 	if rule["active"] != true || rule["rate"] != float64(100) {
 		t.Fatalf("rules = %+v", rules)
+	}
+}
+
+func TestServosSetConfigWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"servos", "set-config", "1", "1100", "1900", "1501", "-50", "2", "5", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["servo_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["index"] != float64(1) || config["rate"] != float64(-50) || result["save_required"] != true {
+		t.Fatalf("servo_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_SERVO_CONFIGURATION" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestServosSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"servos", "set-config", "1", "1100", "1900", "1501", "-50", "2", "5"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestServosSetConfigValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"servos", "set-config", "1", "1100", "1900", "1501", "-200", "2", "5", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestServosSetMixRuleWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"servos", "set-mix-rule", "2", "1", "3", "-25", "10", "5", "95", "4", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["servo_mix_rule"].(map[string]any)
+	rule := result["rule"].(map[string]any)
+	if rule["index"] != float64(2) || rule["rate"] != float64(-25) || rule["active"] != true || result["save_required"] != true {
+		t.Fatalf("servo_mix_rule = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_SERVO_MIX_RULE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestServosSetMixRuleRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"servos", "set-mix-rule", "2", "1", "3", "-25", "10", "5", "95", "4"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

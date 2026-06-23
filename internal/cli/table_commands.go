@@ -165,8 +165,139 @@ func (a *app) servosCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(reverse, &reverseFlags)
-	cmd.AddCommand(set, reverse)
+	cmd.AddCommand(set, reverse, a.servoSetConfigCommand(), a.servoSetMixRuleCommand())
 	return cmd
+}
+
+func (a *app) servoSetConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config INDEX MIN MAX MIDDLE RATE FORWARD_FROM_CHANNEL REVERSED_SOURCES_MASK",
+		Short: "Set one servo configuration row over MSP",
+		Args:  cobra.ExactArgs(7),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			min, err := parseUint16Arg("min", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			max, err := parseUint16Arg("max", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			middle, err := parseUint16Arg("middle", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			rate, err := parseInt8Arg("rate", args[4])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			forward, err := parseUint8Arg("forward_from_channel", args[5])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			reversed, err := parseUint32Arg("reversed_sources_mask", args[6])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "servo configuration changes servo settings; pass --yes"))
+			}
+			config := bfcommands.ServoConfiguration{
+				Index:               int(index),
+				Min:                 min,
+				Max:                 max,
+				Middle:              middle,
+				Rate:                rate,
+				ForwardFromChannel:  forward,
+				ReversedSourcesMask: reversed,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetServoConfiguration(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"servo_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "servo_config",
+					Command: "MSP_SET_SERVO_CONFIGURATION",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) servoSetMixRuleCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-mix-rule INDEX TARGET_CHANNEL INPUT_SOURCE RATE SPEED MIN MAX BOX",
+		Short: "Set one servo mixer rule over MSP",
+		Args:  cobra.ExactArgs(8),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			target, err := parseUint8Arg("target_channel", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			source, err := parseUint8Arg("input_source", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			rate, err := parseInt8Arg("rate", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			speed, err := parseUint8Arg("speed", args[4])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			min, err := parseUint8Arg("min", args[5])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			max, err := parseUint8Arg("max", args[6])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			box, err := parseUint8Arg("box", args[7])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "servo mix rule changes servo settings; pass --yes"))
+			}
+			rule := bfcommands.ServoMixRule{
+				Index:         int(index),
+				TargetChannel: target,
+				InputSource:   source,
+				Rate:          rate,
+				Speed:         speed,
+				Min:           min,
+				Max:           max,
+				Box:           box,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetServoMixRule(cmd.Context(), client, rule)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"servo_mix_rule": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "servo_mix_rule",
+					Command: "MSP_SET_SERVO_MIX_RULE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) adjustmentsCommand() *cobra.Command {

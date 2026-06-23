@@ -573,12 +573,28 @@ func parseUint8Arg(name, value string) (uint8, error) {
 	return uint8(parsed), nil
 }
 
+func parseInt8Arg(name, value string) (int8, error) {
+	parsed, err := strconv.ParseInt(value, 10, 8)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a signed 8-bit integer", name)
+	}
+	return int8(parsed), nil
+}
+
 func parseUint16Arg(name, value string) (uint16, error) {
 	parsed, err := strconv.ParseUint(value, 10, 16)
 	if err != nil {
 		return 0, fmt.Errorf("%s must be an unsigned 16-bit integer", name)
 	}
 	return uint16(parsed), nil
+}
+
+func parseUint32Arg(name, value string) (uint32, error) {
+	parsed, err := strconv.ParseUint(value, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be an unsigned 32-bit integer", name)
+	}
+	return uint32(parsed), nil
 }
 
 func parseProfileCopyKind(value string) (bfcommands.ProfileCopyKind, error) {

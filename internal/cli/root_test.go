@@ -428,10 +428,21 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 		t.Fatalf("summary = %+v", summary)
 	}
 	domains := coverage["domains"].([]any)
+	if len(domains) != int(summary["domain_count"].(float64)) {
+		t.Fatalf("coverage domain_count mismatch: got=%d want=%v", len(domains), summary["domain_count"])
+	}
+	domainCounts := map[string]int{}
 	byDomain := map[string]map[string]any{}
 	for _, item := range domains {
 		domain := item.(map[string]any)
+		name := domain["domain"].(string)
+		domainCounts[name]++
 		byDomain[domain["domain"].(string)] = domain
+	}
+	for name, count := range domainCounts {
+		if count != 1 {
+			t.Fatalf("coverage domain %q has %d entries, expected 1", name, count)
+		}
 	}
 	backup := byDomain["configuration-backup"]
 	if backup["status"] != "implemented" || len(backup["read_commands"].([]any)) == 0 {

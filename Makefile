@@ -100,6 +100,14 @@ verify-release-artifacts:
 test:
 	$(GO) test ./...
 
+.PHONY: test-hardware-readonly
+test-hardware-readonly:
+	@if [ -z "$(BETAFLIGHT_CLI_HARDWARE_PORT)" ]; then \
+		echo "error: BETAFLIGHT_CLI_HARDWARE_PORT is required for read-only hardware tests"; \
+		exit 1; \
+	fi
+	BETAFLIGHT_CLI_HARDWARE_PORT="$(BETAFLIGHT_CLI_HARDWARE_PORT)" $(GO) test -tags hardware ./internal/hardwaretest
+
 .PHONY: generate
 generate:
 	$(GO) generate ./pkg/msp

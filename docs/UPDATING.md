@@ -164,7 +164,7 @@ They should not send random writes and hope the firmware rejects them.
 - CLI contract tests pass.
 - Fake Flight Controller workflow tests pass.
 - CI formatting, unit test, and release build jobs pass.
-- Optional read-only hardware integration tests run when hardware is available.
+- Optional read-only hardware integration tests run with `BETAFLIGHT_CLI_HARDWARE_PORT=/path/to/port make test-hardware-readonly` when hardware is available.
 - Cross-platform build matrix passes.
 - Dangerous command safety tests pass.
 - Blackbox parser fixtures pass when Blackbox code is affected.

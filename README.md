@@ -416,6 +416,8 @@ Windows COM ports, macOS `/dev/tty.*`, Linux `/dev/ttyACM*`, Linux `/dev/ttyUSB*
 Blackbox parsing and analysis ship in the same binary, but use separate packages from live Flight Controller transport.
 Tests should include fake transports and a minimal fake Flight Controller for stateful command behavior.
 Read-only hardware integration tests can exist, but they are secondary and opt-in.
+Run them only against a safe, connected Flight Controller with `BETAFLIGHT_CLI_HARDWARE_PORT=/dev/tty.usbmodem01 make test-hardware-readonly`.
+The hardware test target requires the `hardware` build tag internally and performs only read-only handshake, info, and telemetry checks.
 Release artifacts should include SHA256 checksums from day one.
 Use `make build-release` to create static release binaries in `dist/` and write `dist/SHA256SUMS`.
 The release target also runs `make verify-release-artifacts` to confirm the expected six-platform matrix and checksum manifest are present.

@@ -1049,6 +1049,28 @@ func (a *app) settingsCommand() *cobra.Command {
 			})
 		},
 	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "diff",
+		Short: "Run non-interactive `diff all` and parse response",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				lines, err := client.ExecCLI(cmd.Context(), "diff all")
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				doc := bfconfig.Parse(lines, settings.DefaultRegistry)
+				envData := map[string]any{
+					"command":          "diff all",
+					"lines":            lines,
+					"raw":              strings.Join(lines, "\n"),
+					"sections":         doc.Sections,
+					"configuration":    doc,
+					"raw_authoritative": true,
+				}
+				return output.Success(commandPath(cmd), &target, envData)
+			})
+		},
+	})
 	var apply bool
 	var save bool
 	set := &cobra.Command{

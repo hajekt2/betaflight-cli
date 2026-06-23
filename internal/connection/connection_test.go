@@ -86,6 +86,24 @@ func TestClientRequestRespectsContextCancel(t *testing.T) {
 	}
 }
 
+func TestCheckSupportedFirmwareVersion(t *testing.T) {
+	t.Run("supportedVersions", func(t *testing.T) {
+		for _, version := range []string{"2025.12.0", "2025.12.1", "2026.0.0", "2027.3.2"} {
+			if !isSupportedFirmwareVersion(version) {
+				t.Fatalf("isSupportedFirmwareVersion(%q) = false, want true", version)
+			}
+		}
+	})
+
+	t.Run("unsupportedVersions", func(t *testing.T) {
+		for _, version := range []string{"2025.11.0", "2024.99.0", "foo", "", "abc.def"} {
+			if isSupportedFirmwareVersion(version) {
+				t.Fatalf("isSupportedFirmwareVersion(%q) = true, want false", version)
+			}
+		}
+	})
+}
+
 func TestClientExecCLIRespectsContextDeadline(t *testing.T) {
 	client, err := NewClient(&silentPort{}, time.Second)
 	if err != nil {

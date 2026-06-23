@@ -7,6 +7,7 @@ import (
 	"io"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -143,13 +144,35 @@ func checkSupported(target TargetInfo, allow bool) error {
 	if target.MSPAPIVersion == "" {
 		return &CodedError{Code: "unsupported_firmware", Message: "missing MSP API version"}
 	}
-	if !strings.HasPrefix(target.FirmwareVersion, "2025.12.") && !strings.HasPrefix(target.FirmwareVersion, "2026.") && !allow {
+	if allow {
+		return nil
+	}
+	if !isSupportedFirmwareVersion(target.FirmwareVersion) {
 		return &CodedError{
 			Code:    "unsupported_firmware",
 			Message: fmt.Sprintf("firmware %q is outside the supported metadata set; pass --allow-unsupported to continue", target.FirmwareVersion),
 		}
 	}
 	return nil
+}
+
+func isSupportedFirmwareVersion(version string) bool {
+	parts := strings.Split(version, ".")
+	if len(parts) < 2 {
+		return false
+	}
+	year, err := strconv.Atoi(parts[0])
+	if err != nil || year < 2025 {
+		return false
+	}
+	if year > 2025 {
+		return true
+	}
+	month, err := strconv.Atoi(parts[1])
+	if err != nil || month < 12 {
+		return false
+	}
+	return true
 }
 
 func autoDetect(ctx context.Context, cfg Config) (*Client, TargetInfo, error) {

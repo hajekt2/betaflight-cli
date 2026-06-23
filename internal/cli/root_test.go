@@ -422,7 +422,13 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	if called {
 		t.Fatal("connector was called for capabilities coverage")
 	}
-	coverage := env.Data.(map[string]any)["coverage"].(map[string]any)
+	data := env.Data.(map[string]any)
+	capabilities := data["capabilities"].(map[string]any)
+	safety := capabilities["safety"].(map[string]any)
+	if safety["auto_port_writes_require_opt_in"].(bool) {
+		t.Fatalf("safety auto_port_writes_require_opt_in should be false")
+	}
+	coverage := data["coverage"].(map[string]any)
 	summary := coverage["summary"].(map[string]any)
 	if summary["domain_count"].(float64) < 15 || summary["implemented_count"].(float64) < 10 {
 		t.Fatalf("summary = %+v", summary)
@@ -476,6 +482,33 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	}
 	if _, ok := byDomain["firmware-flashing"]; !ok {
 		t.Fatalf("missing firmware-flashing domain in coverage")
+	}
+}
+
+func TestWriteOperationsDefaultAutoPortWhenNotProvided(t *testing.T) {
+	var observed connection.Config
+	env, err := runTestCommand(t, []string{"settings", "set", "small_angle", "5", "--apply", "--yes"}, func(_ context.Context, cfg connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		observed = cfg
+		client, clientErr := connection.NewClient(fakefc.New(), time.Second)
+		if clientErr != nil {
+			return nil, connection.TargetInfo{}, clientErr
+		}
+		target, targetErr := client.Handshake(context.Background())
+		if targetErr != nil {
+			client.Close()
+			return nil, connection.TargetInfo{}, targetErr
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	if !observed.AutoPort {
+		t.Fatalf("expected AutoPort to default true for write commands: %#v", observed)
 	}
 }
 

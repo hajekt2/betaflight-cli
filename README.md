@@ -118,9 +118,9 @@ JSON output should use a versioned response envelope from the first release.
 The envelope schema is documented in [docs/JSON_SCHEMA.md](docs/JSON_SCHEMA.md).
 `betaflight-cli schema` returns a machine-readable contract payload describing the active envelope fields and known command families.
 When JSON output has `ok: false`, the process should exit non-zero.
-When `--port` is omitted, read-only commands may auto-detect and connect to the most likely Betaflight serial port.
-Write and dangerous commands should require either an explicit `--port` or an explicit `--auto-port` flag.
-If multiple Betaflight-compatible devices answer the handshake, the command should fail with a structured candidate list and require explicit selection.
+When `--port` is omitted, read-only and write commands may auto-detect and connect to the only Betaflight-compatible serial port that responds.
+If multiple Betaflight-compatible devices answer the handshake, commands fail with a structured candidate list and require explicit `--port`.
+`--auto-port=false` is available if you want explicit selection only.
 
 Configurator parity should be exposed as focused command families rather than one giant command.
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
@@ -255,7 +255,7 @@ By default, `settings set name value` should return a JSON change plan without w
 `--apply` must never imply `save`.
 Scripts may use `--apply --save --yes`, but that path must report the persistence and reboot expectation clearly.
 Automatic port selection is allowed for read-only commands.
-For writes, automatic port selection must be explicitly requested with `--auto-port` so the selected device is intentional.
+Automatic port selection is enabled by default for writes, and can be disabled with `--auto-port=false`.
 Automatic selection must fail when more than one Betaflight-compatible device responds.
 Non-interactive commands should never prompt by default.
 Missing confirmation should fail fast with structured JSON.

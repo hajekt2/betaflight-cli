@@ -129,10 +129,11 @@ func buildCapabilityIndex(root *cobra.Command) capabilityIndex {
 			ReadOnlyDefault:          true,
 			WriteRequiresYes:         true,
 			DangerousRequiresYes:     true,
-			AutoPortWritesRequireOpt: true,
+			AutoPortWritesRequireOpt: false,
 			SaveIsExplicit:           true,
 			Notes: []string{
-				"read commands may auto-select a single USB flight-controller candidate",
+				"read and write commands may auto-select a single USB flight-controller candidate",
+				"write and dangerous commands do not require explicit --auto-port by default",
 				"write and dangerous commands require explicit confirmation and never save implicitly unless the command exposes a save option",
 				"configuration restore and preset flows should be planned before apply",
 				"raw CLI text remains authoritative for backups and restores",

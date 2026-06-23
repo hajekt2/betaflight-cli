@@ -79,7 +79,7 @@ func (a *app) rootCommand() *cobra.Command {
 		SilenceErrors: true,
 	}
 	root.PersistentFlags().StringVar(&a.opts.port, "port", "", "USB serial port, such as COM3 or /dev/tty.usbmodem01")
-	root.PersistentFlags().BoolVar(&a.opts.autoPort, "auto-port", false, "explicitly allow automatic port selection for writes")
+	root.PersistentFlags().BoolVar(&a.opts.autoPort, "auto-port", true, "auto-select a single compatible USB serial port when --port is omitted")
 	root.PersistentFlags().BoolVar(&a.opts.allowUnsupported, "allow-unsupported", false, "allow domain commands outside supported firmware metadata")
 	root.PersistentFlags().IntVar(&a.opts.baud, "baud", 115200, "serial baud rate")
 	root.PersistentFlags().DurationVar(&a.opts.timeout, "timeout", 2*time.Second, "serial read timeout")

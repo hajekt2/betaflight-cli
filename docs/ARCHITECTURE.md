@@ -136,9 +136,10 @@ Bluetooth, TCP, UDP, browser-owned WebSerial bridges, and other non-USB transpor
 The USB serial implementation should use `go.bug.st/serial`.
 The connection code should wrap it behind a narrow transport interface so tests and future transports do not leak serial implementation details into command code.
 
-When no port is supplied, read-only commands may auto-detect the most likely Betaflight serial port.
+When no port is supplied, read-only and write commands may auto-detect the most likely Betaflight serial port.
 The selected port and the reason for selection should appear in JSON metadata.
-Write and dangerous commands must require either `--port` or explicit `--auto-port`.
+Auto-detection may be disabled with `--auto-port=false`, but the default is `true`.
+If more than one device answers, the command must fail with a structured candidate list and require explicit `--port`.
 Auto-detection should probe candidates until exactly one Betaflight-compatible device answers `MSP_API_VERSION`.
 If more than one device answers, the command must fail with a structured candidate list and require explicit `--port`.
 Port discovery and examples should treat Windows COM ports, macOS `/dev/tty.*`, Linux `/dev/ttyACM*`, and Linux `/dev/ttyUSB*` as first-class.

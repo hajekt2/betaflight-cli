@@ -13,6 +13,7 @@ var sensorOrder = []string{"gyro", "accelerometer", "barometer", "magnetometer",
 type SensorStatus struct {
 	Config        []SensorHardware `json:"config,omitempty"`
 	Active        []SensorHardware `json:"active,omitempty"`
+	ActiveGyros   *ActiveGyros     `json:"active_gyros,omitempty"`
 	IMU           *RawIMU          `json:"imu,omitempty"`
 	Alignment     *SensorAlignment `json:"alignment,omitempty"`
 	Compass       *CompassConfig   `json:"compass,omitempty"`
@@ -24,6 +25,12 @@ type SensorHardware struct {
 	Name       string `json:"name"`
 	HardwareID uint8  `json:"hardware_id"`
 	Available  bool   `json:"available"`
+}
+
+type ActiveGyros struct {
+	Source   string           `json:"source"`
+	Count    uint8            `json:"count"`
+	Hardware []SensorHardware `json:"hardware"`
 }
 
 type RawIMU struct {
@@ -77,6 +84,11 @@ func ReadSensorStatus(ctx context.Context, client *connection.Client) (*SensorSt
 	} else {
 		warnings = append(warnings, err.Error())
 	}
+	if activeGyros, err := readActiveGyros(ctx, client); err == nil {
+		status.ActiveGyros = activeGyros
+	} else {
+		warnings = append(warnings, err.Error())
+	}
 	if imu, err := readRawIMU(ctx, client); err == nil {
 		status.IMU = imu
 	} else {
@@ -105,6 +117,37 @@ func DecodeSensorHardware(payload []byte, names []string) ([]SensorHardware, err
 		out = append(out, SensorHardware{Name: name, HardwareID: hardwareID, Available: hardwareID != 0xff})
 	}
 	return out, nil
+}
+
+func DecodeActiveGyros(payload []byte) (*ActiveGyros, error) {
+	r := msp.NewPayloadReader(payload)
+	count, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "gyro count")
+	}
+	if r.Remaining() < int(count) {
+		return nil, fmt.Errorf("payload length %d is shorter than gyro count %d", len(payload), count)
+	}
+	hardware := make([]SensorHardware, 0, count)
+	for i := 0; i < int(count); i++ {
+		id, err := r.U8()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, fmt.Sprintf("gyro hardware %d", i))
+		}
+		hardware = append(hardware, SensorHardware{
+			Name:       gyroHardwareName(id),
+			HardwareID: id,
+			Available:  id != 0xff && id != 0,
+		})
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP2_GYRO_SENSOR_ACTIVE returned %d trailing byte(s)", r.Remaining())
+	}
+	return &ActiveGyros{
+		Source:   "MSP2_GYRO_SENSOR_ACTIVE",
+		Count:    count,
+		Hardware: hardware,
+	}, nil
 }
 
 func DecodeRawIMU(payload []byte) (*RawIMU, error) {
@@ -199,6 +242,14 @@ func readActiveSensorHardware(ctx context.Context, client *connection.Client) ([
 	return DecodeSensorHardware(frame.Payload, sensorOrder)
 }
 
+func readActiveGyros(ctx context.Context, client *connection.Client) (*ActiveGyros, error) {
+	frame, err := client.Request(ctx, msp.MSP2GyroSensorActive, nil)
+	if err != nil {
+		return nil, fmt.Errorf("active gyro sensors unavailable: %w", err)
+	}
+	return DecodeActiveGyros(frame.Payload)
+}
+
 func readRawIMU(ctx context.Context, client *connection.Client) (*RawIMU, error) {
 	frame, err := client.Request(ctx, msp.MSPRawImu, nil)
 	if err != nil {
@@ -240,6 +291,43 @@ func activeSensorNames(mask uint16) []string {
 		}
 	}
 	return out
+}
+
+func gyroHardwareName(id uint8) string {
+	if int(id) < len(gyroHardwareNames) {
+		return gyroHardwareNames[id]
+	}
+	return ""
+}
+
+var gyroHardwareNames = []string{
+	"NONE",
+	"AUTO",
+	"MPU6050",
+	"L3GD20",
+	"MPU6000",
+	"MPU6500",
+	"MPU9250",
+	"ICM20601",
+	"ICM20602",
+	"ICM20608G",
+	"ICM20649",
+	"ICM20689",
+	"ICM42605",
+	"ICM42688P",
+	"BMI160",
+	"BMI270",
+	"LSM6DSO",
+	"LSM6DSV16X",
+	"IIM42653",
+	"ICM45605",
+	"ICM45686",
+	"ICM40609D",
+	"IIM42652",
+	"LSM6DSK320X",
+	"ICM42622P",
+	"ICM42686P",
+	"VIRTUAL",
 }
 
 func readS16Triple(r *msp.PayloadReader) ([]int16, error) {

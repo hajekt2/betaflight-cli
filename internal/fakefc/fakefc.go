@@ -382,6 +382,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte{1, 2, 3, 4, 5}, false))
 	case msp.MSP2SensorConfigActive:
 		f.out.Write(response(frame.Code, []byte{10, 11, 12, 13, 14, 15}, false))
+	case msp.MSP2GyroSensorActive:
+		f.out.Write(response(frame.Code, []byte{2, 11, 19}, false))
 	case msp.MSPRawImu:
 		payload := appendS16(nil, 2048)
 		payload = appendS16(payload, -1024)

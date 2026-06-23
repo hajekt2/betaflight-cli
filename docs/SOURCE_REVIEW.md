@@ -72,6 +72,9 @@ Configurator uses this for pilot name, craft name, active profile names, build k
 `MSP_MIXER_CONFIG` returns the mixer mode ID and reverse motor direction flag.
 The firmware CLI keeps authoritative mixer names in `mixerNames`, while Configurator's `mixerList` adds display names, expected motor counts, and servo usage hints.
 
+`MSP2_GYRO_SENSOR_ACTIVE` returns the gyro count followed by one hardware ID per detected gyro.
+The names should be kept in sync with firmware `lookupTableGyroHardware`, because older Configurator sensor tables can lag enum changes.
+
 ## Betaflight MCP Reference
 
 The Python reference uses a small MSP protocol layer and a higher-level command layer.

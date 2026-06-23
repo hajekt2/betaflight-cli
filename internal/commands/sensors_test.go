@@ -12,6 +12,28 @@ func TestDecodeSensorHardware(t *testing.T) {
 	}
 }
 
+func TestDecodeActiveGyros(t *testing.T) {
+	gyros, err := DecodeActiveGyros([]byte{2, 11, 19})
+	if err != nil {
+		t.Fatalf("DecodeActiveGyros() error = %v", err)
+	}
+	if gyros.Source != "MSP2_GYRO_SENSOR_ACTIVE" || gyros.Count != 2 || len(gyros.Hardware) != 2 {
+		t.Fatalf("gyros = %+v", gyros)
+	}
+	if gyros.Hardware[0].HardwareID != 11 || gyros.Hardware[0].Name != "ICM20689" || !gyros.Hardware[0].Available {
+		t.Fatalf("gyro 0 = %+v", gyros.Hardware[0])
+	}
+	if gyros.Hardware[1].HardwareID != 19 || gyros.Hardware[1].Name != "ICM45605" {
+		t.Fatalf("gyro 1 = %+v", gyros.Hardware[1])
+	}
+}
+
+func TestDecodeActiveGyrosRejectsShortPayload(t *testing.T) {
+	if _, err := DecodeActiveGyros([]byte{2, 13}); err == nil {
+		t.Fatal("DecodeActiveGyros() error = nil, want short payload error")
+	}
+}
+
 func TestDecodeRawIMU(t *testing.T) {
 	payload := appendU16Test(nil, 2048)
 	payload = appendS16Test(payload, -1024)

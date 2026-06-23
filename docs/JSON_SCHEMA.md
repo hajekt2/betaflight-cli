@@ -158,8 +158,8 @@ The object includes active battery profile thresholds, runtime battery state, vo
 `failsafe status` returns a `failsafe` object decoded from `MSP_ARMING_CONFIG`, `MSP_FAILSAFE_CONFIG`, `MSP_BOARD_ALIGNMENT_CONFIG`, and `MSP_STATUS_EX`.
 The object includes arming configuration, failsafe stage and procedure configuration, board alignment, active arming-disable flags, a firmware-reported arming flag catalog, and source metadata for each MSP message.
 
-`sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.
-The object includes configured hardware IDs, active hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
+`sensors status` returns a `sensors` object decoded from `MSP_SENSOR_CONFIG`, `MSP2_SENSOR_CONFIG_ACTIVE`, `MSP2_GYRO_SENSOR_ACTIVE`, `MSP_RAW_IMU`, `MSP_SENSOR_ALIGNMENT`, `MSP_COMPASS_CONFIG`, and the active sensor bits from `MSP_STATUS_EX`.
+The object includes configured hardware IDs, active hardware IDs, active gyro hardware IDs, active sensor names, raw and scaled IMU values, alignment fields, and compass declination.
 
 `beeper config` returns a `beeper` object decoded from `MSP_BEEPER_CONFIG`.
 The object includes raw disable masks, decoded disabled beeper condition names, DShot beacon tone, and decoded DShot beacon disabled condition names.

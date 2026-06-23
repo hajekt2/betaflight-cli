@@ -414,6 +414,14 @@ func TestSensorsStatusWithFakeFC(t *testing.T) {
 	if len(active) != 6 {
 		t.Fatalf("active = %+v", active)
 	}
+	activeGyros := sensors["active_gyros"].(map[string]any)
+	if activeGyros["source"] != "MSP2_GYRO_SENSOR_ACTIVE" || activeGyros["count"] != float64(2) {
+		t.Fatalf("active gyros = %+v", activeGyros)
+	}
+	gyroHardware := activeGyros["hardware"].([]any)
+	if len(gyroHardware) != 2 || gyroHardware[0].(map[string]any)["name"] != "ICM20689" || gyroHardware[1].(map[string]any)["hardware_id"] != float64(19) {
+		t.Fatalf("gyro hardware = %+v", gyroHardware)
+	}
 	imu := sensors["imu"].(map[string]any)
 	accRaw := imu["accelerometer_raw"].([]any)
 	if accRaw[0] != float64(2048) || accRaw[1] != float64(-1024) {

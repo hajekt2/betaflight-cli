@@ -126,6 +126,25 @@ func TestCheckSupportedFirmwareVersion(t *testing.T) {
 	})
 }
 
+func TestCheckSupportedRequiresExplicitOverride(t *testing.T) {
+	target := TargetInfo{
+		Variant:         "BTFL",
+		FirmwareVersion: "2025.11.0",
+		MSPAPIVersion:   "1.48",
+	}
+	err := checkSupported(target, false)
+	if err == nil {
+		t.Fatal("checkSupported() error = nil, want unsupported firmware")
+	}
+	coded, ok := err.(*CodedError)
+	if !ok || coded.Code != "unsupported_firmware" {
+		t.Fatalf("checkSupported() error = %T %v, want unsupported_firmware", err, err)
+	}
+	if err := checkSupported(target, true); err != nil {
+		t.Fatalf("checkSupported(..., allow=true) error = %v", err)
+	}
+}
+
 func TestClientExecCLIRespectsContextDeadline(t *testing.T) {
 	client, err := NewClient(&silentPort{}, time.Second)
 	if err != nil {

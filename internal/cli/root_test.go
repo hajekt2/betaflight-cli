@@ -1061,6 +1061,61 @@ func TestWriteOperationsDefaultAutoPortWhenNotProvided(t *testing.T) {
 	}
 }
 
+func TestAllowUnsupportedFlagIsForwarded(t *testing.T) {
+	var observed connection.Config
+	env, err := runTestCommand(t, []string{"--allow-unsupported", "features", "status"}, func(_ context.Context, cfg connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		observed = cfg
+		client, clientErr := connection.NewClient(fakefc.New(), time.Second)
+		if clientErr != nil {
+			return nil, connection.TargetInfo{}, clientErr
+		}
+		target, targetErr := client.Handshake(context.Background())
+		if targetErr != nil {
+			client.Close()
+			return nil, connection.TargetInfo{}, targetErr
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	if !observed.AllowUnsupported {
+		t.Fatalf("expected AllowUnsupported to be forwarded: %#v", observed)
+	}
+}
+
+func TestUnsupportedFirmwareFailureIncludesTarget(t *testing.T) {
+	unsupportedTarget := connection.TargetInfo{
+		Port:            "fake",
+		Variant:         "BTFL",
+		FirmwareVersion: "2025.11.0",
+		MSPAPIVersion:   "1.48",
+		MSPProtocol:     0,
+	}
+	env, err := runTestCommand(t, []string{"features", "status"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		return nil, unsupportedTarget, &connection.CodedError{
+			Code:    "unsupported_firmware",
+			Message: "firmware \"2025.11.0\" is outside the supported metadata set; pass --allow-unsupported to continue",
+		}
+	})
+	if !isExitError(err) {
+		t.Fatalf("command error = %T %v, want exitError", err, err)
+	}
+	if env.OK {
+		t.Fatalf("env.OK = true, want false")
+	}
+	if len(env.Errors) != 1 || env.Errors[0].Code != "unsupported_firmware" {
+		t.Fatalf("env.Errors = %+v, want unsupported_firmware", env.Errors)
+	}
+	if env.Target == nil || env.Target.FirmwareVersion != "2025.11.0" || env.Target.MSPAPIVersion != "1.48" {
+		t.Fatalf("env.Target = %+v, want unsupported target metadata", env.Target)
+	}
+}
+
 func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"telemetry", "snapshot"}, nil)
 	if err != nil {

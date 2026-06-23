@@ -97,6 +97,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if save["operation"] != "dangerous" || save["confirmation"] != "--yes" || save["requires_connection"] != true || save["runnable"] != true {
 		t.Fatalf("save capability = %+v", save)
 	}
+	configurationDiff := byCommand["betaflight-cli configuration diff"]
+	if configurationDiff["operation"] != "read_only" || configurationDiff["requires_connection"] != true || configurationDiff["confirmation"] != "none" || configurationDiff["runnable"] != true {
+		t.Fatalf("configuration diff capability = %+v", configurationDiff)
+	}
+	settingsDiff := byCommand["betaflight-cli settings diff"]
+	if settingsDiff["operation"] != "read_only" || settingsDiff["requires_connection"] != true || settingsDiff["confirmation"] != "none" || settingsDiff["runnable"] != true {
+		t.Fatalf("settings diff capability = %+v", settingsDiff)
+	}
 	validate := byCommand["betaflight-cli configuration validate"]
 	if validate["operation"] != "offline" || validate["requires_connection"] != false || validate["output_root"] != "configuration_validation" {
 		t.Fatalf("validate capability = %+v", validate)

@@ -74,8 +74,11 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
 		cmd.AddCommand(a.gpsSetConfigCommand())
+		cmd.AddCommand(a.gpsSetConfigJSONCommand())
 		cmd.AddCommand(a.gpsSetRescueCommand())
+		cmd.AddCommand(a.gpsSetRescueJSONCommand())
 		cmd.AddCommand(a.gpsSetRescuePIDCommand())
+		cmd.AddCommand(a.gpsSetRescuePIDJSONCommand())
 	}
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
@@ -784,6 +787,66 @@ func (a *app) gpsSetConfigCommand() *cobra.Command {
 	}
 }
 
+func (a *app) gpsSetConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set GPS provider and auto-configuration from JSON through MSP_SET_GPS_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseGPSConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "GPS configuration changes flight-controller configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetGPSConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"gps_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "gps_config",
+					Command: "MSP_SET_GPS_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseGPSConfigJSON(data []byte) (bfcommands.GPSConfig, error) {
+	var wrapped struct {
+		GPSConfig *bfcommands.GPSConfig `json:"gps_config"`
+		Config    *bfcommands.GPSConfig `json:"config"`
+		GPS       *struct {
+			Config *bfcommands.GPSConfig `json:"config"`
+		} `json:"gps"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.GPSConfig{}, err
+	}
+	switch {
+	case wrapped.GPSConfig != nil:
+		return *wrapped.GPSConfig, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	case wrapped.GPS != nil && wrapped.GPS.Config != nil:
+		return *wrapped.GPS.Config, nil
+	}
+	var config bfcommands.GPSConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.GPSConfig{}, err
+	}
+	return config, nil
+}
+
 func (a *app) gpsSetRescueCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-rescue MAX_ANGLE RETURN_ALTITUDE DESCENT_DISTANCE GROUND_SPEED THROTTLE_MIN THROTTLE_MAX THROTTLE_HOVER SANITY_CHECKS MIN_SATS ASCEND_RATE DESCEND_RATE ALLOW_ARMING_WITHOUT_FIX ALTITUDE_MODE MIN_START_DISTANCE INITIAL_CLIMB",
@@ -869,6 +932,69 @@ func (a *app) gpsSetRescueCommand() *cobra.Command {
 	}
 }
 
+func (a *app) gpsSetRescueJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rescue-json FILE",
+		Short: "Set GPS Rescue configuration from JSON through MSP_SET_GPS_RESCUE",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseGPSRescueJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "GPS Rescue configuration changes GPS settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetGPSRescue(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"gps_rescue": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "gps_rescue",
+					Command: "MSP_SET_GPS_RESCUE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseGPSRescueJSON(data []byte) (bfcommands.GPSRescue, error) {
+	var wrapped struct {
+		GPSRescue *bfcommands.GPSRescue `json:"gps_rescue"`
+		Rescue    *bfcommands.GPSRescue `json:"rescue"`
+		Config    *bfcommands.GPSRescue `json:"config"`
+		GPS       *struct {
+			Rescue *bfcommands.GPSRescue `json:"rescue"`
+		} `json:"gps"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.GPSRescue{}, err
+	}
+	switch {
+	case wrapped.GPSRescue != nil:
+		return *wrapped.GPSRescue, nil
+	case wrapped.Rescue != nil:
+		return *wrapped.Rescue, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	case wrapped.GPS != nil && wrapped.GPS.Rescue != nil:
+		return *wrapped.GPS.Rescue, nil
+	}
+	var config bfcommands.GPSRescue
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.GPSRescue{}, err
+	}
+	return config, nil
+}
+
 func (a *app) gpsSetRescuePIDCommand() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set-rescue-pids ALTITUDE_P ALTITUDE_I ALTITUDE_D VELOCITY_P VELOCITY_I VELOCITY_D YAW_P",
@@ -910,6 +1036,72 @@ func (a *app) gpsSetRescuePIDCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) gpsSetRescuePIDJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rescue-pids-json FILE",
+		Short: "Set GPS Rescue PID terms from JSON through MSP_SET_GPS_RESCUE_PIDS",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseGPSRescuePIDJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "GPS Rescue PID changes GPS settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetGPSRescuePID(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"gps_rescue_pids": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "gps_rescue_pids",
+					Command: "MSP_SET_GPS_RESCUE_PIDS",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseGPSRescuePIDJSON(data []byte) (bfcommands.GPSRescuePID, error) {
+	var wrapped struct {
+		GPSRescuePIDs *bfcommands.GPSRescuePID `json:"gps_rescue_pids"`
+		GPSRescuePID  *bfcommands.GPSRescuePID `json:"gps_rescue_pid"`
+		RescuePID     *bfcommands.GPSRescuePID `json:"rescue_pid"`
+		Config        *bfcommands.GPSRescuePID `json:"config"`
+		GPS           *struct {
+			RescuePID *bfcommands.GPSRescuePID `json:"rescue_pid"`
+		} `json:"gps"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.GPSRescuePID{}, err
+	}
+	switch {
+	case wrapped.GPSRescuePIDs != nil:
+		return *wrapped.GPSRescuePIDs, nil
+	case wrapped.GPSRescuePID != nil:
+		return *wrapped.GPSRescuePID, nil
+	case wrapped.RescuePID != nil:
+		return *wrapped.RescuePID, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	case wrapped.GPS != nil && wrapped.GPS.RescuePID != nil:
+		return *wrapped.GPS.RescuePID, nil
+	}
+	var config bfcommands.GPSRescuePID
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.GPSRescuePID{}, err
+	}
+	return config, nil
 }
 
 func parseBoolFlagArg(name, value string) (bool, error) {

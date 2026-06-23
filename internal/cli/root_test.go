@@ -403,13 +403,25 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if gpsConfig["operation"] != "write" || gpsConfig["confirmation"] != "--yes" || gpsConfig["requires_connection"] != true || gpsConfig["output_root"] != "gps_config" || gpsConfig["runnable"] != true {
 		t.Fatalf("gps config capability = %+v", gpsConfig)
 	}
+	gpsConfigJSON := byCommand["betaflight-cli gps set-config-json"]
+	if gpsConfigJSON["operation"] != "write" || gpsConfigJSON["confirmation"] != "--yes" || gpsConfigJSON["requires_connection"] != true || gpsConfigJSON["output_root"] != "gps_config" || gpsConfigJSON["runnable"] != true {
+		t.Fatalf("gps config JSON capability = %+v", gpsConfigJSON)
+	}
 	gpsRescue := byCommand["betaflight-cli gps set-rescue"]
 	if gpsRescue["operation"] != "write" || gpsRescue["confirmation"] != "--yes" || gpsRescue["requires_connection"] != true || gpsRescue["output_root"] != "gps_rescue" || gpsRescue["runnable"] != true {
 		t.Fatalf("gps rescue capability = %+v", gpsRescue)
 	}
+	gpsRescueJSON := byCommand["betaflight-cli gps set-rescue-json"]
+	if gpsRescueJSON["operation"] != "write" || gpsRescueJSON["confirmation"] != "--yes" || gpsRescueJSON["requires_connection"] != true || gpsRescueJSON["output_root"] != "gps_rescue" || gpsRescueJSON["runnable"] != true {
+		t.Fatalf("gps rescue JSON capability = %+v", gpsRescueJSON)
+	}
 	gpsRescuePIDs := byCommand["betaflight-cli gps set-rescue-pids"]
 	if gpsRescuePIDs["operation"] != "write" || gpsRescuePIDs["confirmation"] != "--yes" || gpsRescuePIDs["requires_connection"] != true || gpsRescuePIDs["output_root"] != "gps_rescue_pids" || gpsRescuePIDs["runnable"] != true {
 		t.Fatalf("gps rescue pids capability = %+v", gpsRescuePIDs)
+	}
+	gpsRescuePIDsJSON := byCommand["betaflight-cli gps set-rescue-pids-json"]
+	if gpsRescuePIDsJSON["operation"] != "write" || gpsRescuePIDsJSON["confirmation"] != "--yes" || gpsRescuePIDsJSON["requires_connection"] != true || gpsRescuePIDsJSON["output_root"] != "gps_rescue_pids" || gpsRescuePIDsJSON["runnable"] != true {
+		t.Fatalf("gps rescue pids JSON capability = %+v", gpsRescuePIDsJSON)
 	}
 	armingConfig := byCommand["betaflight-cli failsafe set-arming-json"]
 	if armingConfig["operation"] != "write" || armingConfig["confirmation"] != "--yes" || armingConfig["requires_connection"] != true || armingConfig["output_root"] != "arming_config" || armingConfig["runnable"] != true {
@@ -3630,8 +3642,45 @@ func TestGPSSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 	}
 }
 
+func TestGPSSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"gps":{"config":{"provider":1,"sbas_mode":0,"auto_config":true,"auto_baud":true,"home_point_once":true,"ublox_use_galileo":true}}}`
+	env, err := runTestCommandWithInput(t, []string{"gps", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestGPSSetConfigWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"gps", "set-config", "1", "0", "1", "1", "1", "1", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["gps_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["provider"] != float64(1) || config["auto_config"] != true || config["ublox_use_galileo"] != true {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_GPS_CONFIG" || result["save_required"] != true {
+		t.Fatalf("gps config result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "gps_config" || env.SideEffects[0].Command != "MSP_SET_GPS_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestGPSSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"gps":{"config":{"provider":1,"sbas_mode":0,"auto_config":true,"auto_baud":true,"home_point_once":true,"ublox_use_galileo":true}}}`
+	env, err := runTestCommandWithInput(t, []string{"gps", "set-config-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}
@@ -3680,6 +3729,20 @@ func TestGPSSetRescueRequiresConfirmationBeforeConnect(t *testing.T) {
 	}
 }
 
+func TestGPSSetRescueJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"gps":{"rescue":{"max_rescue_angle":3200,"return_altitude_m":100,"descent_distance_m":50,"ground_speed_cm_s":1500,"throttle_min":1200,"throttle_max":1800,"throttle_hover":1450,"sanity_checks":1,"min_sats":8,"ascend_rate":500,"descend_rate":150,"allow_arming_without_fix":true,"altitude_mode":2,"min_start_distance_m":30,"initial_climb_m":20}}}`
+	env, err := runTestCommandWithInput(t, []string{"gps", "set-rescue-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
 func TestGPSSetRescueWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"gps", "set-rescue", "3200", "100", "50", "1500", "1200", "1800", "1450", "1", "8", "500", "150", "1", "2", "30", "20", "--yes"}, nil)
 	if err != nil {
@@ -3702,8 +3765,68 @@ func TestGPSSetRescueWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestGPSSetRescueJSONWithFakeFC(t *testing.T) {
+	input := `{"gps":{"rescue":{"max_rescue_angle":3200,"return_altitude_m":100,"descent_distance_m":50,"ground_speed_cm_s":1500,"throttle_min":1200,"throttle_max":1800,"throttle_hover":1450,"sanity_checks":1,"min_sats":8,"ascend_rate":500,"descend_rate":150,"allow_arming_without_fix":true,"altitude_mode":2,"min_start_distance_m":30,"initial_climb_m":20}}}`
+	env, err := runTestCommandWithInput(t, []string{"gps", "set-rescue-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["gps_rescue"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["max_rescue_angle"] != float64(3200) || config["min_sats"] != float64(8) || config["initial_climb_m"] != float64(20) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_GPS_RESCUE" || result["save_required"] != true {
+		t.Fatalf("gps rescue result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "gps_rescue" || env.SideEffects[0].Command != "MSP_SET_GPS_RESCUE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestGPSSetRescuePIDWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"gps", "set-rescue-pids", "80", "10", "5", "120", "20", "10", "45", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["gps_rescue_pids"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["altitude_p"] != float64(80) || config["velocity_p"] != float64(120) || config["yaw_p"] != float64(45) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_GPS_RESCUE_PIDS" || result["save_required"] != true {
+		t.Fatalf("gps rescue pid result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "gps_rescue_pids" || env.SideEffects[0].Command != "MSP_SET_GPS_RESCUE_PIDS" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestGPSSetRescuePIDJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"gps":{"rescue_pid":{"altitude_p":80,"altitude_i":10,"altitude_d":5,"velocity_p":120,"velocity_i":20,"velocity_d":10,"yaw_p":45}}}`
+	env, err := runTestCommandWithInput(t, []string{"gps", "set-rescue-pids-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestGPSSetRescuePIDJSONWithFakeFC(t *testing.T) {
+	input := `{"gps":{"rescue_pid":{"altitude_p":80,"altitude_i":10,"altitude_d":5,"velocity_p":120,"velocity_i":20,"velocity_d":10,"yaw_p":45}}}`
+	env, err := runTestCommandWithInput(t, []string{"gps", "set-rescue-pids-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

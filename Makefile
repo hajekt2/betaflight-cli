@@ -19,15 +19,17 @@ build-release:
 	GOOS=darwin GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-amd64 ./cmd/$(BINARY)
 	GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-arm64 ./cmd/$(BINARY)
 	GOOS=windows GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-amd64.exe ./cmd/$(BINARY)
+	GOOS=windows GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-arm64.exe ./cmd/$(BINARY)
 
 .PHONY: build-static
 build-static:
 	mkdir -p $(BINDIR)
-	CGO_ENABLED=0 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-linux-amd64 ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-linux-amd64 ./cmd/$(BINARY)
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-linux-arm64 ./cmd/$(BINARY)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-amd64 ./cmd/$(BINARY)
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-arm64 ./cmd/$(BINARY)
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-amd64.exe ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-arm64.exe ./cmd/$(BINARY)
 
 .PHONY: test
 test:

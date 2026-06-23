@@ -66,8 +66,39 @@ func (a *app) featuresCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(disable, &disableFlags)
-	cmd.AddCommand(enable, disable)
+	cmd.AddCommand(enable, disable, a.featureSetMaskCommand())
 	return cmd
+}
+
+func (a *app) featureSetMaskCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-mask MASK",
+		Short: "Set the complete feature mask through MSP_SET_FEATURE_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			parsed, err := strconv.ParseUint(args[0], 0, 32)
+			if err != nil {
+				return validationFailureMessage(a, cmd, "mask must be an unsigned 32-bit integer")
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "feature mask changes configuration; pass --yes"))
+			}
+			mask := uint32(parsed)
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetFeatureMask(cmd.Context(), client, mask)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"feature_mask": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "feature_mask",
+					Command: "MSP_SET_FEATURE_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
 }
 
 func (a *app) serialCommand() *cobra.Command {

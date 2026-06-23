@@ -40,3 +40,13 @@ func TestDecodeFeatureStatusRejectsShortPayload(t *testing.T) {
 		t.Fatal("DecodeFeatureStatus() error = nil, want short payload error")
 	}
 }
+
+func TestSetFeatureMaskResultDecodeShape(t *testing.T) {
+	status, err := DecodeFeatureStatus(appendU32Test(nil, 1<<7|1<<18))
+	if err != nil {
+		t.Fatalf("DecodeFeatureStatus() error = %v", err)
+	}
+	if len(status.EnabledNames) != 2 || status.EnabledNames[0] != "GPS" || status.EnabledNames[1] != "OSD" {
+		t.Fatalf("enabled names = %+v", status.EnabledNames)
+	}
+}

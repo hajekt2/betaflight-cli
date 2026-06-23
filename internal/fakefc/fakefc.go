@@ -282,6 +282,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte("BetaFlight"), false))
 	case msp.MSPFeatureConfig:
 		f.out.Write(response(frame.Code, appendU32(nil, 0x00040488), false))
+	case msp.MSPSetFeatureConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 4))
 	case msp.MSPStatusEx:
 		payload := make([]byte, 0, 32)
 		payload = appendU16(payload, 250)

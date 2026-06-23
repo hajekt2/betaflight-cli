@@ -311,6 +311,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if settingsDiff["operation"] != "read_only" || settingsDiff["requires_connection"] != true || settingsDiff["confirmation"] != "none" || settingsDiff["runnable"] != true {
 		t.Fatalf("settings diff capability = %+v", settingsDiff)
 	}
+	featureMask := byCommand["betaflight-cli features set-mask"]
+	if featureMask["operation"] != "write" || featureMask["confirmation"] != "--yes" || featureMask["requires_connection"] != true || featureMask["output_root"] != "feature_mask" || featureMask["runnable"] != true {
+		t.Fatalf("feature mask capability = %+v", featureMask)
+	}
 	beeperEnable := byCommand["betaflight-cli beeper enable"]
 	if beeperEnable["operation"] != "plan_or_write" || beeperEnable["requires_connection"] != true || beeperEnable["confirmation"] != "--yes with --apply or --save" || beeperEnable["runnable"] != true {
 		t.Fatalf("beeper enable capability = %+v", beeperEnable)
@@ -4203,6 +4207,51 @@ func TestFeaturesStatusWithFakeFC(t *testing.T) {
 	catalog := features["catalog"].([]any)
 	if len(catalog) != 24 {
 		t.Fatalf("catalog length = %d", len(catalog))
+	}
+}
+
+func TestFeaturesSetMaskWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"features", "set-mask", "0x00040488", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["feature_mask"].(map[string]any)
+	features := result["features"].(map[string]any)
+	if features["mask"] != float64(0x00040488) || result["save_required"] != true {
+		t.Fatalf("feature_mask = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_FEATURE_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestFeaturesSetMaskRequiresConfirmationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"features", "set-mask", "0x00040488"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestFeaturesSetMaskValidationBeforeConnect(t *testing.T) {
+	env, err := runTestCommand(t, []string{"features", "set-mask", "not-a-mask", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
 	}
 }
 

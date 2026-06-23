@@ -61,6 +61,14 @@ type FeatureFlag struct {
 	Known   bool   `json:"known"`
 }
 
+type FeatureMaskSetResult struct {
+	Features     FeatureStatus `json:"features"`
+	MSPCode      uint16        `json:"msp_code"`
+	MSPName      string        `json:"msp_name"`
+	Acknowledged bool          `json:"acknowledged"`
+	SaveRequired bool          `json:"save_required"`
+}
+
 func ReadFeatureStatus(ctx context.Context, client *connection.Client) (*FeatureStatus, error) {
 	frame, err := client.Request(ctx, msp.MSPFeatureConfig, nil)
 	if err != nil {
@@ -72,6 +80,24 @@ func ReadFeatureStatus(ctx context.Context, client *connection.Client) (*Feature
 	}
 	status.Source = "MSP_FEATURE_CONFIG"
 	return status, nil
+}
+
+func SetFeatureMask(ctx context.Context, client *connection.Client, mask uint32) (*FeatureMaskSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetFeatureConfig, appendU32Payload(nil, mask)); err != nil {
+		return nil, fmt.Errorf("feature config request failed: %w", err)
+	}
+	status, err := DecodeFeatureStatus(appendU32Payload(nil, mask))
+	if err != nil {
+		return nil, err
+	}
+	status.Source = "MSP_SET_FEATURE_CONFIG"
+	return &FeatureMaskSetResult{
+		Features:     *status,
+		MSPCode:      msp.MSPSetFeatureConfig,
+		MSPName:      "MSP_SET_FEATURE_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
 }
 
 func DecodeFeatureStatus(payload []byte) (*FeatureStatus, error) {

@@ -174,6 +174,11 @@ When `--reboot-first` is set, a reboot command is sent first and the response in
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
 
+`features status` returns a `features` object decoded from `MSP_FEATURE_CONFIG`.
+The object includes the raw feature mask, enabled feature names, per-feature bit catalog, and an unknown mask for future firmware bits this binary does not yet name.
+`features set-mask` returns a `feature_mask` object with the decoded feature status for the requested mask, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful feature mask writes include a `feature_mask` side effect.
+
 `serial status` returns a `serial` object decoded from `MSP2_COMMON_SERIAL_CONFIG` with legacy `MSP_CF_SERIAL_CONFIG` fallback.
 The object includes port identifiers, decoded port names, function masks, decoded functions, baudrate indexes, and decoded baudrate names.
 `serial apply-config-json` returns a `serial_config` object with the applied full-table port rows, MSP command name/code, acknowledgement flag, and `save_required`.
@@ -192,9 +197,6 @@ The object includes loop and motor protocol fields, gyro calibration and overflo
 The object includes a paged mode definition catalog and mode range rows with permanent IDs, names, AUX channel indexes, microsecond ranges, logic, and linked mode names when supplied by firmware.
 `modes set-range` returns a `mode_range` object with the written row, decoded microsecond equivalents, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful mode range writes include a `mode_range` side effect.
-
-`features status` returns a `features` object decoded from `MSP_FEATURE_CONFIG`.
-The object includes the raw feature mask, enabled feature names, per-feature bit catalog, and an unknown mask for future firmware bits this binary does not yet name.
 
 `profiles status` returns a `profiles` object decoded from `MSP_STATUS_EX` with `MSP_STATUS` fallback.
 The object includes active PID, rate, and battery profile indexes, profile counts when supplied by firmware, native CLI selector commands, and reboot-required state when supplied by firmware.

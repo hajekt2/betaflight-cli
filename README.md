@@ -187,6 +187,7 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `storage export FILE` reads Dataflash contents over MSP into a local file, defaults to the used byte count reported by the firmware, refuses to overwrite unless `--force` is explicit, and returns a `dataflash_export` summary for agents.
 `storage erase` sends `MSP_DATAFLASH_ERASE`, requires `--yes`, captures read-only before and after storage snapshots, emits a `dataflash_erase` side effect, and returns an audit summary with freed bytes.
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
+`features set-mask` writes the complete feature mask through `MSP_SET_FEATURE_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `serial status` reads serial port identifiers, function masks, decoded function names, and baudrate indexes over MSP.
 `serial apply-config-json` writes a complete serial port table through `MSP_SET_CF_SERIAL_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `modes active` reads mode definitions, permanent IDs, configured ranges, mode logic, and linked modes over MSP.

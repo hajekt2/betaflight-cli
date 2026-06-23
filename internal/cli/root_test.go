@@ -444,6 +444,29 @@ func TestBeeperConfigWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestMixerStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"mixer", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	mixer := data["mixer"].(map[string]any)
+	mode := mixer["mixer"].(map[string]any)
+	if mode["cli_name"] != "QUADX" || mode["display_name"] != "Quad X" || mode["motor_count"] != float64(4) {
+		t.Fatalf("mixer mode = %+v", mode)
+	}
+	if mixer["yaw_motors_reversed"] != true {
+		t.Fatalf("mixer = %+v", mixer)
+	}
+	commands := mixer["cli_commands"].([]any)
+	if len(commands) != 2 || commands[0] != "mixer QUADX" || commands[1] != "set yaw_motors_reversed = ON" {
+		t.Fatalf("commands = %+v", commands)
+	}
+}
+
 func TestMotorsStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"motors", "status"}, nil)
 	if err != nil {

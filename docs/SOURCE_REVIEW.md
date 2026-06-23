@@ -66,6 +66,9 @@ The option codes are generated upstream in `src/main/msp/msp_build_info.h` and m
 Firmware returns the requested text type byte followed by a one-byte length and the text bytes.
 Configurator uses this for pilot name, craft name, active profile names, build key, and release name.
 
+`MSP_MIXER_CONFIG` returns the mixer mode ID and reverse motor direction flag.
+The firmware CLI keeps authoritative mixer names in `mixerNames`, while Configurator's `mixerList` adds display names, expected motor counts, and servo usage hints.
+
 ## Betaflight MCP Reference
 
 The Python reference uses a small MSP protocol layer and a higher-level command layer.

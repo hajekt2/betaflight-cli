@@ -55,6 +55,7 @@ betaflight-cli blackbox config --port /dev/tty.usbmodem01
 betaflight-cli blackbox inspect flight.bbl
 betaflight-cli sensors status --port /dev/tty.usbmodem01
 betaflight-cli beeper config --port /dev/tty.usbmodem01
+betaflight-cli mixer status --port /dev/tty.usbmodem01
 betaflight-cli motors status --port /dev/tty.usbmodem01
 betaflight-cli servos status --port /dev/tty.usbmodem01
 betaflight-cli settings get gyro_lpf1_static_hz --port /dev/tty.usbmodem01
@@ -136,6 +137,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `filters status` reads loop timing, motor protocol, gyro, D-term, dynamic notch, and RPM filter configuration over MSP.
 `sensors status` reads configured and active sensor hardware, raw IMU data, sensor alignment, active sensor flags, and compass declination over MSP.
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
+`mixer status` reads the mixer mode and motor direction flag over MSP and returns native CLI commands for the same settings.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
 `adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.

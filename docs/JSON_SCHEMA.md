@@ -163,6 +163,9 @@ The object includes configured hardware IDs, active hardware IDs, active sensor 
 `beeper config` returns a `beeper` object decoded from `MSP_BEEPER_CONFIG`.
 The object includes raw disable masks, decoded disabled beeper condition names, DShot beacon tone, and decoded DShot beacon disabled condition names.
 
+`mixer status` returns a `mixer` object decoded from `MSP_MIXER_CONFIG`.
+The object includes the mixer mode ID, CLI mixer name, display name, expected motor count, servo usage, motor direction reversal state, native CLI commands for the same values, and a mixer catalog.
+
 `motors status` returns a `motors` object decoded from `MSP_MOTOR_CONFIG`, `MSP_MOTOR`, `MSP_MOTOR_TELEMETRY`, `MSP_MOTOR_3D_CONFIG`, and `MSP2_MOTOR_OUTPUT_REORDERING`.
 The object includes motor configuration, current motor outputs, telemetry values with raw and scaled units, 3D motor config, and output reordering.
 

@@ -282,6 +282,14 @@ func (f *FC) handleMSP(frame msp.Frame) {
 	case msp.MSPModeRangesExtra:
 		payload := []byte{3, 0, 0, 0, 52, 1, 53, 0, 0, 0}
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPAdjustmentRanges:
+		payload := []byte{0, 0, 0, 16, 12, 0}
+		payload = appendU16(payload, 1500)
+		payload = appendU16(payload, 100)
+		payload = append(payload, 0, 1, 4, 8, 33, 2)
+		payload = appendU16(payload, 1600)
+		payload = appendU16(payload, 50)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPRXConfig:
 		payload := []byte{2}
 		payload = appendU16(payload, 2000)

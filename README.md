@@ -74,6 +74,7 @@ betaflight-cli vtxtable list --port /dev/tty.usbmodem01
 betaflight-cli leds list --port /dev/tty.usbmodem01
 betaflight-cli servos list --port /dev/tty.usbmodem01
 betaflight-cli adjustments list --port /dev/tty.usbmodem01
+betaflight-cli adjustments status --port /dev/tty.usbmodem01
 betaflight-cli rxrange list --port /dev/tty.usbmodem01
 betaflight-cli pid list --port /dev/tty.usbmodem01
 betaflight-cli pid set p_roll 46 --port /dev/tty.usbmodem01
@@ -134,6 +135,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `beeper config` reads beeper and DShot beacon disable masks and returns decoded condition names.
 `motors status` reads motor configuration, live motor outputs, motor telemetry, 3D motor config, and output order over MSP.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
+`adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.
 `blackbox inspect` reads a local Blackbox log without connecting to hardware and returns header metadata, field definitions, approximate frame marker counts, and a capped candidate frame index.
 Firmware flashing and DFU workflows are part of eventual parity, but the first implementation slice should stay focused on already-running Betaflight firmware over MSP and CLI.
 Preset workflows should support local files through the same plan, apply, and save model.

@@ -956,6 +956,29 @@ func TestSerialListIncludesDecodedFunctions(t *testing.T) {
 	}
 }
 
+func TestAdjustmentsStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"adjustments", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	adjustments := data["adjustments"].(map[string]any)
+	if adjustments["source"] != "MSP_ADJUSTMENT_RANGES" {
+		t.Fatalf("adjustments = %+v", adjustments)
+	}
+	ranges := adjustments["ranges"].([]any)
+	if len(ranges) != 2 {
+		t.Fatalf("ranges = %+v", ranges)
+	}
+	second := ranges[1].(map[string]any)
+	if second["adjustment_function_name"] != "BATTERY_PROFILE" || second["range_start_us"] != float64(1000) || second["cli_command"] != "adjrange 1 0 1 1000 1100 33 2 1600 50" {
+		t.Fatalf("second range = %+v", second)
+	}
+}
+
 func TestSerialStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"serial", "status"}, nil)
 	if err != nil {

@@ -161,6 +161,9 @@ The object includes motor configuration, current motor outputs, telemetry values
 `servos status` returns a `servos` object decoded from `MSP_SERVO`, `MSP_SERVO_CONFIGURATIONS`, and `MSP_SERVO_MIX_RULES`.
 The object includes current servo outputs, servo configuration rows, and servo mix rules.
 
+`adjustments status` returns an `adjustments` object decoded from `MSP_ADJUSTMENT_RANGES`.
+The object includes adjustment range rows, AUX channel names, range microsecond values, adjustment function names, center and scale values, active markers, and native `adjrange` CLI commands.
+
 ## Error Codes
 
 Errors should include stable machine-readable codes.

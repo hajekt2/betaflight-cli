@@ -131,6 +131,21 @@ func (a *app) adjustmentsCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List adjustment range rows", func(doc bfconfig.Document) any {
 		return map[string]any{"adjranges": doc.AdjRanges, "lines": doc.Sections["adjranges"]}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read adjustment ranges over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				adjustments, err := bfcommands.ReadAdjustmentStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"adjustments": adjustments,
+				})
+			})
+		},
+	})
 	var flags changeFlags
 	set := &cobra.Command{
 		Use:   "set INDEX UNUSED RANGE_CHANNEL START END FUNCTION SELECT_CHANNEL CENTER SCALE",

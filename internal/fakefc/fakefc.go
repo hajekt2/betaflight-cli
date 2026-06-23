@@ -52,6 +52,17 @@ func New() *FC {
 				"Voltage: 15.99V (4S battery - OK)",
 				"Arming disable flags: RXLOSS THROTTLE",
 			},
+			"resource show all": {
+				"# resources",
+				"resource MOTOR 1 A00",
+				"resource SERIAL_TX 1 A09",
+				"# timer",
+				"timer A00 AF1",
+				"timer A09 NONE",
+				"# dma",
+				"dma pin A00 1",
+				"dma SPI_TX 1 0",
+			},
 			"diff all": {
 				"# version",
 				"batch start",

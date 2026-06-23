@@ -149,6 +149,21 @@ func (a *app) resourcesCommand() *cobra.Command {
 	cmd.AddCommand(a.configListCommand("list", "List resource assignments", func(doc bfconfig.Document) any {
 		return map[string]any{"resources": doc.Resources, "lines": doc.Sections["resources"]}
 	}))
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read resource, timer, and DMA assignments through Betaflight CLI",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				resources, err := bfcommands.ReadResourceDiagnostics(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"resources": resources,
+				})
+			})
+		},
+	})
 	var flags changeFlags
 	set := &cobra.Command{
 		Use:   "set KIND INDEX TARGET",

@@ -229,6 +229,42 @@ func TestSystemStatusWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestResourcesStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"resources", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	resources := data["resources"].(map[string]any)
+	assignments := resources["resources"].([]any)
+	if len(assignments) != 2 {
+		t.Fatalf("resources = %+v", assignments)
+	}
+	first := assignments[0].(map[string]any)
+	if first["kind"] != "MOTOR" || first["index"] != "1" || first["target"] != "A00" {
+		t.Fatalf("first resource = %+v", first)
+	}
+	timers := resources["timers"].([]any)
+	if len(timers) != 2 {
+		t.Fatalf("timers = %+v", timers)
+	}
+	timer := timers[1].(map[string]any)
+	if timer["pin"] != "A09" || timer["none"] != true {
+		t.Fatalf("none timer = %+v", timer)
+	}
+	dma := resources["dma"].([]any)
+	if len(dma) != 2 {
+		t.Fatalf("dma = %+v", dma)
+	}
+	deviceDMA := dma[1].(map[string]any)
+	if deviceDMA["scope"] != "SPI_TX" || deviceDMA["device"] != "1" || deviceDMA["option"] != "0" {
+		t.Fatalf("device dma = %+v", deviceDMA)
+	}
+}
+
 func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	env, err := runTestCommand(t, []string{"info"}, nil)
 	if err != nil {

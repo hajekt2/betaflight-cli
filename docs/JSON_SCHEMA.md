@@ -167,6 +167,9 @@ The object includes raw lines, parsed task rows, optional check-function stats, 
 `system status` returns a `system` object parsed from Betaflight's CLI `status` command.
 The object includes raw lines, parsed configuration storage usage, detected device counts, selected raw device lines, build key, uptime, runtime rates, voltage summary, arming-disable flags, and unparsed lines for firmware text drift.
 
+`resources status` returns a `resources` object parsed from Betaflight's CLI `resource show all` command.
+The object includes raw lines, resource assignments, timer alternate-function assignments, DMA assignments, comments, and unparsed lines for firmware text drift.
+
 `debug status` returns a `debug` object decoded from `MSP_DEBUG` and `MSP_ACC_TRIM`.
 The object includes signed debug channel values, signed accelerometer pitch/roll trims, source metadata, and per-message warnings when one optional request is unavailable.
 

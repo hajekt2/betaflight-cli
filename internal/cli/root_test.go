@@ -47,6 +47,11 @@ func TestClassifyCLI(t *testing.T) {
 	}
 }
 
+func isExitError(err error) bool {
+	_, ok := err.(exitError)
+	return ok
+}
+
 func TestIsKnownCLICommand(t *testing.T) {
 	tests := map[string]bool{
 		"set foo = 1":         true,
@@ -2582,7 +2587,7 @@ func TestBlackboxSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3392,7 +3397,7 @@ func TestVTXSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3406,7 +3411,7 @@ func TestVTXSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3419,7 +3424,7 @@ func TestVTXSetConfigValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -3507,7 +3512,7 @@ func TestModesSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3521,7 +3526,7 @@ func TestModesSetJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -3534,7 +3539,7 @@ func TestModesSetRangeRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3547,7 +3552,7 @@ func TestModesSetRangeValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -3621,7 +3626,7 @@ func TestReceiverSetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -3738,7 +3743,7 @@ func TestReceiverSetMapRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3752,7 +3757,7 @@ func TestReceiverSetMapJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3765,7 +3770,7 @@ func TestReceiverSetMapValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -3779,7 +3784,7 @@ func TestReceiverSetMapJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid JSON")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -3792,7 +3797,7 @@ func TestReceiverSetMapRejectsDuplicateValuesBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -3843,7 +3848,7 @@ func TestReceiverSetDeadbandRejectsInvalidValueDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
@@ -3860,7 +3865,7 @@ func TestReceiverSetDeadbandRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -3878,7 +3883,7 @@ func TestReceiverSetDeadbandJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -3967,7 +3972,7 @@ func TestGPSSetConfigRejectsInvalidBoolBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_error" {
@@ -3980,7 +3985,7 @@ func TestGPSSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -3994,7 +3999,7 @@ func TestGPSSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4053,7 +4058,7 @@ func TestGPSSetRescueRejectsInvalidValueBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_error" {
@@ -4067,7 +4072,7 @@ func TestGPSSetRescueRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4081,7 +4086,7 @@ func TestGPSSetRescueJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4162,7 +4167,7 @@ func TestGPSSetRescuePIDJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4245,7 +4250,7 @@ func TestOSDSetCanvasRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4258,7 +4263,7 @@ func TestOSDSetCanvasValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -4292,7 +4297,7 @@ func TestOSDSetGeneralJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4305,7 +4310,7 @@ func TestOSDSetGeneralJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -4357,7 +4362,7 @@ func TestOSDSetVideoSystemRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4384,7 +4389,7 @@ func TestOSDSetVideoSystemValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -4522,7 +4527,7 @@ func TestOSDSetPositionRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4536,7 +4541,7 @@ func TestOSDSetPositionJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4549,7 +4554,7 @@ func TestOSDSetStatValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -4634,7 +4639,7 @@ func TestSensorsSetConfigRejectsInvalidValueBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_error" {
@@ -4647,7 +4652,7 @@ func TestSensorsSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4661,7 +4666,7 @@ func TestSensorsSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4723,7 +4728,7 @@ func TestSensorsSetAlignmentRejectsPartialCustomAlignmentBeforeConnect(t *testin
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_error" {
@@ -4736,7 +4741,7 @@ func TestSensorsSetAlignmentRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4750,7 +4755,7 @@ func TestSensorsSetAlignmentJSONRequiresConfirmationBeforeConnect(t *testing.T) 
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4810,7 +4815,7 @@ func TestSensorsSetCompassDeclinationRejectsInvalidValueBeforeConnect(t *testing
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_error" {
@@ -4823,7 +4828,7 @@ func TestSensorsSetCompassDeclinationRequiresConfirmationBeforeConnect(t *testin
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4837,7 +4842,7 @@ func TestSensorsSetCompassJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4953,7 +4958,7 @@ func TestBeeperSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4967,7 +4972,7 @@ func TestBeeperSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -4980,7 +4985,7 @@ func TestBeeperSetConfigValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -5008,7 +5013,7 @@ func TestBeeperEnablePlanOnly(t *testing.T) {
 
 func TestBeeperEnableRejectsUnknownMode(t *testing.T) {
 	env, err := runTestCommand(t, []string{"beeper", "enable", "NOT_A_MODE"}, nil)
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK {
@@ -5117,7 +5122,7 @@ func TestTransponderSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5131,7 +5136,7 @@ func TestTransponderSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T)
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5144,7 +5149,7 @@ func TestTransponderSetConfigValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -5172,7 +5177,7 @@ func TestTransponderSetProviderPlan(t *testing.T) {
 
 func TestTransponderSetProviderRejectsUnknown(t *testing.T) {
 	env, err := runTestCommand(t, []string{"transponder", "set-provider", "UNKNOWN"}, nil)
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK {
@@ -5265,7 +5270,7 @@ func TestMixerSetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -5306,7 +5311,7 @@ func TestMotorsSetConfigRejectsInvalidBoolBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_error" {
@@ -5319,7 +5324,7 @@ func TestMotorsSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5355,7 +5360,7 @@ func TestMotorsSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5391,7 +5396,7 @@ func TestMotorsSet3DConfigRejectsInvalidValueBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_error" {
@@ -5404,7 +5409,7 @@ func TestMotorsSet3DConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5418,7 +5423,7 @@ func TestMotorsSet3DConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatalf("connector should not be called")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5716,7 +5721,7 @@ func TestServosSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5730,7 +5735,7 @@ func TestServosSetConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5743,7 +5748,7 @@ func TestServosSetConfigValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -5776,7 +5781,7 @@ func TestServosSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5790,7 +5795,7 @@ func TestServosSetJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -5842,7 +5847,7 @@ func TestServosSetMixRuleRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5856,7 +5861,7 @@ func TestServosSetMixRuleJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5933,7 +5938,7 @@ func TestFeaturesSetMaskRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -5946,7 +5951,7 @@ func TestFeaturesSetMaskValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -6077,7 +6082,7 @@ func TestReceiverSetRXFailRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -6091,7 +6096,7 @@ func TestReceiverSetRXFailJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -6104,7 +6109,7 @@ func TestReceiverSetRXFailValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -6118,7 +6123,7 @@ func TestReceiverSetRXFailJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid JSON")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -6920,7 +6925,7 @@ func TestAdjustmentsSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -6934,7 +6939,7 @@ func TestAdjustmentsSetJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -6947,7 +6952,7 @@ func TestAdjustmentsSetRangeRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -6961,7 +6966,7 @@ func TestAdjustmentsSetRangeJSONRequiresConfirmationBeforeConnect(t *testing.T) 
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -6974,7 +6979,7 @@ func TestAdjustmentsSetRangeValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7037,7 +7042,7 @@ func TestSerialApplyConfigJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -7051,7 +7056,7 @@ func TestSerialApplyConfigJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7235,7 +7240,7 @@ func TestLEDSetValuesJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -7274,7 +7279,7 @@ func TestLEDSetColorsJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -7291,7 +7296,7 @@ func TestLEDSetColorsJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid LED colors")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7345,7 +7350,7 @@ func TestLEDSetModeColorJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -7362,7 +7367,7 @@ func TestLEDSetModeColorRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -7451,7 +7456,7 @@ func TestPIDSetGainsJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -7465,7 +7470,7 @@ func TestPIDSetGainsJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid JSON shape")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7499,7 +7504,7 @@ func TestPIDSetAdvancedJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -7513,7 +7518,7 @@ func TestPIDSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid PID advanced config")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7548,7 +7553,7 @@ func TestPIDSetSimplifiedJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -7562,7 +7567,7 @@ func TestPIDSetSimplifiedJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid simplified tuning")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7667,7 +7672,7 @@ func TestRatesSetProfileJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -7681,7 +7686,7 @@ func TestRatesSetProfileJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid JSON shape")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7744,7 +7749,7 @@ func TestFiltersSetAdvancedJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -7758,7 +7763,7 @@ func TestFiltersSetAdvancedJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid advanced config")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7792,7 +7797,7 @@ func TestFiltersSetFilterJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -7806,7 +7811,7 @@ func TestFiltersSetFilterJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid filter config")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7875,7 +7880,7 @@ func TestBatterySetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -7892,7 +7897,7 @@ func TestBatterySetConfigJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid battery config")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -7927,7 +7932,7 @@ func TestBatterySetProfileJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -7944,7 +7949,7 @@ func TestBatterySetProfileJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid battery profile")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -8215,7 +8220,7 @@ func TestFailsafeSetArmingJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -8253,7 +8258,7 @@ func TestFailsafeSetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
@@ -8473,7 +8478,7 @@ func TestVTXTableSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -8486,7 +8491,7 @@ func TestVTXTableSetJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -8499,7 +8504,7 @@ func TestVTXTableSetBandRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {
@@ -8540,7 +8545,7 @@ func TestVTXTableSetPowerValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -8692,7 +8697,7 @@ func TestRXRangeSetJSONValidationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called for invalid rxrange JSON")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "validation_failed" {
@@ -8761,7 +8766,7 @@ func TestResourcesSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
 		t.Fatal("connector should not be called without --yes")
 		return nil, connection.TargetInfo{}, nil
 	})
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
 	if env.OK || env.Errors[0].Code != "confirmation_required" {

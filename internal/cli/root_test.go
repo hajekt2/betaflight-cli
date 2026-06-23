@@ -113,6 +113,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if beeperDisable["operation"] != "plan_or_write" || beeperDisable["requires_connection"] != true || beeperDisable["confirmation"] != "--yes with --apply or --save" || beeperDisable["runnable"] != true {
 		t.Fatalf("beeper disable capability = %+v", beeperDisable)
 	}
+	transponderSetProvider := byCommand["betaflight-cli transponder set-provider"]
+	if transponderSetProvider["operation"] != "plan_or_write" || transponderSetProvider["requires_connection"] != true || transponderSetProvider["confirmation"] != "--yes with --apply or --save" || transponderSetProvider["runnable"] != true {
+		t.Fatalf("transponder set-provider capability = %+v", transponderSetProvider)
+	}
+	transponderSetData := byCommand["betaflight-cli transponder set-data"]
+	if transponderSetData["operation"] != "plan_or_write" || transponderSetData["requires_connection"] != true || transponderSetData["confirmation"] != "--yes with --apply or --save" || transponderSetData["runnable"] != true {
+		t.Fatalf("transponder set-data capability = %+v", transponderSetData)
+	}
 	validate := byCommand["betaflight-cli configuration validate"]
 	if validate["operation"] != "offline" || validate["requires_connection"] != false || validate["output_root"] != "configuration_validation" {
 		t.Fatalf("validate capability = %+v", validate)
@@ -1679,6 +1687,68 @@ func TestTransponderConfigWithFakeFC(t *testing.T) {
 	commands := transponder["cli_commands"].([]any)
 	if len(commands) != 2 || commands[0] != "set transponder_provider = ARCITIMER" {
 		t.Fatalf("cli_commands = %+v", commands)
+	}
+}
+
+func TestTransponderSetProviderPlan(t *testing.T) {
+	env, err := runTestCommand(t, []string{"transponder", "set-provider", "ARCITIMER"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	plan := env.Data.(map[string]any)
+	if plan["kind"] != "transponder" || plan["applied"] != false {
+		t.Fatalf("plan = %+v", plan)
+	}
+	lines := plan["cli_lines"].([]any)
+	if len(lines) != 1 || lines[0] != "set transponder_provider = ARCITIMER" {
+		t.Fatalf("lines = %+v", lines)
+	}
+}
+
+func TestTransponderSetProviderRejectsUnknown(t *testing.T) {
+	env, err := runTestCommand(t, []string{"transponder", "set-provider", "UNKNOWN"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK {
+		t.Fatalf("expected failure: %+v", env)
+	}
+}
+
+func TestTransponderSetDataApply(t *testing.T) {
+	var seenOp connection.OperationClass
+	connect := func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		seenOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	}
+	env, err := runTestCommandWithInput(t, []string{"transponder", "set-data", "1,2,3", "--apply", "--yes"}, "", connect)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if seenOp != connection.Write {
+		t.Fatalf("operation = %v, want Write", seenOp)
+	}
+	plan := env.Data.(map[string]any)
+	if plan["applied"] != true || plan["kind"] != "transponder" {
+		t.Fatalf("plan = %+v", plan)
+	}
+	if plan["command_preview"] != "set transponder_data = 1,2,3" {
+		t.Fatalf("plan = %+v", plan)
 	}
 }
 

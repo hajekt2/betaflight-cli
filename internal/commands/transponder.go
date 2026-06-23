@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
@@ -26,6 +27,25 @@ type TransponderProvider struct {
 	ID         uint8  `json:"id"`
 	Name       string `json:"name,omitempty"`
 	DataLength uint8  `json:"data_length"`
+}
+
+var transponderProviderNames = []string{"NONE", "ILAP", "ARCITIMER", "ERLT"}
+
+// ValidateTransponderProviderName validates and normalizes a transponder provider.
+func ValidateTransponderProviderName(value string) (string, error) {
+	if value == "" {
+		return "", fmt.Errorf("provider must not be empty")
+	}
+	provider := strings.ToUpper(strings.TrimSpace(value))
+	if _, err := strconv.Atoi(provider); err == nil {
+		return provider, nil
+	}
+	for _, known := range transponderProviderNames {
+		if provider == known {
+			return provider, nil
+		}
+	}
+	return "", fmt.Errorf("unknown transponder provider %q", value)
 }
 
 func ReadTransponderConfig(ctx context.Context, client *connection.Client) (*TransponderConfig, error) {
@@ -147,4 +167,40 @@ func transponderCLIProvider(provider uint8) string {
 		return name
 	}
 	return fmt.Sprintf("%d", provider)
+}
+
+// ValidateTransponderData parses a comma-delimited list of unsigned bytes.
+func ValidateTransponderData(value string) ([]uint8, error) {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return nil, nil
+	}
+	parts := strings.Split(trimmed, ",")
+	data := make([]uint8, 0, len(parts))
+	for _, part := range parts {
+		token := strings.TrimSpace(part)
+		if token == "" {
+			return nil, fmt.Errorf("empty transponder data token")
+		}
+		parsed, err := strconv.Atoi(token)
+		if err != nil {
+			return nil, fmt.Errorf("invalid transponder data token %q", token)
+		}
+		if parsed < 0 || parsed > 255 {
+			return nil, fmt.Errorf("transponder data token %q outside byte range", token)
+		}
+		data = append(data, uint8(parsed))
+	}
+	return data, nil
+}
+
+func FormatTransponderData(data []uint8) string {
+	if len(data) == 0 {
+		return "set transponder_data = "
+	}
+	values := make([]string, 0, len(data))
+	for _, b := range data {
+		values = append(values, fmt.Sprintf("%d", b))
+	}
+	return "set transponder_data = " + strings.Join(values, ",")
 }

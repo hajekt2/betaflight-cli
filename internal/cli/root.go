@@ -334,6 +334,36 @@ func (a *app) transponderCommand() *cobra.Command {
 			})
 		},
 	})
+	var setProviderFlags changeFlags
+	setProvider := &cobra.Command{
+		Use:   "set-provider NAME",
+		Short: "Plan or set transponder provider",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			provider, err := bfcommands.ValidateTransponderProviderName(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			return a.planOrApplyCLI(cmd, []string{fmt.Sprintf("set transponder_provider = %s", provider)}, "transponder", setProviderFlags)
+		},
+	}
+	addChangeFlags(setProvider, &setProviderFlags)
+	cmd.AddCommand(setProvider)
+	var setDataFlags changeFlags
+	setData := &cobra.Command{
+		Use:   "set-data BYTES",
+		Short: "Plan or set transponder data bytes",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := bfcommands.ValidateTransponderData(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			return a.planOrApplyCLI(cmd, []string{bfcommands.FormatTransponderData(data)}, "transponder", setDataFlags)
+		},
+	}
+	addChangeFlags(setData, &setDataFlags)
+	cmd.AddCommand(setData)
 	return cmd
 }
 

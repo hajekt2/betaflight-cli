@@ -62,3 +62,42 @@ func TestDecodeTransponderConfigRejectsTrailingBytes(t *testing.T) {
 		t.Fatal("DecodeTransponderConfig() error = nil, want trailing byte error")
 	}
 }
+
+func TestValidateTransponderProviderName(t *testing.T) {
+	for _, tc := range []struct {
+		input string
+		want  string
+	}{
+		{"arcitimer", "ARCITIMER"},
+		{"ILAP", "ILAP"},
+		{"0", "0"},
+		{"3", "3"},
+	} {
+		got, err := ValidateTransponderProviderName(tc.input)
+		if err != nil || got != tc.want {
+			t.Fatalf("ValidateTransponderProviderName(%q) = %q, %v, want %q", tc.input, got, err, tc.want)
+		}
+	}
+	if _, err := ValidateTransponderProviderName("UNKNOWN"); err == nil {
+		t.Fatal("ValidateTransponderProviderName(\"UNKNOWN\") = nil, want error")
+	}
+}
+
+func TestValidateTransponderData(t *testing.T) {
+	data, err := ValidateTransponderData("1,2,3,255")
+	if err != nil {
+		t.Fatalf("ValidateTransponderData() error = %v", err)
+	}
+	if len(data) != 4 || data[0] != 1 || data[3] != 255 {
+		t.Fatalf("data = %+v", data)
+	}
+	if _, err := ValidateTransponderData("1,,2"); err == nil {
+		t.Fatal("ValidateTransponderData(\"1,,2\") error = nil, want error")
+	}
+	if _, err := ValidateTransponderData("1,256"); err == nil {
+		t.Fatal("ValidateTransponderData(\"1,256\") error = nil, want error")
+	}
+	if _, err := ValidateTransponderData("bad"); err == nil {
+		t.Fatal("ValidateTransponderData(\"bad\") error = nil, want error")
+	}
+}

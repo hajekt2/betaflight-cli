@@ -955,6 +955,41 @@ func TestCLIExecDiffIncludesConfiguration(t *testing.T) {
 	}
 }
 
+func TestCLIDiffCommandIncludesConfiguration(t *testing.T) {
+	env, err := runTestCommand(t, []string{"cli", "diff"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	configuration := data["configuration"].(map[string]any)
+	if len(configuration["settings"].([]any)) != 1 {
+		t.Fatalf("configuration = %+v", configuration)
+	}
+	if data["command"] != "diff all" {
+		t.Fatalf("command = %v", data["command"])
+	}
+}
+
+func TestCLIDumpCommandIncludesConfiguration(t *testing.T) {
+	env, err := runTestCommand(t, []string{"cli", "dump"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["command"] != "dump all" {
+		t.Fatalf("command = %v", data["command"])
+	}
+	if len(data["lines"].([]any)) == 0 {
+		t.Fatalf("lines = %+v", data["lines"])
+	}
+}
+
 func TestBlackboxInspectDoesNotConnect(t *testing.T) {
 	path := writeTempBlackboxLog(t)
 	called := false

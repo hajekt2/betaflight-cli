@@ -895,50 +895,62 @@ func (a *app) rtcCommand() *cobra.Command {
 
 func (a *app) cliCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "cli", Short: "Run Betaflight CLI commands"}
+	runCLIRaw := func(cmd *cobra.Command, raw string) error {
+		class := classifyCLI(raw)
+		if class != cliReadOnly && !a.opts.yes {
+			env := output.Failure(commandPath(cmd), nil, "confirmation_required", fmt.Sprintf("%q is not classified as read-only; pass --yes or use a safer domain command", raw))
+			return a.render(env)
+		}
+		op := connection.ReadOnly
+		if class == cliWrite {
+			op = connection.Write
+		}
+		if class == cliDangerous {
+			op = connection.Dangerous
+		}
+		return a.withClient(cmd.Context(), commandPath(cmd), op, func(client *connection.Client, target output.Target) output.Envelope {
+			lines, err := client.ExecCLI(cmd.Context(), raw)
+			if err != nil {
+				return a.failure(commandPath(cmd), &target, err)
+			}
+			envData := map[string]any{
+				"command": raw,
+				"lines":   lines,
+				"raw":     strings.Join(lines, "\n"),
+			}
+			if isConfigurationRead(raw) {
+				doc := bfconfig.Parse(lines, settings.DefaultRegistry)
+				envData["configuration"] = doc
+				envData["sections"] = doc.Sections
+				envData["raw_authoritative"] = true
+			}
+			env := output.Success(commandPath(cmd), &target, envData)
+			if class != cliReadOnly {
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: raw})
+			}
+			return env
+		})
+	}
 	cmd.AddCommand(&cobra.Command{
 		Use:   "exec COMMAND",
 		Short: "Run a framed non-interactive Betaflight CLI command",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			raw := args[0]
-			class := classifyCLI(raw)
-			if class != cliReadOnly && !a.opts.yes {
-				env := output.Failure(commandPath(cmd), nil, "confirmation_required", fmt.Sprintf("%q is not classified as read-only; pass --yes or use a safer domain command", raw))
-				return a.render(env)
-			}
-			op := connection.ReadOnly
-			if class == cliWrite {
-				op = connection.Write
-			}
-			if class == cliDangerous {
-				op = connection.Dangerous
-			}
-			return a.withClient(cmd.Context(), commandPath(cmd), op, func(client *connection.Client, target output.Target) output.Envelope {
-				lines, err := client.ExecCLI(cmd.Context(), raw)
-				if err != nil {
-					return a.failure(commandPath(cmd), &target, err)
-				}
-				env := output.Success(commandPath(cmd), &target, map[string]any{
-					"command": raw,
-					"lines":   lines,
-					"raw":     strings.Join(lines, "\n"),
-				})
-				if isConfigurationRead(raw) {
-					doc := bfconfig.Parse(lines, settings.DefaultRegistry)
-					env.Data = map[string]any{
-						"command":           raw,
-						"lines":             lines,
-						"raw":               strings.Join(lines, "\n"),
-						"configuration":     doc,
-						"sections":          doc.Sections,
-						"raw_authoritative": true,
-					}
-				}
-				if class != cliReadOnly {
-					env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: raw})
-				}
-				return env
-			})
+			return runCLIRaw(cmd, args[0])
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "diff",
+		Short: "Run non-interactive `diff all` and parse response",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runCLIRaw(cmd, "diff all")
+		},
+	})
+	cmd.AddCommand(&cobra.Command{
+		Use:   "dump",
+		Short: "Run non-interactive `dump all` and parse response",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return runCLIRaw(cmd, "dump all")
 		},
 	})
 	cmd.AddCommand(&cobra.Command{

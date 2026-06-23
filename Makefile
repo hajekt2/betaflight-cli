@@ -12,14 +12,11 @@ build:
 	$(GO) build -o $(BINARY) ./cmd/betaflight-cli
 
 .PHONY: build-release
-build-release:
-	mkdir -p $(BINDIR)
-	$(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-linux-amd64 ./cmd/$(BINARY)
-	GOOS=linux GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-linux-arm64 ./cmd/$(BINARY)
-	GOOS=darwin GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-amd64 ./cmd/$(BINARY)
-	GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-arm64 ./cmd/$(BINARY)
-	GOOS=windows GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-amd64.exe ./cmd/$(BINARY)
-	GOOS=windows GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-arm64.exe ./cmd/$(BINARY)
+build-release: clean-dist build-static checksums
+
+.PHONY: clean-dist
+clean-dist:
+	rm -rf $(BINDIR)
 
 .PHONY: build-static
 build-static:
@@ -30,6 +27,27 @@ build-static:
 	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-arm64 ./cmd/$(BINARY)
 	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-amd64.exe ./cmd/$(BINARY)
 	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-arm64.exe ./cmd/$(BINARY)
+
+.PHONY: checksums
+checksums:
+	@if [ ! -d "$(BINDIR)" ]; then \
+		echo "error: $(BINDIR) does not exist; run make build-static first"; \
+		exit 1; \
+	fi
+	@set -eu; \
+	cd "$(BINDIR)"; \
+	rm -f SHA256SUMS; \
+	files=$$(find . -maxdepth 1 -type f ! -name 'SHA256SUMS' -print | sed 's#^\./##' | sort); \
+	if [ -z "$$files" ]; then \
+		echo "error: no release artifacts found in $(BINDIR)"; \
+		exit 1; \
+	fi; \
+	if command -v sha256sum >/dev/null 2>&1; then \
+		sha256sum $$files > SHA256SUMS; \
+	else \
+		shasum -a 256 $$files > SHA256SUMS; \
+	fi; \
+	echo "wrote $(BINDIR)/SHA256SUMS"
 
 .PHONY: test
 test:

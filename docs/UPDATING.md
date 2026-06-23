@@ -167,6 +167,6 @@ They should not send random writes and hope the firmware rejects them.
 - Cross-platform build matrix passes.
 - Dangerous command safety tests pass.
 - Blackbox parser fixtures pass when Blackbox code is affected.
-- Release checksums generated for built artifacts.
+- `make build-release` generated static binaries and `dist/SHA256SUMS`.
 - README supported-version note updated.
 - Source review note updated if an upstream behavior changed.

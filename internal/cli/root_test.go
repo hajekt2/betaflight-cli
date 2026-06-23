@@ -543,6 +543,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if modeRanges["operation"] != "write" || modeRanges["confirmation"] != "--yes" || modeRanges["requires_connection"] != true || modeRanges["output_root"] != "mode_ranges" || modeRanges["runnable"] != true {
 		t.Fatalf("mode ranges capability = %+v", modeRanges)
 	}
+	ledSetJSON := byCommand["betaflight-cli leds set-json"]
+	if ledSetJSON["operation"] != "plan_or_write" || ledSetJSON["confirmation"] != "--yes with --apply or --save" || ledSetJSON["requires_connection"] != true || ledSetJSON["output_root"] != "change_plan" || ledSetJSON["input"] == "" || ledSetJSON["runnable"] != true {
+		t.Fatalf("led set json capability = %+v", ledSetJSON)
+	}
 	ledValues := byCommand["betaflight-cli leds set-values"]
 	if ledValues["operation"] != "write" || ledValues["confirmation"] != "--yes" || ledValues["requires_connection"] != true || ledValues["output_root"] != "led_values" || ledValues["runnable"] != true {
 		t.Fatalf("led values capability = %+v", ledValues)
@@ -7115,6 +7119,61 @@ func TestLEDSetValuesRejectsOutOfRangeDoesNotConnect(t *testing.T) {
 	}
 	if called {
 		t.Fatal("connector was called after LED values validation failure")
+	}
+}
+
+func TestLEDSetJSONPlansDoNotConnect(t *testing.T) {
+	input := `{"leds":[{"index":0,"config":"0,0::C:0"},{"index":1,"config":"1,0::W:0"}]}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"leds", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	lines := data["cli_lines"].([]any)
+	if data["applied"] != false || len(lines) != 2 || lines[0] != "led 0 0,0::C:0" || lines[1] != "led 1 1,0::W:0" {
+		t.Fatalf("plan = %+v", data)
+	}
+	if called {
+		t.Fatal("connector was called for LED JSON plan")
+	}
+}
+
+func TestLEDSetJSONApplyWithFakeFC(t *testing.T) {
+	input := `{"led":{"index":0,"config":"0,0::C:0"}}`
+	env, err := runTestCommandWithInput(t, []string{"leds", "set-json", "-", "--apply", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "led 0 0,0::C:0" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestLEDSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"led":{"index":0,"config":"bad\nline"}}`
+	env, err := runTestCommandWithInput(t, []string{"leds", "set-json", "-", "--apply", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid LED row JSON")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want validation failure")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
 	}
 }
 

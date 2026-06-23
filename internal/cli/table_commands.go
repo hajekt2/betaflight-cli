@@ -356,8 +356,88 @@ func (a *app) ledsCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.ledValuesCommand(), a.ledValuesJSONCommand(), a.ledColorsJSONCommand(), a.ledModeColorCommand(), a.ledModeColorJSONCommand())
+	cmd.AddCommand(set, a.ledSetJSONCommand(), a.ledValuesCommand(), a.ledValuesJSONCommand(), a.ledColorsJSONCommand(), a.ledModeColorCommand(), a.ledModeColorJSONCommand())
 	return cmd
+}
+
+type ledSetRow struct {
+	Index  int    `json:"index"`
+	Config string `json:"config"`
+}
+
+func (a *app) ledSetJSONCommand() *cobra.Command {
+	var flags changeFlags
+	cmd := &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Plan or set LED strip rows from JSON using native Betaflight CLI syntax",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			rows, err := parseLEDRowsJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			lines := make([]string, 0, len(rows))
+			for _, row := range rows {
+				lines = append(lines, fmt.Sprintf("led %d %s", row.Index, row.Config))
+			}
+			return a.planOrApplyCLI(cmd, lines, "led", flags)
+		},
+	}
+	addChangeFlags(cmd, &flags)
+	return cmd
+}
+
+func parseLEDRowsJSON(data []byte) ([]ledSetRow, error) {
+	var wrapped struct {
+		LED  *ledSetRow  `json:"led"`
+		Row  *ledSetRow  `json:"row"`
+		LEDs []ledSetRow `json:"leds"`
+		Rows []ledSetRow `json:"rows"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return nil, err
+	}
+	switch {
+	case wrapped.LED != nil:
+		return validateLEDRows([]ledSetRow{*wrapped.LED})
+	case wrapped.Row != nil:
+		return validateLEDRows([]ledSetRow{*wrapped.Row})
+	case wrapped.LEDs != nil:
+		return validateLEDRows(wrapped.LEDs)
+	case wrapped.Rows != nil:
+		return validateLEDRows(wrapped.Rows)
+	}
+	var rows []ledSetRow
+	if err := json.Unmarshal(data, &rows); err == nil {
+		return validateLEDRows(rows)
+	}
+	var row ledSetRow
+	if err := json.Unmarshal(data, &row); err != nil {
+		return nil, err
+	}
+	return validateLEDRows([]ledSetRow{row})
+}
+
+func validateLEDRows(rows []ledSetRow) ([]ledSetRow, error) {
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("at least one LED row is required")
+	}
+	for i, row := range rows {
+		if row.Index < 0 {
+			return nil, fmt.Errorf("row %d index must be >= 0", i)
+		}
+		if strings.TrimSpace(row.Config) == "" {
+			return nil, fmt.Errorf("row %d config is required", i)
+		}
+		if strings.ContainsAny(row.Config, "\r\n") {
+			return nil, fmt.Errorf("row %d config must be a single CLI token", i)
+		}
+	}
+	return rows, nil
 }
 
 func (a *app) ledValuesCommand() *cobra.Command {

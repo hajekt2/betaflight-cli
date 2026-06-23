@@ -422,6 +422,8 @@ Successful apply responses set `applied` and `stopped`, include read-only runtim
 
 `leds status` returns a `leds` object decoded from `MSP_LED_STRIP_CONFIG`, `MSP_LED_COLORS`, `MSP_LED_STRIP_MODECOLOR`, and `MSP2_GET_LED_STRIP_CONFIG_VALUES`.
 The object includes LED layout rows, decoded CLI row syntax, HSV colors, mode colors, global brightness, rainbow delta, rainbow frequency, and source metadata.
+`leds set-json` returns a `change_plan` object with native `led INDEX CONFIG` CLI rows, `applied`, `saved`, and command response fields when applied.
+`leds set-json` accepts a direct LED row object, an array of rows, or an object with `led`, `leds`, `row`, or `rows`.
 `leds set-colors-json` returns a `led_colors` object with the requested HSV color rows, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful LED color writes include a `led_colors` side effect.
 `leds set-mode-color` returns a `led_mode_color` object with mode, direction, color, MSP command name/code, acknowledgement flag, and `save_required`.

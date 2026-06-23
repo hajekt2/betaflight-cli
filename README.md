@@ -276,6 +276,7 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 It never connects to hardware.
 `motors test-apply` runs the same bounded single-motor plan, requires `--yes`, `--props-off`, and `--battery-aware`, records read-only runtime preflight state, sends a stop command after the requested duration, records a read-only post-stop motor snapshot, emits a `motor_output` side effect, and returns both a compact audit record and a preflight-to-post-stop summary.
 `leds status` reads LED strip rows, HSV colors, mode colors, and brightness/rainbow values over MSP.
+`leds set-json` plans or applies native `led INDEX CONFIG` CLI rows from a JSON object, array, or object with `led`, `leds`, `row`, or `rows`, supports dry-run planning by default, and requires `--yes` when applying or saving.
 `leds set-colors-json` writes the full LED HSV color table through `MSP_SET_LED_COLORS`, accepts either an array of colors or an object with `colors`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `leds set-mode-color` writes one LED mode color row through `MSP_SET_LED_STRIP_MODECOLOR`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `leds set-mode-color-json` writes one LED mode color row through `MSP_SET_LED_STRIP_MODECOLOR`, accepts either a mode color object or an object with `led_mode_color`, `mode_color`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

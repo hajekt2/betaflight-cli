@@ -69,6 +69,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.receiverMapCommand())
 		cmd.AddCommand(a.receiverMapJSONCommand())
 		cmd.AddCommand(a.receiverDeadbandCommand())
+		cmd.AddCommand(a.receiverDeadbandJSONCommand())
 	}
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
@@ -614,6 +615,69 @@ func (a *app) receiverDeadbandCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) receiverDeadbandJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-deadband-json FILE",
+		Short: "Set RC deadband values from JSON through MSP_SET_RC_DEADBAND",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseRCDeadbandJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "RC deadband changes receiver configuration; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRCDeadband(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rc_deadband": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rc_deadband",
+					Command: "MSP_SET_RC_DEADBAND",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseRCDeadbandJSON(data []byte) (bfcommands.RCDeadband, error) {
+	var wrapped struct {
+		RCDeadband *bfcommands.RCDeadband `json:"rc_deadband"`
+		Deadband   *bfcommands.RCDeadband `json:"deadband"`
+		Config     *bfcommands.RCDeadband `json:"config"`
+		Receiver   *struct {
+			Deadband *bfcommands.RCDeadband `json:"deadband"`
+		} `json:"receiver"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.RCDeadband{}, err
+	}
+	switch {
+	case wrapped.RCDeadband != nil:
+		return *wrapped.RCDeadband, nil
+	case wrapped.Deadband != nil:
+		return *wrapped.Deadband, nil
+	case wrapped.Config != nil:
+		return *wrapped.Config, nil
+	case wrapped.Receiver != nil && wrapped.Receiver.Deadband != nil:
+		return *wrapped.Receiver.Deadband, nil
+	}
+	var config bfcommands.RCDeadband
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.RCDeadband{}, err
+	}
+	return config, nil
 }
 
 func receiverRXFailLine(args []string) (string, error) {

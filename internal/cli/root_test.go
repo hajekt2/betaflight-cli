@@ -395,6 +395,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rcDeadband["operation"] != "write" || rcDeadband["confirmation"] != "--yes" || rcDeadband["requires_connection"] != true || rcDeadband["output_root"] != "rc_deadband" || rcDeadband["runnable"] != true {
 		t.Fatalf("rc deadband capability = %+v", rcDeadband)
 	}
+	rcDeadbandJSON := byCommand["betaflight-cli receiver set-deadband-json"]
+	if rcDeadbandJSON["operation"] != "write" || rcDeadbandJSON["confirmation"] != "--yes" || rcDeadbandJSON["requires_connection"] != true || rcDeadbandJSON["output_root"] != "rc_deadband" || rcDeadbandJSON["runnable"] != true {
+		t.Fatalf("rc deadband JSON capability = %+v", rcDeadbandJSON)
+	}
 	gpsConfig := byCommand["betaflight-cli gps set-config"]
 	if gpsConfig["operation"] != "write" || gpsConfig["confirmation"] != "--yes" || gpsConfig["requires_connection"] != true || gpsConfig["output_root"] != "gps_config" || gpsConfig["runnable"] != true {
 		t.Fatalf("gps config capability = %+v", gpsConfig)
@@ -3509,8 +3513,49 @@ func TestReceiverSetDeadbandRequiresYesDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestReceiverSetDeadbandJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"deadband":5,"yaw_deadband":7,"pos_hold_deadband":3,"deadband_3d_throttle":50}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"receiver", "set-deadband-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after RC deadband confirmation failure")
+	}
+}
+
 func TestReceiverSetDeadbandWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"receiver", "set-deadband", "5", "7", "3", "50", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["rc_deadband"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["deadband"] != float64(5) || config["yaw_deadband"] != float64(7) || config["deadband_3d_throttle"] != float64(50) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_RC_DEADBAND" || result["save_required"] != true {
+		t.Fatalf("rc deadband result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "rc_deadband" || env.SideEffects[0].Command != "MSP_SET_RC_DEADBAND" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestReceiverSetDeadbandJSONWithFakeFC(t *testing.T) {
+	input := `{"receiver":{"deadband":{"deadband":5,"yaw_deadband":7,"pos_hold_deadband":3,"deadband_3d_throttle":50}}}`
+	env, err := runTestCommandWithInput(t, []string{"receiver", "set-deadband-json", "-", "--yes"}, input, nil)
 	if err != nil {
 		t.Fatalf("command error = %v", err)
 	}

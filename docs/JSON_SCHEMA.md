@@ -315,6 +315,8 @@ Successful receiver map writes include an `rc_map` side effect.
 It returns the same `rc_map` object as `receiver set-map`.
 `receiver set-deadband` returns an `rc_deadband` object with deadband, yaw deadband, position-hold deadband, 3D throttle deadband, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful RC deadband writes include an `rc_deadband` side effect.
+`receiver set-deadband-json` accepts either a deadband object or an object with `rc_deadband`, `deadband`, `config`, or `receiver.deadband`.
+It returns the same `rc_deadband` object as `receiver set-deadband`.
 
 `gps status` returns a `gps` object decoded from `MSP_GPS_CONFIG`, `MSP_RAW_GPS`, `MSP_COMP_GPS`, `MSP_GPS_RESCUE`, `MSP_GPS_RESCUE_PIDS`, and `MSP_GPSSVINFO`.
 The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.

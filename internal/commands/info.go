@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
@@ -15,11 +16,20 @@ type Info struct {
 	FirmwareVersion string     `json:"firmware_version"`
 	MSPAPIVersion   string     `json:"msp_api_version"`
 	MSPProtocol     uint8      `json:"msp_protocol_version"`
+	Support         Support    `json:"support"`
 	Board           *BoardInfo `json:"board,omitempty"`
 	MCU             *MCUInfo   `json:"mcu,omitempty"`
 	UID             *DeviceUID `json:"uid,omitempty"`
 	Build           *BuildInfo `json:"build,omitempty"`
 	LegacyName      string     `json:"legacy_name,omitempty"`
+}
+
+type Support struct {
+	Supported            bool     `json:"supported"`
+	Policy               string   `json:"policy"`
+	Reason               string   `json:"reason"`
+	AllowUnsupportedFlag string   `json:"allow_unsupported_flag"`
+	Warnings             []string `json:"warnings,omitempty"`
 }
 
 type BoardInfo struct {
@@ -80,13 +90,36 @@ type BuildOption struct {
 
 func ReadInfo(ctx context.Context, client *connection.Client) (Info, []string) {
 	target := client.Target()
+	var warnings []string
 	info := Info{
 		Variant:         target.Variant,
 		FirmwareVersion: target.FirmwareVersion,
 		MSPAPIVersion:   target.MSPAPIVersion,
 		MSPProtocol:     target.MSPProtocol,
 	}
-	var warnings []string
+	if info.Variant == "" {
+		if variant, err := client.FCVariant(ctx); err == nil {
+			info.Variant = variant
+		} else {
+			warnings = append(warnings, fmt.Sprintf("MSP_FC_VARIANT unavailable: %v", err))
+		}
+	}
+	if info.FirmwareVersion == "" {
+		if version, err := client.FCVersion(ctx); err == nil {
+			info.FirmwareVersion = version
+		} else {
+			warnings = append(warnings, fmt.Sprintf("MSP_FC_VERSION unavailable: %v", err))
+		}
+	}
+	if info.MSPAPIVersion == "" {
+		if api, err := client.APIVersion(ctx); err == nil {
+			info.MSPProtocol = api.MSPProtocol
+			info.MSPAPIVersion = strconv.Itoa(int(api.Major)) + "." + strconv.Itoa(int(api.Minor))
+		} else {
+			warnings = append(warnings, fmt.Sprintf("MSP_API_VERSION unavailable: %v", err))
+		}
+	}
+	info.Support = supportFromTarget(info.Variant, info.FirmwareVersion, info.MSPAPIVersion)
 	frame, err := client.Request(ctx, msp.MSPBoardInfo, nil)
 	if err != nil {
 		warnings = append(warnings, fmt.Sprintf("MSP_BOARD_INFO unavailable: %v", err))
@@ -133,7 +166,23 @@ func ReadInfo(ctx context.Context, client *connection.Client) (Info, []string) {
 	} else {
 		warnings = append(warnings, fmt.Sprintf("MSP_NAME unavailable: %v", err))
 	}
+	if !info.Support.Supported {
+		info.Support.Warnings = append(info.Support.Warnings, info.Support.Reason)
+	}
+	if len(warnings) > 0 {
+		info.Support.Warnings = append(info.Support.Warnings, warnings...)
+	}
 	return info, warnings
+}
+
+func supportFromTarget(variant, firmwareVersion, apiVersion string) Support {
+	status := EvaluateFirmwareSupport(variant, firmwareVersion, apiVersion)
+	return Support{
+		Supported:            status.Supported,
+		Policy:               status.Policy,
+		Reason:               status.Reason,
+		AllowUnsupportedFlag: status.AllowUnsupportedFlag,
+	}
 }
 
 func DecodeBoardInfo(payload []byte) (*BoardInfo, error) {

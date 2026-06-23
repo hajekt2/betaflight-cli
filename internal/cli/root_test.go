@@ -183,6 +183,27 @@ func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestTelemetryDefaultCommandMapsToSnapshot(t *testing.T) {
+	env, err := runTestCommand(t, []string{"telemetry"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data, ok := env.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("env.Data type = %T", env.Data)
+	}
+	sources, ok := data["sources"].(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected telemetry sources: %+v", data["sources"])
+	}
+	if sources["status"] == nil || sources["attitude"] == nil || sources["battery"] == nil || sources["rc"] == nil {
+		t.Fatalf("missing telemetry source keys: %+v", sources)
+	}
+}
+
 func TestDebugStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"debug", "status"}, nil)
 	if err != nil {
@@ -640,6 +661,13 @@ func TestInfoWithFakeFCIncludesBuildMetadata(t *testing.T) {
 	data := env.Data.(map[string]any)
 	if data["legacy_name"] != "BetaFlight" {
 		t.Fatalf("legacy name = %+v", data["legacy_name"])
+	}
+	support := data["support"].(map[string]any)
+	if support["supported"] != true {
+		t.Fatalf("support = %+v", support)
+	}
+	if support["policy"] != "official Betaflight 2025.12.x and newer" {
+		t.Fatalf("support policy = %+v", support)
 	}
 	board := data["board"].(map[string]any)
 	if board["configuration_state_name"] != "CONFIGURED" || board["sample_rate_hz"] != float64(8000) {

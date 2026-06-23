@@ -811,16 +811,20 @@ func (a *app) systemCommand() *cobra.Command {
 
 func (a *app) telemetryCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "telemetry", Short: "Read telemetry"}
+	readSnapshot := func(cmd *cobra.Command, _ []string) error {
+		return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+			telemetry, warnings := bfcommands.ReadTelemetry(cmd.Context(), client)
+			env := output.Success(commandPath(cmd), &target, telemetry)
+			addStringWarnings(&env, warnings)
+			return env
+		})
+	}
+	cmd.RunE = readSnapshot
 	cmd.AddCommand(&cobra.Command{
 		Use:   "snapshot",
 		Short: "Read one telemetry snapshot",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
-				telemetry, warnings := bfcommands.ReadTelemetry(cmd.Context(), client)
-				env := output.Success(commandPath(cmd), &target, telemetry)
-				addStringWarnings(&env, warnings)
-				return env
-			})
+			return readSnapshot(cmd, nil)
 		},
 	})
 	return cmd

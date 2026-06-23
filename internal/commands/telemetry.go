@@ -10,10 +10,11 @@ import (
 )
 
 type Telemetry struct {
-	Status   *Status   `json:"status,omitempty"`
-	Attitude *Attitude `json:"attitude,omitempty"`
-	Battery  *Battery  `json:"battery,omitempty"`
-	RC       []uint16  `json:"rc,omitempty"`
+	Sources  map[string]string `json:"sources"`
+	Status   *Status           `json:"status,omitempty"`
+	Attitude *Attitude         `json:"attitude,omitempty"`
+	Battery  *Battery          `json:"battery,omitempty"`
+	RC       []uint16          `json:"rc,omitempty"`
 }
 
 type Status struct {
@@ -55,25 +56,34 @@ type Battery struct {
 
 func ReadTelemetry(ctx context.Context, client *connection.Client) (Telemetry, []string) {
 	var out Telemetry
+	out.Sources = map[string]string{}
 	var warnings []string
 	if status, err := readStatus(ctx, client); err == nil {
 		out.Status = status
+		out.Sources["status"] = status.Source
 	} else {
+		out.Sources["status"] = "MSP_STATUS"
 		warnings = append(warnings, err.Error())
 	}
 	if attitude, err := readAttitude(ctx, client); err == nil {
 		out.Attitude = attitude
+		out.Sources["attitude"] = "MSP_ATTITUDE"
 	} else {
+		out.Sources["attitude"] = ""
 		warnings = append(warnings, err.Error())
 	}
 	if battery, err := readBattery(ctx, client); err == nil {
 		out.Battery = battery
+		out.Sources["battery"] = "MSP_BATTERY_STATE"
 	} else {
+		out.Sources["battery"] = ""
 		warnings = append(warnings, err.Error())
 	}
 	if rc, err := readRC(ctx, client); err == nil {
 		out.RC = rc
+		out.Sources["rc"] = "MSP_RC"
 	} else {
+		out.Sources["rc"] = ""
 		warnings = append(warnings, err.Error())
 	}
 	return out, warnings

@@ -479,6 +479,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if servoConfig["operation"] != "write" || servoConfig["confirmation"] != "--yes" || servoConfig["requires_connection"] != true || servoConfig["output_root"] != "servo_config" || servoConfig["runnable"] != true {
 		t.Fatalf("servo config capability = %+v", servoConfig)
 	}
+	servoTable := byCommand["betaflight-cli servos set-json"]
+	if servoTable["operation"] != "write" || servoTable["confirmation"] != "--yes" || servoTable["requires_connection"] != true || servoTable["output_root"] != "servo_table" || servoTable["runnable"] != true {
+		t.Fatalf("servo table capability = %+v", servoTable)
+	}
 	servoMixRule := byCommand["betaflight-cli servos set-mix-rule"]
 	if servoMixRule["operation"] != "write" || servoMixRule["confirmation"] != "--yes" || servoMixRule["requires_connection"] != true || servoMixRule["output_root"] != "servo_mix_rule" || servoMixRule["runnable"] != true {
 		t.Fatalf("servo mix rule capability = %+v", servoMixRule)
@@ -4698,6 +4702,53 @@ func TestServosSetConfigRequiresConfirmationBeforeConnect(t *testing.T) {
 
 func TestServosSetConfigValidationBeforeConnect(t *testing.T) {
 	env, err := runTestCommand(t, []string{"servos", "set-config", "1", "1100", "1900", "1501", "-200", "2", "5", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid args")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_failed" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestServosSetJSONWithFakeFC(t *testing.T) {
+	input := `{"servo_table":{"configurations":[{"index":1,"min":1100,"max":1900,"middle":1501,"rate":-50,"forward_from_channel":2,"reversed_sources_mask":5}],"mix_rules":[{"index":2,"target_channel":1,"input_source":3,"rate":-25,"speed":10,"min":5,"max":95,"box":4}]}}`
+	env, err := runTestCommandWithInput(t, []string{"servos", "set-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["servo_table"].(map[string]any)
+	if result["configuration_count"] != float64(1) || result["mix_rule_count"] != float64(1) || result["save_required"] != true {
+		t.Fatalf("servo_table = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "MSP_SET_SERVO_CONFIGURATION,MSP_SET_SERVO_MIX_RULE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestServosSetJSONRequiresConfirmationBeforeConnect(t *testing.T) {
+	input := `{"configurations":[{"index":1,"min":1100,"max":1900,"middle":1501,"rate":-50,"forward_from_channel":2,"reversed_sources_mask":5}]}`
+	env, err := runTestCommandWithInput(t, []string{"servos", "set-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called without --yes")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestServosSetJSONValidationBeforeConnect(t *testing.T) {
+	input := `{"configurations":[{"index":1,"min":1900,"max":1100,"middle":1501,"rate":-50,"forward_from_channel":2,"reversed_sources_mask":5}]}`
+	env, err := runTestCommandWithInput(t, []string{"servos", "set-json", "-", "--yes"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		t.Fatal("connector should not be called for invalid args")
 		return nil, connection.TargetInfo{}, nil
 	})

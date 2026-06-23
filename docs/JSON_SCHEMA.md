@@ -387,9 +387,10 @@ Successful LED value writes include a `led_values` side effect.
 
 `servos status` returns a `servos` object decoded from `MSP_SERVO`, `MSP_SERVO_CONFIGURATIONS`, and `MSP_SERVO_MIX_RULES`.
 The object includes current servo outputs, servo configuration rows, and servo mix rules.
+`servos set-json` returns a `servo_table` object with applied servo configuration rows, applied mix rules, row counts, MSP command names, acknowledgement flag, and `save_required`.
 `servos set-config` returns a `servo_config` object with the written row, MSP command name/code, acknowledgement flag, and `save_required`.
 `servos set-mix-rule` returns a `servo_mix_rule` object with the written rule, MSP command name/code, acknowledgement flag, and `save_required`.
-Successful servo writes include `servo_config` or `servo_mix_rule` side effects.
+Successful servo writes include `servo_table`, `servo_config`, or `servo_mix_rule` side effects.
 
 `adjustments status` returns an `adjustments` object decoded from `MSP_ADJUSTMENT_RANGES`.
 The object includes adjustment range rows, AUX channel names, range microsecond values, adjustment function names, center and scale values, active markers, and native `adjrange` CLI commands.

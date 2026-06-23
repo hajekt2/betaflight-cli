@@ -428,8 +428,70 @@ func (a *app) servosCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(reverse, &reverseFlags)
-	cmd.AddCommand(set, reverse, a.servoSetConfigCommand(), a.servoSetMixRuleCommand())
+	cmd.AddCommand(set, reverse, a.servoSetJSONCommand(), a.servoSetConfigCommand(), a.servoSetMixRuleCommand())
 	return cmd
+}
+
+func (a *app) servoSetJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-json FILE",
+		Short: "Set servo configuration and mix rows from JSON through typed MSP writes",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseServoTableJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "servo table changes servo settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetServoTable(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"servo_table": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "servo_table",
+					Command: strings.Join(result.MSPNames, ","),
+					Detail:  "servo rows changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseServoTableJSON(data []byte) (bfcommands.ServoTableSetConfig, error) {
+	var wrapped struct {
+		ServoTable *bfcommands.ServoTableSetConfig `json:"servo_table"`
+		Servos     *bfcommands.ServoTableSetConfig `json:"servos"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.ServoTableSetConfig{}, err
+	}
+	if wrapped.ServoTable != nil {
+		return validateServoTableConfig(*wrapped.ServoTable)
+	}
+	if wrapped.Servos != nil {
+		return validateServoTableConfig(*wrapped.Servos)
+	}
+	var config bfcommands.ServoTableSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.ServoTableSetConfig{}, err
+	}
+	return validateServoTableConfig(config)
+}
+
+func validateServoTableConfig(config bfcommands.ServoTableSetConfig) (bfcommands.ServoTableSetConfig, error) {
+	if err := bfcommands.ValidateServoTable(config); err != nil {
+		return bfcommands.ServoTableSetConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) servoSetConfigCommand() *cobra.Command {

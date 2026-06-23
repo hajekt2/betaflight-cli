@@ -133,3 +133,33 @@ func TestEncodeServoMixRule(t *testing.T) {
 		t.Fatalf("payload = %v, want %v", payload, want)
 	}
 }
+
+func TestValidateServoTable(t *testing.T) {
+	err := ValidateServoTable(ServoTableSetConfig{
+		Configurations: []ServoConfiguration{{
+			Index:               1,
+			Min:                 1100,
+			Max:                 1900,
+			Middle:              1500,
+			Rate:                -50,
+			ForwardFromChannel:  2,
+			ReversedSourcesMask: 5,
+		}},
+		MixRules: []ServoMixRule{{
+			Index:         2,
+			TargetChannel: 1,
+			InputSource:   3,
+			Rate:          -25,
+			Speed:         10,
+			Min:           5,
+			Max:           95,
+			Box:           4,
+		}},
+	})
+	if err != nil {
+		t.Fatalf("ValidateServoTable() error = %v", err)
+	}
+	if err := ValidateServoTable(ServoTableSetConfig{}); err == nil {
+		t.Fatal("ValidateServoTable() error = nil")
+	}
+}

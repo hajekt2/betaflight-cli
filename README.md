@@ -254,6 +254,7 @@ It never connects to hardware.
 `leds set-mode-color` writes one LED mode color row through `MSP_SET_LED_STRIP_MODECOLOR`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `leds set-values` writes LED strip brightness, rainbow delta, and rainbow frequency through `MSP2_SET_LED_STRIP_CONFIG_VALUES`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos status` reads live servo outputs, servo configuration rows, and servo mix rules over MSP.
+`servos set-json` writes servo configuration rows and servo mix rules through typed MSP row commands, accepts either a servo table object or an object with `servo_table` or `servos`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos set-config` writes one servo configuration row through `MSP_SET_SERVO_CONFIGURATION`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `servos set-mix-rule` writes one servo mixer rule through `MSP_SET_SERVO_MIX_RULE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `adjustments status` reads adjustment ranges over MSP and returns decoded AUX ranges, adjustment function names, center/scale values, and native `adjrange` CLI commands.

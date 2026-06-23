@@ -112,6 +112,21 @@ type ServoMixRuleSetResult struct {
 	SaveRequired bool         `json:"save_required"`
 }
 
+type ServoTableSetConfig struct {
+	Configurations []ServoConfiguration `json:"configurations,omitempty"`
+	MixRules       []ServoMixRule       `json:"mix_rules,omitempty"`
+}
+
+type ServoTableSetResult struct {
+	Configurations     []ServoConfiguration `json:"configurations,omitempty"`
+	MixRules           []ServoMixRule       `json:"mix_rules,omitempty"`
+	ConfigurationCount int                  `json:"configuration_count"`
+	MixRuleCount       int                  `json:"mix_rule_count"`
+	MSPNames           []string             `json:"msp_names"`
+	Acknowledged       bool                 `json:"acknowledged"`
+	SaveRequired       bool                 `json:"save_required"`
+}
+
 func ReadMotorStatus(ctx context.Context, client *connection.Client) (*MotorStatus, []string, error) {
 	status := &MotorStatus{}
 	warnings := []string{}
@@ -214,6 +229,9 @@ func EncodeMotor3DConfig(config Motor3DConfig) []byte {
 }
 
 func SetServoConfiguration(ctx context.Context, client *connection.Client, config ServoConfiguration) (*ServoConfigurationSetResult, error) {
+	if err := ValidateServoConfiguration(config); err != nil {
+		return nil, err
+	}
 	if _, err := client.Request(ctx, msp.MSPSetServoConfiguration, EncodeServoConfiguration(config)); err != nil {
 		return nil, fmt.Errorf("servo configuration request failed: %w", err)
 	}
@@ -237,6 +255,9 @@ func EncodeServoConfiguration(config ServoConfiguration) []byte {
 }
 
 func SetServoMixRule(ctx context.Context, client *connection.Client, rule ServoMixRule) (*ServoMixRuleSetResult, error) {
+	if err := ValidateServoMixRule(rule); err != nil {
+		return nil, err
+	}
 	if _, err := client.Request(ctx, msp.MSPSetServoMixRule, EncodeServoMixRule(rule)); err != nil {
 		return nil, fmt.Errorf("servo mix rule request failed: %w", err)
 	}
@@ -261,6 +282,75 @@ func EncodeServoMixRule(rule ServoMixRule) []byte {
 		rule.Max,
 		rule.Box,
 	}
+}
+
+func SetServoTable(ctx context.Context, client *connection.Client, config ServoTableSetConfig) (*ServoTableSetResult, error) {
+	if err := ValidateServoTable(config); err != nil {
+		return nil, err
+	}
+	mspNames := make([]string, 0, 2)
+	for _, row := range config.Configurations {
+		if _, err := SetServoConfiguration(ctx, client, row); err != nil {
+			return nil, err
+		}
+	}
+	if len(config.Configurations) > 0 {
+		mspNames = append(mspNames, "MSP_SET_SERVO_CONFIGURATION")
+	}
+	rules := make([]ServoMixRule, 0, len(config.MixRules))
+	for _, rule := range config.MixRules {
+		result, err := SetServoMixRule(ctx, client, rule)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, result.Rule)
+	}
+	if len(config.MixRules) > 0 {
+		mspNames = append(mspNames, "MSP_SET_SERVO_MIX_RULE")
+	}
+	return &ServoTableSetResult{
+		Configurations:     config.Configurations,
+		MixRules:           rules,
+		ConfigurationCount: len(config.Configurations),
+		MixRuleCount:       len(config.MixRules),
+		MSPNames:           mspNames,
+		Acknowledged:       true,
+		SaveRequired:       true,
+	}, nil
+}
+
+func ValidateServoTable(config ServoTableSetConfig) error {
+	if len(config.Configurations) == 0 && len(config.MixRules) == 0 {
+		return fmt.Errorf("at least one servo configuration or mix rule is required")
+	}
+	for i, row := range config.Configurations {
+		if err := ValidateServoConfiguration(row); err != nil {
+			return fmt.Errorf("configurations[%d]: %w", i, err)
+		}
+	}
+	for i, rule := range config.MixRules {
+		if err := ValidateServoMixRule(rule); err != nil {
+			return fmt.Errorf("mix_rules[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func ValidateServoConfiguration(config ServoConfiguration) error {
+	if config.Index < 0 || config.Index > 255 {
+		return fmt.Errorf("index must be 0..255")
+	}
+	if config.Min > config.Middle || config.Middle > config.Max {
+		return fmt.Errorf("min, middle, and max must be ordered")
+	}
+	return nil
+}
+
+func ValidateServoMixRule(rule ServoMixRule) error {
+	if rule.Index < 0 || rule.Index > 255 {
+		return fmt.Errorf("index must be 0..255")
+	}
+	return nil
 }
 
 func appendU16Payload(dst []byte, value uint16) []byte {

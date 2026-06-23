@@ -355,6 +355,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if rssiChannel["operation"] != "write" || rssiChannel["confirmation"] != "--yes" || rssiChannel["requires_connection"] != true || rssiChannel["output_root"] != "rssi_channel" || rssiChannel["runnable"] != true {
 		t.Fatalf("rssi channel capability = %+v", rssiChannel)
 	}
+	rcDeadband := byCommand["betaflight-cli receiver set-deadband"]
+	if rcDeadband["operation"] != "write" || rcDeadband["confirmation"] != "--yes" || rcDeadband["requires_connection"] != true || rcDeadband["output_root"] != "rc_deadband" || rcDeadband["runnable"] != true {
+		t.Fatalf("rc deadband capability = %+v", rcDeadband)
+	}
 	gpsConfig := byCommand["betaflight-cli gps set-config"]
 	if gpsConfig["operation"] != "write" || gpsConfig["confirmation"] != "--yes" || gpsConfig["requires_connection"] != true || gpsConfig["output_root"] != "gps_config" || gpsConfig["runnable"] != true {
 		t.Fatalf("gps config capability = %+v", gpsConfig)
@@ -2890,6 +2894,10 @@ func TestReceiverStatusWithFakeFC(t *testing.T) {
 	if receiver["rssi_channel"] != float64(8) {
 		t.Fatalf("receiver = %+v", receiver)
 	}
+	deadband := receiver["deadband"].(map[string]any)
+	if deadband["deadband"] != float64(5) || deadband["yaw_deadband"] != float64(7) || deadband["deadband_3d_throttle"] != float64(50) {
+		t.Fatalf("deadband = %+v", deadband)
+	}
 	channels := receiver["channels"].([]any)
 	if len(channels) != 6 || channels[3] != float64(1000) {
 		t.Fatalf("channels = %+v", channels)
@@ -2956,6 +2964,62 @@ func TestReceiverSetRSSIChannelWithFakeFC(t *testing.T) {
 		t.Fatalf("rssi channel = %+v", result)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "rssi_channel" || env.SideEffects[0].Command != "MSP_SET_RSSI_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestReceiverSetDeadbandRejectsInvalidValueDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"receiver", "set-deadband", "5", "300", "3", "50", "--yes"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after RC deadband validation failure")
+	}
+}
+
+func TestReceiverSetDeadbandRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"receiver", "set-deadband", "5", "7", "3", "50"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after RC deadband confirmation failure")
+	}
+}
+
+func TestReceiverSetDeadbandWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"receiver", "set-deadband", "5", "7", "3", "50", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["rc_deadband"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["deadband"] != float64(5) || config["yaw_deadband"] != float64(7) || config["deadband_3d_throttle"] != float64(50) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_RC_DEADBAND" || result["save_required"] != true {
+		t.Fatalf("rc deadband result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "rc_deadband" || env.SideEffects[0].Command != "MSP_SET_RC_DEADBAND" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

@@ -13,6 +13,7 @@ type ReceiverStatus struct {
 	RCMap       []uint8         `json:"rc_map,omitempty"`
 	RCMapNames  []string        `json:"rc_map_names,omitempty"`
 	RSSIChannel *uint8          `json:"rssi_channel,omitempty"`
+	Deadband    *RCDeadband     `json:"deadband,omitempty"`
 	Channels    []uint16        `json:"channels,omitempty"`
 	Failsafe    []RXFailChannel `json:"failsafe,omitempty"`
 }
@@ -64,6 +65,21 @@ type RSSIChannelSetResult struct {
 	SaveRequired bool   `json:"save_required"`
 }
 
+type RCDeadband struct {
+	Deadband           uint8  `json:"deadband"`
+	YawDeadband        uint8  `json:"yaw_deadband"`
+	PosHoldDeadband    uint8  `json:"pos_hold_deadband"`
+	Deadband3DThrottle uint16 `json:"deadband_3d_throttle"`
+}
+
+type RCDeadbandSetResult struct {
+	Config       RCDeadband `json:"config"`
+	MSPCode      uint16     `json:"msp_code"`
+	MSPName      string     `json:"msp_name"`
+	Acknowledged bool       `json:"acknowledged"`
+	SaveRequired bool       `json:"save_required"`
+}
+
 func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*ReceiverStatus, []string, error) {
 	status := &ReceiverStatus{}
 	warnings := []string{}
@@ -84,6 +100,11 @@ func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*Receiv
 	}
 	if rssiChannel, err := readRSSIChannel(ctx, client); err == nil {
 		status.RSSIChannel = &rssiChannel
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if deadband, err := readRCDeadband(ctx, client); err == nil {
+		status.Deadband = deadband
 	} else {
 		warnings = append(warnings, err.Error())
 	}
@@ -115,6 +136,50 @@ func SetRSSIChannel(ctx context.Context, client *connection.Client, channel uint
 
 func EncodeRSSIChannel(channel uint8) []byte {
 	return []byte{channel}
+}
+
+func SetRCDeadband(ctx context.Context, client *connection.Client, config RCDeadband) (*RCDeadbandSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetRCDeadband, EncodeRCDeadband(config)); err != nil {
+		return nil, fmt.Errorf("rc deadband request failed: %w", err)
+	}
+	return &RCDeadbandSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetRCDeadband,
+		MSPName:      "MSP_SET_RC_DEADBAND",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeRCDeadband(config RCDeadband) []byte {
+	payload := []byte{config.Deadband, config.YawDeadband, config.PosHoldDeadband}
+	return append(payload, byte(config.Deadband3DThrottle), byte(config.Deadband3DThrottle>>8))
+}
+
+func DecodeRCDeadband(payload []byte) (*RCDeadband, error) {
+	r := msp.NewPayloadReader(payload)
+	deadband, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	yawDeadband, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	posHoldDeadband, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	deadband3DThrottle, err := r.U16()
+	if err != nil {
+		return nil, err
+	}
+	return &RCDeadband{
+		Deadband:           deadband,
+		YawDeadband:        yawDeadband,
+		PosHoldDeadband:    posHoldDeadband,
+		Deadband3DThrottle: deadband3DThrottle,
+	}, nil
 }
 
 func DecodeReceiverConfig(payload []byte) (*ReceiverConfig, error) {
@@ -281,6 +346,14 @@ func readRSSIChannel(ctx context.Context, client *connection.Client) (uint8, err
 		return 0, err
 	}
 	return channel, nil
+}
+
+func readRCDeadband(ctx context.Context, client *connection.Client) (*RCDeadband, error) {
+	frame, err := client.Request(ctx, msp.MSPRCDeadband, nil)
+	if err != nil {
+		return nil, fmt.Errorf("rc deadband unavailable: %w", err)
+	}
+	return DecodeRCDeadband(frame.Payload)
 }
 
 func DecodeRXFailConfig(payload []byte) ([]RXFailChannel, error) {

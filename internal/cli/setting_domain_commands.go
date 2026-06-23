@@ -61,6 +61,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.receiverStatusCommand())
 		cmd.AddCommand(a.receiverRXFailCommand())
 		cmd.AddCommand(a.receiverRSSIChannelCommand())
+		cmd.AddCommand(a.receiverDeadbandCommand())
 	}
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
@@ -180,6 +181,54 @@ func (a *app) receiverRSSIChannelCommand() *cobra.Command {
 				env.SideEffects = append(env.SideEffects, output.SideEffect{
 					Type:    "rssi_channel",
 					Command: "MSP_SET_RSSI_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) receiverDeadbandCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-deadband DEADBAND YAW_DEADBAND POS_HOLD_DEADBAND DEADBAND_3D_THROTTLE",
+		Short: "Set RC deadband values through MSP_SET_RC_DEADBAND",
+		Args:  cobra.ExactArgs(4),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			deadband, err := parseUint8Arg("deadband", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			yawDeadband, err := parseUint8Arg("yaw_deadband", args[1])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			posHoldDeadband, err := parseUint8Arg("pos_hold_deadband", args[2])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			deadband3DThrottle, err := parseUint16Arg("deadband_3d_throttle", args[3])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "RC deadband changes receiver configuration; pass --yes"))
+			}
+			config := bfcommands.RCDeadband{
+				Deadband:           deadband,
+				YawDeadband:        yawDeadband,
+				PosHoldDeadband:    posHoldDeadband,
+				Deadband3DThrottle: deadband3DThrottle,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetRCDeadband(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"rc_deadband": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "rc_deadband",
+					Command: "MSP_SET_RC_DEADBAND",
 					Detail:  "configuration changed but not saved",
 				})
 				return env

@@ -478,6 +478,12 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte{8}, false))
 	case msp.MSPSetRSSIConfig:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 1))
+	case msp.MSPRCDeadband:
+		payload := []byte{5, 7, 3}
+		payload = appendU16(payload, 50)
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetRCDeadband:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 5))
 	case msp.MSPRxfailConfig:
 		payload := []byte{0}
 		payload = appendU16(payload, 1000)

@@ -256,10 +256,12 @@ An empty payload is treated as a successful unavailable state because Betaflight
 `rtc set` returns an `rtc` object with the UTC timestamp written, MSP command name/code, and acknowledgement flag.
 Successful `rtc set` responses include an `rtc_set` side effect.
 
-`receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
-The object includes receiver configuration, channel map indexes and names, RSSI channel, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
+`receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC_DEADBAND`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
+The object includes receiver configuration, channel map indexes and names, RSSI channel, RC deadband values, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 `receiver set-rssi-channel` returns an `rssi_channel` object with the channel, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful RSSI channel writes include an `rssi_channel` side effect.
+`receiver set-deadband` returns an `rc_deadband` object with deadband, yaw deadband, position-hold deadband, 3D throttle deadband, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful RC deadband writes include an `rc_deadband` side effect.
 
 `gps status` returns a `gps` object decoded from `MSP_GPS_CONFIG`, `MSP_RAW_GPS`, `MSP_COMP_GPS`, `MSP_GPS_RESCUE`, `MSP_GPS_RESCUE_PIDS`, and `MSP_GPSSVINFO`.
 The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.

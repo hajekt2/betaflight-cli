@@ -68,6 +68,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPRXConfig:           decodeVia(commands.DecodeReceiverConfig),
 	msp.MSPRSSIConfig:         decodeRawBytes,
 	msp.MSPRXMap:              decodeByteSlice(commands.DecodeBoxIDs),
+	msp.MSPRCDeadband:         decodeVia(commands.DecodeRCDeadband),
 	msp.MSPRxfailConfig:       decodeVia(commands.DecodeRXFailConfig),
 	msp.MSPServo:              decodeVia(commands.DecodeU16Array),
 	msp.MSP2GetOSDWarnings:    decodeVia(commands.DecodeOSDWarnings),

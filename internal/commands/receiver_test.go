@@ -88,6 +88,26 @@ func TestEncodeRSSIChannel(t *testing.T) {
 	}
 }
 
+func TestDecodeAndEncodeRCDeadband(t *testing.T) {
+	config, err := DecodeRCDeadband([]byte{5, 7, 3, 50, 0})
+	if err != nil {
+		t.Fatalf("DecodeRCDeadband() error = %v", err)
+	}
+	if config.Deadband != 5 || config.YawDeadband != 7 || config.PosHoldDeadband != 3 || config.Deadband3DThrottle != 50 {
+		t.Fatalf("config = %+v", config)
+	}
+	payload := EncodeRCDeadband(*config)
+	want := []byte{5, 7, 3, 50, 0}
+	if len(payload) != len(want) {
+		t.Fatalf("payload = %v", payload)
+	}
+	for i := range want {
+		if payload[i] != want[i] {
+			t.Fatalf("payload = %v, want %v", payload, want)
+		}
+	}
+}
+
 func TestDecodeRXFailConfig(t *testing.T) {
 	payload := []byte{0}
 	payload = appendU16Test(payload, 1000)

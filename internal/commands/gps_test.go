@@ -88,6 +88,10 @@ func TestDecodeGPSRescue(t *testing.T) {
 	if rescue.AllowArmingWithoutFix == nil || !*rescue.AllowArmingWithoutFix || rescue.InitialClimbM == nil || *rescue.InitialClimbM != 20 {
 		t.Fatalf("rescue = %+v", rescue)
 	}
+	payload = EncodeGPSRescue(*rescue)
+	if len(payload) != 26 || payload[0] != 0x80 || payload[1] != 0x0c || payload[24] != 20 || payload[25] != 0 {
+		t.Fatalf("payload = %v", payload)
+	}
 }
 
 func TestDecodeGPSRescuePIDAndSatellites(t *testing.T) {
@@ -104,6 +108,10 @@ func TestDecodeGPSRescuePIDAndSatellites(t *testing.T) {
 	}
 	if pid.AltitudeP != 80 || pid.VelocityP != 120 || pid.YawP != 45 {
 		t.Fatalf("pid = %+v", pid)
+	}
+	encodedPID := EncodeGPSRescuePID(*pid)
+	if len(encodedPID) != 14 || encodedPID[0] != 80 || encodedPID[6] != 120 || encodedPID[12] != 45 {
+		t.Fatalf("encoded pid = %v", encodedPID)
 	}
 
 	satellites, err := DecodeGPSSatellites([]byte{2, 0, 12, 4, 45, 1, 24, 3, 39})

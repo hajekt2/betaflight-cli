@@ -81,6 +81,22 @@ type GPSRescuePID struct {
 	YawP      uint16 `json:"yaw_p"`
 }
 
+type GPSRescueSetResult struct {
+	Config       GPSRescue `json:"config"`
+	MSPCode      uint16    `json:"msp_code"`
+	MSPName      string    `json:"msp_name"`
+	Acknowledged bool      `json:"acknowledged"`
+	SaveRequired bool      `json:"save_required"`
+}
+
+type GPSRescuePIDSetResult struct {
+	Config       GPSRescuePID `json:"config"`
+	MSPCode      uint16       `json:"msp_code"`
+	MSPName      string       `json:"msp_name"`
+	Acknowledged bool         `json:"acknowledged"`
+	SaveRequired bool         `json:"save_required"`
+}
+
 type GPSSatellite struct {
 	Channel uint8 `json:"channel"`
 	SVID    uint8 `json:"svid"`
@@ -141,6 +157,32 @@ func SetGPSConfig(ctx context.Context, client *connection.Client, config GPSConf
 	}, nil
 }
 
+func SetGPSRescue(ctx context.Context, client *connection.Client, config GPSRescue) (*GPSRescueSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetGPSRescue, EncodeGPSRescue(config)); err != nil {
+		return nil, fmt.Errorf("gps rescue request failed: %w", err)
+	}
+	return &GPSRescueSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetGPSRescue,
+		MSPName:      "MSP_SET_GPS_RESCUE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func SetGPSRescuePID(ctx context.Context, client *connection.Client, config GPSRescuePID) (*GPSRescuePIDSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetGPSRescuePids, EncodeGPSRescuePID(config)); err != nil {
+		return nil, fmt.Errorf("gps rescue pids request failed: %w", err)
+	}
+	return &GPSRescuePIDSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetGPSRescuePids,
+		MSPName:      "MSP_SET_GPS_RESCUE_PIDS",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
 func EncodeGPSConfig(config GPSConfig) []byte {
 	payload := []byte{config.Provider, config.SBASMode, boolByte(config.AutoConfig), boolByte(config.AutoBaud)}
 	if config.HomePointOnce != nil {
@@ -150,6 +192,44 @@ func EncodeGPSConfig(config GPSConfig) []byte {
 		payload = append(payload, boolByte(*config.UBloxUseGalileo))
 	}
 	return payload
+}
+
+func EncodeGPSRescue(config GPSRescue) []byte {
+	payload := appendU16GPS(nil, config.MaxRescueAngle)
+	payload = appendU16GPS(payload, config.ReturnAltitudeM)
+	payload = appendU16GPS(payload, config.DescentDistanceM)
+	payload = appendU16GPS(payload, config.GroundSpeedCMS)
+	payload = appendU16GPS(payload, config.ThrottleMin)
+	payload = appendU16GPS(payload, config.ThrottleMax)
+	payload = appendU16GPS(payload, config.ThrottleHover)
+	payload = append(payload, config.SanityChecks, config.MinSats)
+	if config.AscendRate != nil && config.DescendRate != nil && config.AllowArmingWithoutFix != nil && config.AltitudeMode != nil {
+		payload = appendU16GPS(payload, *config.AscendRate)
+		payload = appendU16GPS(payload, *config.DescendRate)
+		payload = append(payload, boolByte(*config.AllowArmingWithoutFix), *config.AltitudeMode)
+	}
+	if config.MinStartDistanceM != nil {
+		payload = appendU16GPS(payload, *config.MinStartDistanceM)
+	}
+	if config.InitialClimbM != nil {
+		payload = appendU16GPS(payload, *config.InitialClimbM)
+	}
+	return payload
+}
+
+func EncodeGPSRescuePID(config GPSRescuePID) []byte {
+	payload := appendU16GPS(nil, config.AltitudeP)
+	payload = appendU16GPS(payload, config.AltitudeI)
+	payload = appendU16GPS(payload, config.AltitudeD)
+	payload = appendU16GPS(payload, config.VelocityP)
+	payload = appendU16GPS(payload, config.VelocityI)
+	payload = appendU16GPS(payload, config.VelocityD)
+	payload = appendU16GPS(payload, config.YawP)
+	return payload
+}
+
+func appendU16GPS(dst []byte, value uint16) []byte {
+	return append(dst, byte(value), byte(value>>8))
 }
 
 func boolByte(v bool) byte {

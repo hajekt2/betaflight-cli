@@ -267,6 +267,10 @@ Successful RC deadband writes include an `rc_deadband` side effect.
 The object includes GPS configuration, live position, distance and direction to home, GPS Rescue settings, GPS Rescue PID terms, and visible satellite details when supplied by firmware.
 `gps set-config` returns a `gps_config` object with the requested provider, SBAS mode, boolean auto-configuration flags, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful GPS config writes include a `gps_config` side effect.
+`gps set-rescue` returns a `gps_rescue` object with GPS Rescue return, throttle, sanity, climb, and arming parameters, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful GPS Rescue writes include a `gps_rescue` side effect.
+`gps set-rescue-pids` returns a `gps_rescue_pids` object with GPS Rescue altitude, velocity, and yaw PID terms, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful GPS Rescue PID writes include a `gps_rescue_pids` side effect.
 
 `battery status` returns a `battery` object decoded from `MSP_BATTERY_CONFIG`, `MSP2_BATTERY_PROFILE`, `MSP_BATTERY_STATE`, `MSP_VOLTAGE_METERS`, `MSP_CURRENT_METERS`, `MSP_VOLTAGE_METER_CONFIG`, and `MSP_CURRENT_METER_CONFIG`.
 The object includes active battery profile thresholds, runtime battery state, voltage and current meter readings, voltage meter calibration, current meter calibration, and meter source names when known.

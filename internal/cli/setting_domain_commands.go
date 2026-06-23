@@ -66,6 +66,8 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	if domain.use == "gps" {
 		cmd.AddCommand(a.gpsStatusCommand())
 		cmd.AddCommand(a.gpsSetConfigCommand())
+		cmd.AddCommand(a.gpsSetRescueCommand())
+		cmd.AddCommand(a.gpsSetRescuePIDCommand())
 	}
 	if domain.use == "osd" {
 		cmd.AddCommand(a.osdStatusCommand())
@@ -333,6 +335,134 @@ func (a *app) gpsSetConfigCommand() *cobra.Command {
 				env.SideEffects = append(env.SideEffects, output.SideEffect{
 					Type:    "gps_config",
 					Command: "MSP_SET_GPS_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) gpsSetRescueCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rescue MAX_ANGLE RETURN_ALTITUDE DESCENT_DISTANCE GROUND_SPEED THROTTLE_MIN THROTTLE_MAX THROTTLE_HOVER SANITY_CHECKS MIN_SATS ASCEND_RATE DESCEND_RATE ALLOW_ARMING_WITHOUT_FIX ALTITUDE_MODE MIN_START_DISTANCE INITIAL_CLIMB",
+		Short: "Set GPS Rescue configuration through MSP_SET_GPS_RESCUE",
+		Args:  cobra.ExactArgs(15),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			values := make([]uint16, 0, 12)
+			for i, name := range []string{"max_angle", "return_altitude", "descent_distance", "ground_speed", "throttle_min", "throttle_max", "throttle_hover"} {
+				value, err := parseUint16Arg(name, args[i])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				values = append(values, value)
+			}
+			sanityChecks, err := parseUint8Arg("sanity_checks", args[7])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			minSats, err := parseUint8Arg("min_sats", args[8])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			for i, name := range []string{"ascend_rate", "descend_rate"} {
+				value, err := parseUint16Arg(name, args[9+i])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				values = append(values, value)
+			}
+			allowArming, err := parseBoolFlagArg("allow_arming_without_fix", args[11])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			altitudeMode, err := parseUint8Arg("altitude_mode", args[12])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			for i, name := range []string{"min_start_distance", "initial_climb"} {
+				value, err := parseUint16Arg(name, args[13+i])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				values = append(values, value)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "GPS Rescue configuration changes GPS settings; pass --yes"))
+			}
+			ascendRate := values[7]
+			descendRate := values[8]
+			minStartDistance := values[9]
+			initialClimb := values[10]
+			config := bfcommands.GPSRescue{
+				MaxRescueAngle:        values[0],
+				ReturnAltitudeM:       values[1],
+				DescentDistanceM:      values[2],
+				GroundSpeedCMS:        values[3],
+				ThrottleMin:           values[4],
+				ThrottleMax:           values[5],
+				ThrottleHover:         values[6],
+				SanityChecks:          sanityChecks,
+				MinSats:               minSats,
+				AscendRate:            &ascendRate,
+				DescendRate:           &descendRate,
+				AllowArmingWithoutFix: &allowArming,
+				AltitudeMode:          &altitudeMode,
+				MinStartDistanceM:     &minStartDistance,
+				InitialClimbM:         &initialClimb,
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetGPSRescue(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"gps_rescue": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "gps_rescue",
+					Command: "MSP_SET_GPS_RESCUE",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) gpsSetRescuePIDCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-rescue-pids ALTITUDE_P ALTITUDE_I ALTITUDE_D VELOCITY_P VELOCITY_I VELOCITY_D YAW_P",
+		Short: "Set GPS Rescue PID terms through MSP_SET_GPS_RESCUE_PIDS",
+		Args:  cobra.ExactArgs(7),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			values := make([]uint16, 0, 7)
+			for i, name := range []string{"altitude_p", "altitude_i", "altitude_d", "velocity_p", "velocity_i", "velocity_d", "yaw_p"} {
+				value, err := parseUint16Arg(name, args[i])
+				if err != nil {
+					return validationFailure(a, cmd, err)
+				}
+				values = append(values, value)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "GPS Rescue PID changes GPS settings; pass --yes"))
+			}
+			config := bfcommands.GPSRescuePID{
+				AltitudeP: values[0],
+				AltitudeI: values[1],
+				AltitudeD: values[2],
+				VelocityP: values[3],
+				VelocityI: values[4],
+				VelocityD: values[5],
+				YawP:      values[6],
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetGPSRescuePID(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"gps_rescue_pids": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "gps_rescue_pids",
+					Command: "MSP_SET_GPS_RESCUE_PIDS",
 					Detail:  "configuration changed but not saved",
 				})
 				return env

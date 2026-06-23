@@ -119,6 +119,8 @@ betaflight-cli osd list --port /dev/tty.usbmodem01
 betaflight-cli gps list --port /dev/tty.usbmodem01
 betaflight-cli gps status --port /dev/tty.usbmodem01
 betaflight-cli gps set-config 1 0 1 1 1 1 --port /dev/tty.usbmodem01 --yes
+betaflight-cli gps set-rescue 3200 100 50 1500 1200 1800 1450 1 8 500 150 1 2 30 20 --port /dev/tty.usbmodem01 --yes
+betaflight-cli gps set-rescue-pids 80 10 5 120 20 10 45 --port /dev/tty.usbmodem01 --yes
 betaflight-cli failsafe list --port /dev/tty.usbmodem01
 betaflight-cli failsafe status --port /dev/tty.usbmodem01
 betaflight-cli failsafe set-board-alignment -2 3 90 --port /dev/tty.usbmodem01 --yes
@@ -192,6 +194,8 @@ It pages `MSP_BOXNAMES` and `MSP_BOXIDS`, so it can report mode catalogs larger 
 `receiver set-deadband` writes RC deadband, yaw deadband, position-hold deadband, and 3D throttle deadband through `MSP_SET_RC_DEADBAND`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `gps status` reads GPS configuration, live position, home vector, GPS Rescue configuration, GPS Rescue PID terms, and satellite info over MSP.
 `gps set-config` writes provider, SBAS mode, auto-configuration, auto-baud, home-point-once, and u-blox Galileo flags through `MSP_SET_GPS_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`gps set-rescue` writes GPS Rescue return, throttle, sanity, climb, and arming parameters through `MSP_SET_GPS_RESCUE`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`gps set-rescue-pids` writes GPS Rescue altitude, velocity, and yaw PID terms through `MSP_SET_GPS_RESCUE_PIDS`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery status` reads battery profile thresholds, runtime battery state, and voltage/current meter readings and calibration over MSP.
 `battery set-voltage-meter` writes one voltage meter calibration row through `MSP_SET_VOLTAGE_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `battery set-current-meter` writes one current meter calibration row through `MSP_SET_CURRENT_METER_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.

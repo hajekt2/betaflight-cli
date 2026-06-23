@@ -371,6 +371,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if gpsConfig["operation"] != "write" || gpsConfig["confirmation"] != "--yes" || gpsConfig["requires_connection"] != true || gpsConfig["output_root"] != "gps_config" || gpsConfig["runnable"] != true {
 		t.Fatalf("gps config capability = %+v", gpsConfig)
 	}
+	gpsRescue := byCommand["betaflight-cli gps set-rescue"]
+	if gpsRescue["operation"] != "write" || gpsRescue["confirmation"] != "--yes" || gpsRescue["requires_connection"] != true || gpsRescue["output_root"] != "gps_rescue" || gpsRescue["runnable"] != true {
+		t.Fatalf("gps rescue capability = %+v", gpsRescue)
+	}
+	gpsRescuePIDs := byCommand["betaflight-cli gps set-rescue-pids"]
+	if gpsRescuePIDs["operation"] != "write" || gpsRescuePIDs["confirmation"] != "--yes" || gpsRescuePIDs["requires_connection"] != true || gpsRescuePIDs["output_root"] != "gps_rescue_pids" || gpsRescuePIDs["runnable"] != true {
+		t.Fatalf("gps rescue pids capability = %+v", gpsRescuePIDs)
+	}
 	motorConfig := byCommand["betaflight-cli motors set-config"]
 	if motorConfig["operation"] != "write" || motorConfig["confirmation"] != "--yes" || motorConfig["requires_connection"] != true || motorConfig["output_root"] != "motor_config" || motorConfig["runnable"] != true {
 		t.Fatalf("motor config capability = %+v", motorConfig)
@@ -3108,6 +3116,78 @@ func TestGPSSetConfigWithFakeFC(t *testing.T) {
 		t.Fatalf("gps config result = %+v", result)
 	}
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "gps_config" || env.SideEffects[0].Command != "MSP_SET_GPS_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestGPSSetRescueRejectsInvalidValueBeforeConnect(t *testing.T) {
+	args := []string{"gps", "set-rescue", "3200", "100", "50", "1500", "1200", "1800", "1450", "1", "8", "500", "150", "2", "2", "30", "20", "--yes"}
+	env, err := runTestCommand(t, args, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestGPSSetRescueRequiresConfirmationBeforeConnect(t *testing.T) {
+	args := []string{"gps", "set-rescue", "3200", "100", "50", "1500", "1200", "1800", "1450", "1", "8", "500", "150", "1", "2", "30", "20"}
+	env, err := runTestCommand(t, args, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatalf("connector should not be called")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("env = %+v", env)
+	}
+}
+
+func TestGPSSetRescueWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"gps", "set-rescue", "3200", "100", "50", "1500", "1200", "1800", "1450", "1", "8", "500", "150", "1", "2", "30", "20", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["gps_rescue"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["max_rescue_angle"] != float64(3200) || config["min_sats"] != float64(8) || config["initial_climb_m"] != float64(20) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_GPS_RESCUE" || result["save_required"] != true {
+		t.Fatalf("gps rescue result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "gps_rescue" || env.SideEffects[0].Command != "MSP_SET_GPS_RESCUE" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestGPSSetRescuePIDWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"gps", "set-rescue-pids", "80", "10", "5", "120", "20", "10", "45", "--yes"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["gps_rescue_pids"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["altitude_p"] != float64(80) || config["velocity_p"] != float64(120) || config["yaw_p"] != float64(45) {
+		t.Fatalf("config = %+v", config)
+	}
+	if result["msp_name"] != "MSP_SET_GPS_RESCUE_PIDS" || result["save_required"] != true {
+		t.Fatalf("gps rescue pid result = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "gps_rescue_pids" || env.SideEffects[0].Command != "MSP_SET_GPS_RESCUE_PIDS" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
 }

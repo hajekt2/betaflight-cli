@@ -527,6 +527,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 30)
 		payload = appendU16(payload, 20)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetGPSRescue:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 26))
 	case msp.MSPGPSRescuePids:
 		payload := appendU16(nil, 80)
 		payload = appendU16(payload, 10)
@@ -536,6 +538,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 10)
 		payload = appendU16(payload, 45)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetGPSRescuePids:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 14))
 	case msp.MSPGpssvinfo:
 		f.out.Write(response(frame.Code, []byte{2, 0, 12, 4, 45, 1, 24, 3, 39}, false))
 	case msp.MSPSensorConfig:

@@ -288,6 +288,67 @@ func TestConfigurationValidateReportsDangerousLine(t *testing.T) {
 	}
 }
 
+func TestConfigurationValidateAcceptsJSONLines(t *testing.T) {
+	input := `{"data":{"lines":["# version","batch start","feature GPS","set gyro_lpf1_static_hz = 0","save"]}}`
+	env, err := runTestCommandWithInput(t, []string{"configuration", "validate"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	validation := env.Data.(map[string]any)["configuration_validation"].(map[string]any)
+	if validation["source_format"] != "json" {
+		t.Fatalf("validation = %+v", validation)
+	}
+	plan := validation["plan"].(map[string]any)
+	lines := plan["cli_lines"].([]any)
+	if len(lines) != 2 || lines[1] != "set gyro_lpf1_static_hz = 0" {
+		t.Fatalf("plan = %+v", plan)
+	}
+}
+
+func TestConfigurationCompareWithFakeFC(t *testing.T) {
+	reference := "# version\nbatch start\nfeature GPS\nset gyro_lpf1_static_hz = 0\nset p_roll = 46\nsave\n"
+	env, err := runTestCommandWithInput(t, []string{"configuration", "compare"}, reference, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	compare := data["configuration_compare"].(map[string]any)
+	summary := compare["summary"].(map[string]any)
+	if summary["matches"] != false || summary["changed_setting_count"] != float64(1) {
+		t.Fatalf("summary = %+v", summary)
+	}
+	settingDiff := compare["setting_diff"].(map[string]any)
+	changed := settingDiff["changed"].([]any)
+	if len(changed) != 1 || changed[0].(map[string]any)["name"] != "p_roll" {
+		t.Fatalf("changed = %+v", changed)
+	}
+	lineDiff := compare["line_diff"].(map[string]any)
+	if len(lineDiff["only_in_current"].([]any)) == 0 {
+		t.Fatalf("line diff = %+v", lineDiff)
+	}
+}
+
+func TestConfigurationCompareAcceptsJSONRaw(t *testing.T) {
+	reference := `{"data":{"raw":"# version\nbatch start\nfeature GPS\nset gyro_lpf1_static_hz = 0\nset p_roll = 46\nsave\n"}}`
+	env, err := runTestCommandWithInput(t, []string{"configuration", "compare"}, reference, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	summary := env.Data.(map[string]any)["configuration_compare"].(map[string]any)["summary"].(map[string]any)
+	if summary["changed_setting_count"] != float64(1) {
+		t.Fatalf("summary = %+v", summary)
+	}
+}
+
 func TestTasksStatusWithFakeFC(t *testing.T) {
 	env, err := runTestCommand(t, []string{"tasks", "status"}, nil)
 	if err != nil {

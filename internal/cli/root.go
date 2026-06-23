@@ -3,6 +3,7 @@ package cli
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -536,6 +537,7 @@ func (a *app) statusCommand() *cobra.Command {
 func (a *app) configurationCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "configuration", Short: "Inspect configuration state and write readiness"}
 	cmd.AddCommand(a.configurationValidateCommand())
+	cmd.AddCommand(a.configurationCompareCommand())
 	cmd.AddCommand(&cobra.Command{
 		Use:   "status",
 		Short: "Read configuration state, profiles, arming blockers, and write guidance",
@@ -568,6 +570,32 @@ func (a *app) configurationCommand() *cobra.Command {
 	return cmd
 }
 
+func (a *app) configurationCompareCommand() *cobra.Command {
+	var file string
+	cmd := &cobra.Command{
+		Use:   "compare",
+		Short: "Compare local Betaflight CLI configuration text with the current controller dump",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			data, err := a.readInput(file)
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_error", err.Error()))
+			}
+			referenceLines, _ := configurationLinesFromInput(data)
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				compare, err := bfcommands.ReadConfigurationCompare(cmd.Context(), client, referenceLines)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"configuration_compare": compare,
+				})
+			})
+		},
+	}
+	cmd.Flags().StringVar(&file, "file", "-", "reference configuration text file path, or - for stdin")
+	return cmd
+}
+
 func (a *app) configurationValidateCommand() *cobra.Command {
 	var file string
 	var includeDefaults bool
@@ -579,10 +607,11 @@ func (a *app) configurationValidateCommand() *cobra.Command {
 			if err != nil {
 				return a.render(output.Failure(commandPath(cmd), nil, "read_error", err.Error()))
 			}
-			lines := strings.Split(string(data), "\n")
+			lines, sourceFormat := configurationLinesFromInput(data)
 			doc := bfconfig.Parse(lines, settings.DefaultRegistry)
+			importData := []byte(strings.Join(lines, "\n"))
 			result := map[string]any{
-				"source_format":     "cli_text",
+				"source_format":     sourceFormat,
 				"line_count":        countNonEmptyInputLines(lines),
 				"section_counts":    countConfigurationSections(doc.Sections),
 				"unknown_count":     len(doc.Unknown),
@@ -595,9 +624,9 @@ func (a *app) configurationValidateCommand() *cobra.Command {
 				"valid":  true,
 				"errors": []output.Error{},
 			}
-			imported, err := batch.ImportCLI(data, batch.ImportOptions{
+			imported, err := batch.ImportCLI(importData, batch.ImportOptions{
 				Kind:            "configuration_validation",
-				SourceFormat:    "cli_text",
+				SourceFormat:    sourceFormat,
 				IncludeDefaults: includeDefaults,
 			})
 			if err != nil {
@@ -635,6 +664,42 @@ func countNonEmptyInputLines(lines []string) int {
 		}
 	}
 	return count
+}
+
+func configurationLinesFromInput(data []byte) ([]string, string) {
+	trimmed := strings.TrimSpace(string(data))
+	if strings.HasPrefix(trimmed, "{") {
+		var payload map[string]any
+		if err := json.Unmarshal([]byte(trimmed), &payload); err == nil {
+			if lines, ok := configurationLinesFromJSONMap(payload); ok {
+				return lines, "json"
+			}
+			if nested, ok := payload["data"].(map[string]any); ok {
+				if lines, ok := configurationLinesFromJSONMap(nested); ok {
+					return lines, "json"
+				}
+			}
+		}
+	}
+	return strings.Split(string(data), "\n"), "cli_text"
+}
+
+func configurationLinesFromJSONMap(payload map[string]any) ([]string, bool) {
+	if lines, ok := payload["lines"].([]any); ok {
+		out := make([]string, 0, len(lines))
+		for _, line := range lines {
+			text, ok := line.(string)
+			if !ok {
+				return nil, false
+			}
+			out = append(out, text)
+		}
+		return out, true
+	}
+	if raw, ok := payload["raw"].(string); ok {
+		return strings.Split(raw, "\n"), true
+	}
+	return nil, false
 }
 
 func countConfigurationSections(sections map[string][]string) map[string]int {

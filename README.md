@@ -47,6 +47,7 @@ betaflight-cli target status --port /dev/tty.usbmodem01
 betaflight-cli configuration status --port /dev/tty.usbmodem01
 betaflight-cli configuration snapshot --port /dev/tty.usbmodem01
 betaflight-cli configuration validate --file backup.txt
+betaflight-cli configuration compare --file backup.txt --port /dev/tty.usbmodem01
 betaflight-cli text status --port /dev/tty.usbmodem01
 betaflight-cli telemetry snapshot --port /dev/tty.usbmodem01
 betaflight-cli cli exec "diff all" --port /dev/tty.usbmodem01

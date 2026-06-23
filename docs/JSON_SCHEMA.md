@@ -184,6 +184,11 @@ The `mixer`, `mmix`, and `map` arrays include decoded mixer names, custom motor 
 
 `configuration validate` returns a `configuration_validation` object built from local Betaflight CLI text without opening a serial connection.
 The object includes the parsed document, section counts, unknown line and unknown setting counts, restore-import skipped lines, the normalized change plan, and a `validation` object with `valid`, `review_required`, and structured errors.
+Input may be raw CLI text or JSON containing `lines` or `raw` at the top level or under `data`.
+
+`configuration compare` returns a `configuration_compare` object built from local Betaflight CLI text and the current read-only `dump all` output.
+The object includes parsed reference and current documents, wrapper-insensitive line differences, machine-readable setting differences, summary counts, and recommended review actions.
+Input may be raw CLI text or JSON containing `lines` or `raw` at the top level or under `data`.
 
 `tasks status` returns a `tasks` object parsed from the Betaflight `tasks` CLI command.
 The object includes raw lines, parsed task rows, optional check-function stats, optional total load, parser warnings, and a `task_stats_reset` side effect because Betaflight resets max task execution statistics after printing them.

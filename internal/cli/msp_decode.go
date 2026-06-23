@@ -57,11 +57,22 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPBoardAlignmentConfig: decodeVia(commands.DecodeBoardAlignment),
 	msp.MSPAccTrim:            decodeRawAccTrim,
 	msp.MSP2GetText:           decodeMSP2Text,
+	msp.MSP2SensorConfigActive: decodeVia(func(payload []byte) ([]any, error) {
+		out := make([]any, len(payload))
+		for i, raw := range payload {
+			out[i] = float64(raw)
+		}
+		return out, nil
+	}),
+	msp.MSP2GyroSensorActive:  decodeVia(commands.DecodeActiveGyros),
 	msp.MSPRXConfig:           decodeVia(commands.DecodeReceiverConfig),
 	msp.MSPRSSIConfig:         decodeRawBytes,
 	msp.MSPRXMap:              decodeByteSlice(commands.DecodeBoxIDs),
 	msp.MSPRxfailConfig:       decodeVia(commands.DecodeRXFailConfig),
+	msp.MSPServo:              decodeVia(commands.DecodeU16Array),
+	msp.MSP2GetOSDWarnings:    decodeVia(commands.DecodeOSDWarnings),
 	msp.MSPMotor:              decodeVia(commands.DecodeU16Array),
+	msp.MSP2MotorOutputReordering: decodeVia(commands.DecodeMotorOutputOrder),
 	msp.MSPGPSConfig:          decodeVia(commands.DecodeGPSConfig),
 	msp.MSPRawGPS:             decodeVia(commands.DecodeGPSPosition),
 	msp.MSPGPSRescue:          decodeVia(commands.DecodeGPSRescue),

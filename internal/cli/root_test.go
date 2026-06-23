@@ -1658,6 +1658,104 @@ func TestMSPRequestWithDecodeForText(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForGyroSensorsActive(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_GYRO_SENSOR_ACTIVE", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["source"] != "MSP2_GYRO_SENSOR_ACTIVE" {
+		t.Fatalf("decoded source = %v", decoded["source"])
+	}
+	if decoded["count"] != float64(2) {
+		t.Fatalf("decoded count = %v", decoded["count"])
+	}
+	hardware := decoded["hardware"].([]any)
+	if len(hardware) != 2 || hardware[0].(map[string]any)["hardware_id"] != float64(11) || hardware[1].(map[string]any)["name"] != "ICM45605" {
+		t.Fatalf("decoded hardware = %+v", hardware)
+	}
+}
+
+func TestMSPRequestWithDecodeForSensorConfigActive(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_SENSOR_CONFIG_ACTIVE", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].([]any)
+	if len(decoded) != 6 || decoded[0] != float64(10) || decoded[5] != float64(15) {
+		t.Fatalf("decoded = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForOSDWarnings(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_GET_OSD_WARNINGS", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["display_attributes"] != float64(2) {
+		t.Fatalf("decoded display_attributes = %v", decoded["display_attributes"])
+	}
+	if decoded["text"] != "LOW BATTERY" {
+		t.Fatalf("decoded text = %v", decoded["text"])
+	}
+}
+
+func TestMSPRequestWithDecodeForServoAndMotorOutputOrder(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_SERVO", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	servo := data["decoded"].([]any)
+	if len(servo) != 6 || servo[0] != float64(1500) || servo[5] != float64(0) {
+		t.Fatalf("decoded servo = %+v", servo)
+	}
+
+	env, err = runTestCommand(t, []string{"msp", "request", "MSP2_MOTOR_OUTPUT_REORDERING", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data = env.Data.(map[string]any)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	order := data["decoded"].([]any)
+	if len(order) != 4 || order[0] != float64(0) || order[3] != float64(3) {
+		t.Fatalf("order channels = %+v", order)
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

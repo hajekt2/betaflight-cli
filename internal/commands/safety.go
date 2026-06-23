@@ -78,6 +78,14 @@ type FailsafeConfig struct {
 	TrailingBytesIgnored    int    `json:"trailing_bytes_ignored,omitempty"`
 }
 
+type FailsafeConfigSetResult struct {
+	Config       FailsafeConfig `json:"config"`
+	MSPCode      uint16         `json:"msp_code"`
+	MSPName      string         `json:"msp_name"`
+	Acknowledged bool           `json:"acknowledged"`
+	SaveRequired bool           `json:"save_required"`
+}
+
 type BoardAlignment struct {
 	RollDegrees          int16 `json:"roll_degrees"`
 	PitchDegrees         int16 `json:"pitch_degrees"`
@@ -246,6 +254,28 @@ func DecodeBoardAlignment(payload []byte) (*BoardAlignment, error) {
 		YawDegrees:           yaw,
 		TrailingBytesIgnored: r.Remaining(),
 	}, nil
+}
+
+func SetFailsafeConfig(ctx context.Context, client *connection.Client, config FailsafeConfig) (*FailsafeConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSPSetFailsafeConfig, EncodeFailsafeConfig(config)); err != nil {
+		return nil, fmt.Errorf("failsafe config request failed: %w", err)
+	}
+	return &FailsafeConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetFailsafeConfig,
+		MSPName:      "MSP_SET_FAILSAFE_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeFailsafeConfig(config FailsafeConfig) []byte {
+	payload := []byte{config.DelayTenthsS, config.LandingTimeS}
+	payload = appendU16Payload(payload, config.Throttle)
+	payload = append(payload, config.SwitchMode)
+	payload = appendU16Payload(payload, config.ThrottleLowDelayTenthsS)
+	payload = append(payload, config.Procedure)
+	return payload
 }
 
 func SetBoardAlignment(ctx context.Context, client *connection.Client, alignment BoardAlignment) (*BoardAlignmentSetResult, error) {

@@ -388,6 +388,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 100)
 		payload = append(payload, 1)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPSetFailsafeConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 8))
 	case msp.MSPBoardAlignmentConfig:
 		payload := appendS16(nil, -2)
 		payload = appendS16(payload, 3)

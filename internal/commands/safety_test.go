@@ -47,6 +47,25 @@ func TestEncodeBoardAlignment(t *testing.T) {
 	}
 }
 
+func TestEncodeFailsafeConfig(t *testing.T) {
+	got := EncodeFailsafeConfig(FailsafeConfig{
+		DelayTenthsS:            15,
+		LandingTimeS:            60,
+		Throttle:                1000,
+		SwitchMode:              2,
+		ThrottleLowDelayTenthsS: 100,
+		Procedure:               1,
+	})
+	want := []byte{15, 60}
+	want = appendU16Test(want, 1000)
+	want = append(want, 2)
+	want = appendU16Test(want, 100)
+	want = append(want, 1)
+	if string(got) != string(want) {
+		t.Fatalf("EncodeFailsafeConfig() = %v, want %v", got, want)
+	}
+}
+
 func TestDecodeArmingDisableState(t *testing.T) {
 	count := uint8(len(armingDisableFlagNames))
 	flags := uint32(0x1234)

@@ -395,6 +395,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if gpsRescuePIDs["operation"] != "write" || gpsRescuePIDs["confirmation"] != "--yes" || gpsRescuePIDs["requires_connection"] != true || gpsRescuePIDs["output_root"] != "gps_rescue_pids" || gpsRescuePIDs["runnable"] != true {
 		t.Fatalf("gps rescue pids capability = %+v", gpsRescuePIDs)
 	}
+	failsafeConfig := byCommand["betaflight-cli failsafe set-config-json"]
+	if failsafeConfig["operation"] != "write" || failsafeConfig["confirmation"] != "--yes" || failsafeConfig["requires_connection"] != true || failsafeConfig["output_root"] != "failsafe_config" || failsafeConfig["runnable"] != true {
+		t.Fatalf("failsafe config capability = %+v", failsafeConfig)
+	}
 	pidGains := byCommand["betaflight-cli pid set-gains-json"]
 	if pidGains["operation"] != "write" || pidGains["confirmation"] != "--yes" || pidGains["requires_connection"] != true || pidGains["output_root"] != "pid_gains" || pidGains["runnable"] != true {
 		t.Fatalf("pid gains capability = %+v", pidGains)
@@ -6182,6 +6186,44 @@ func TestFailsafeSetBoardAlignmentRequiresValidInt16(t *testing.T) {
 	}
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
 		t.Fatalf("unexpected envelope: %+v", env)
+	}
+}
+
+func TestFailsafeSetConfigJSONWithFakeFC(t *testing.T) {
+	input := `{"failsafe_config":{"delay_tenths_s":15,"landing_time_s":60,"throttle":1000,"switch_mode":2,"throttle_low_delay_tenths_s":100,"procedure":1}}`
+	env, err := runTestCommandWithInput(t, []string{"failsafe", "set-config-json", "-", "--yes"}, input, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	result := data["failsafe_config"].(map[string]any)
+	config := result["config"].(map[string]any)
+	if config["throttle"] != float64(1000) || config["switch_mode"] != float64(2) || result["save_required"] != true {
+		t.Fatalf("failsafe_config = %+v", result)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "failsafe_config" || env.SideEffects[0].Command != "MSP_SET_FAILSAFE_CONFIG" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestFailsafeSetConfigJSONRequiresYesDoesNotConnect(t *testing.T) {
+	input := `{"failsafe_config":{"delay_tenths_s":15,"landing_time_s":60,"throttle":1000,"switch_mode":2,"throttle_low_delay_tenths_s":100,"procedure":1}}`
+	called := false
+	env, err := runTestCommandWithInput(t, []string{"failsafe", "set-config-json", "-"}, input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after failsafe config confirmation failure")
 	}
 }
 

@@ -101,6 +101,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	}
 	if domain.use == "failsafe" {
 		cmd.AddCommand(a.failsafeStatusCommand())
+		cmd.AddCommand(a.failsafeSetConfigJSONCommand())
 		cmd.AddCommand(a.failsafeBoardAlignmentCommand())
 	}
 	return cmd
@@ -1320,6 +1321,65 @@ func (a *app) failsafeBoardAlignmentCommand() *cobra.Command {
 			})
 		},
 	}
+}
+
+func (a *app) failsafeSetConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-config-json FILE",
+		Short: "Set failsafe configuration from JSON through MSP_SET_FAILSAFE_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseFailsafeConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "failsafe changes affect safety behavior; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetFailsafeConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"failsafe_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "failsafe_config",
+					Command: "MSP_SET_FAILSAFE_CONFIG",
+					Detail:  "failsafe config changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func parseFailsafeConfigJSON(data []byte) (bfcommands.FailsafeConfig, error) {
+	var wrapped struct {
+		FailsafeConfig *bfcommands.FailsafeConfig `json:"failsafe_config"`
+		Failsafe       *bfcommands.FailsafeConfig `json:"failsafe"`
+		Config         *bfcommands.FailsafeConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.FailsafeConfig{}, err
+	}
+	if wrapped.FailsafeConfig != nil {
+		return *wrapped.FailsafeConfig, nil
+	}
+	if wrapped.Failsafe != nil {
+		return *wrapped.Failsafe, nil
+	}
+	if wrapped.Config != nil {
+		return *wrapped.Config, nil
+	}
+	var config bfcommands.FailsafeConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		return bfcommands.FailsafeConfig{}, err
+	}
+	return config, nil
 }
 
 func currentDomainSettings(doc bfconfig.Document, matches func(settings.Metadata) bool) []bfconfig.Setting {

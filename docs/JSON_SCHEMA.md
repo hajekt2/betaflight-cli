@@ -315,6 +315,8 @@ Successful current meter writes include a `current_meter_config` side effect.
 
 `failsafe status` returns a `failsafe` object decoded from `MSP_ARMING_CONFIG`, `MSP_FAILSAFE_CONFIG`, `MSP_BOARD_ALIGNMENT_CONFIG`, and `MSP_STATUS_EX`.
 The object includes arming configuration, failsafe stage and procedure configuration, board alignment, active arming-disable flags, a firmware-reported arming flag catalog, and source metadata for each MSP message.
+`failsafe set-config-json` returns a `failsafe_config` object with the requested failsafe config, MSP command name/code, acknowledgement flag, and `save_required`.
+Successful failsafe config writes include a `failsafe_config` side effect.
 `failsafe set-board-alignment` returns a `board_alignment` object with roll, pitch, yaw, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful board alignment writes include a `board_alignment` side effect.
 

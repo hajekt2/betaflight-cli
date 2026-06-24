@@ -771,6 +771,32 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 5662)
 		payload = append(payload, 1, 5, 8, 3)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPVtxtableBand:
+		if len(frame.Payload) != 1 || frame.Payload[0] == 0 || frame.Payload[0] > 5 {
+			f.out.Write(response(frame.Code, nil, true))
+			break
+		}
+		band := frame.Payload[0]
+		payload := []byte{band, 8}
+		payload = append(payload, []byte("RACEBAND")...)
+		payload = append(payload, 'R', 1, 8)
+		for _, frequency := range []uint16{5658, 5695, 5732, 5769, 5806, 5843, 5880, 5917} {
+			payload = appendU16(payload, frequency+uint16(band-1))
+		}
+		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPVtxtablePowerlevel:
+		if len(frame.Payload) != 1 || frame.Payload[0] == 0 || frame.Payload[0] > 3 {
+			f.out.Write(response(frame.Code, nil, true))
+			break
+		}
+		level := frame.Payload[0]
+		values := []uint16{25, 200, 400}
+		label := fmt.Sprintf("%d", values[level-1])
+		payload := []byte{level}
+		payload = appendU16(payload, values[level-1])
+		payload = append(payload, byte(len(label)))
+		payload = append(payload, []byte(label)...)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetVTXConfig:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 11))
 	case msp.MSPSetVtxtableBand:

@@ -52,6 +52,34 @@ func TestEncodeVTXConfig(t *testing.T) {
 	}
 }
 
+func TestDecodeVTXTableRows(t *testing.T) {
+	bandPayload := []byte{1, 8, 'R', 'A', 'C', 'E', 'B', 'A', 'N', 'D', 'R', 1, 2, 0x1a, 0x16, 0x3f, 0x16}
+	band, err := DecodeVTXTableBand(bandPayload)
+	if err != nil {
+		t.Fatalf("DecodeVTXTableBand() error = %v", err)
+	}
+	if band.Band != 1 || band.Name != "RACEBAND" || band.Letter != "R" || !band.Factory || len(band.FrequenciesMHz) != 2 || band.FrequenciesMHz[0] != 5658 || band.FrequenciesMHz[1] != 5695 {
+		t.Fatalf("band = %+v", band)
+	}
+
+	power, err := DecodeVTXTablePowerLevel([]byte{2, 0xc8, 0x00, 3, '2', '0', '0'})
+	if err != nil {
+		t.Fatalf("DecodeVTXTablePowerLevel() error = %v", err)
+	}
+	if power.Level != 2 || power.Value != 200 || power.Label != "200" {
+		t.Fatalf("power = %+v", power)
+	}
+}
+
+func TestDecodeVTXTableRowsRejectTrailingBytes(t *testing.T) {
+	if _, err := DecodeVTXTableBand([]byte{1, 1, 'A', 'A', 1, 0, 9}); err == nil {
+		t.Fatal("DecodeVTXTableBand() error = nil")
+	}
+	if _, err := DecodeVTXTablePowerLevel([]byte{1, 25, 0, 2, '2', '5', 9}); err == nil {
+		t.Fatal("DecodeVTXTablePowerLevel() error = nil")
+	}
+}
+
 func TestEncodeVTXTableBand(t *testing.T) {
 	payload := EncodeVTXTableBand(VTXTableBandSetConfig{
 		Band:           1,

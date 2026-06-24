@@ -787,6 +787,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if mspBatch["operation"] != "read_only" || mspBatch["requires_connection"] != true || mspBatch["confirmation"] != "none" || mspBatch["output_root"] != "msp" || mspBatch["runnable"] != true {
 		t.Fatalf("msp batch capability = %+v", mspBatch)
 	}
+	vtxTableStatus := byCommand["betaflight-cli vtxtable status"]
+	if vtxTableStatus["operation"] != "read_only" || vtxTableStatus["requires_connection"] != true || vtxTableStatus["confirmation"] != "none" || vtxTableStatus["output_root"] != "vtxtable" || vtxTableStatus["runnable"] != true {
+		t.Fatalf("vtxtable status capability = %+v", vtxTableStatus)
+	}
 	schema := byCommand["betaflight-cli schema"]
 	if schema["operation"] != "offline" || schema["requires_connection"] != false || schema["confirmation"] != "none" || schema["runnable"] != true {
 		t.Fatalf("schema capability = %+v", schema)
@@ -1124,6 +1128,7 @@ func TestReadOnlyCommandOutputRootsMatchCapabilities(t *testing.T) {
 		{command: "betaflight-cli beeper config", args: []string{"beeper", "config"}},
 		{command: "betaflight-cli transponder config", args: []string{"transponder", "config"}},
 		{command: "betaflight-cli vtx config", args: []string{"vtx", "config"}},
+		{command: "betaflight-cli vtxtable status", args: []string{"vtxtable", "status"}},
 		{command: "betaflight-cli osd status", args: []string{"osd", "status"}},
 		{command: "betaflight-cli leds status", args: []string{"leds", "status"}},
 		{command: "betaflight-cli storage status", args: []string{"storage", "status"}},
@@ -4048,6 +4053,41 @@ func TestMSPRequestWithDecodeForRSSIConfig(t *testing.T) {
 	decoded := data["decoded"].(map[string]any)
 	if decoded["channel"] != float64(8) || decoded["source"] != "MSP_RSSI_CONFIG" {
 		t.Fatalf("decoded rssi config = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForVTXTableRows(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_VTXTABLE_BAND", "--payload-hex", "01", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("band command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("band env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	bandData := mspResponseData(t, env)
+	if bandData["decode_supported"] != true {
+		t.Fatalf("band decode_supported = %v", bandData["decode_supported"])
+	}
+	band := bandData["decoded"].(map[string]any)
+	frequencies := band["frequencies_mhz"].([]any)
+	if band["band"] != float64(1) || band["name"] != "RACEBAND" || frequencies[0] != float64(5658) {
+		t.Fatalf("decoded band = %+v", band)
+	}
+
+	env, err = runTestCommand(t, []string{"msp", "request", "MSP_VTXTABLE_POWERLEVEL", "--payload-hex", "02", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("power command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("power env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	powerData := mspResponseData(t, env)
+	if powerData["decode_supported"] != true {
+		t.Fatalf("power decode_supported = %v", powerData["decode_supported"])
+	}
+	power := powerData["decoded"].(map[string]any)
+	if power["level"] != float64(2) || power["value"] != float64(200) || power["label"] != "200" {
+		t.Fatalf("decoded power = %+v", power)
 	}
 }
 
@@ -9654,6 +9694,65 @@ func TestVTXTableListIncludesSummary(t *testing.T) {
 	powerValues := vtx["power_values"].([]any)
 	if len(powerValues) != 2 || powerValues[1] != float64(200) {
 		t.Fatalf("power values = %+v", powerValues)
+	}
+}
+
+func TestVTXTableStatusReadsTypedMSPRows(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtxtable", "status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	table := data["vtxtable"].(map[string]any)
+	if table["supported"] != true {
+		t.Fatalf("supported = %+v", table["supported"])
+	}
+	summary := table["summary"].(map[string]any)
+	if summary["available"] != true || summary["bands"] != float64(5) || summary["channels"] != float64(8) || summary["power_levels"] != float64(3) {
+		t.Fatalf("summary = %+v", summary)
+	}
+	bands := table["bands"].([]any)
+	if len(bands) != 5 {
+		t.Fatalf("bands = %+v", bands)
+	}
+	firstBand := bands[0].(map[string]any)
+	frequencies := firstBand["frequencies_mhz"].([]any)
+	if firstBand["band"] != float64(1) || firstBand["name"] != "RACEBAND" || firstBand["letter"] != "R" || firstBand["factory"] != true || frequencies[0] != float64(5658) {
+		t.Fatalf("first band = %+v", firstBand)
+	}
+	powers := table["powers"].([]any)
+	if len(powers) != 3 {
+		t.Fatalf("powers = %+v", powers)
+	}
+	secondPower := powers[1].(map[string]any)
+	if secondPower["level"] != float64(2) || secondPower["value"] != float64(200) || secondPower["label"] != "200" {
+		t.Fatalf("second power = %+v", secondPower)
+	}
+}
+
+func TestVTXTableStatusReportsUnsupportedTarget(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtxtable", "status"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		fc := fakefc.New()
+		fc.Unsupported[msp.MSPVTXConfig] = true
+		client, clientErr := connection.NewClient(fc, time.Second)
+		return client, connection.TargetInfo{}, clientErr
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	table := data["vtxtable"].(map[string]any)
+	if table["supported"] != false || table["unsupported_reason"] == "" {
+		t.Fatalf("table = %+v", table)
+	}
+	if len(env.Warnings) != 1 || env.Warnings[0].Code != "unsupported_msp" {
+		t.Fatalf("warnings = %+v", env.Warnings)
 	}
 }
 

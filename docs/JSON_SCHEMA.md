@@ -202,6 +202,10 @@ The object includes VTX device type, band, channel, power, pit mode, frequency, 
 `vtx set-config-json` accepts either a VTX config object or an object with `vtx_config`, `vtx`, or `config`.
 It returns the same `vtx_config` object as `vtx set-config`.
 Successful VTX config writes include a `vtx_config` side effect.
+`vtxtable status` returns a `vtxtable` object read over MSP.
+The object includes the VTX table summary from `MSP_VTX_CONFIG`, band rows from `MSP_VTXTABLE_BAND`, and power rows from `MSP_VTXTABLE_POWERLEVEL`.
+If the target does not support VTX MSP, the command succeeds with `supported: false`, an `unsupported_reason`, and an `unsupported_msp` warning.
+Raw `msp request --decode` supports the same typed row payloads for `MSP_VTXTABLE_BAND` and `MSP_VTXTABLE_POWERLEVEL`.
 `osd set-canvas` returns an `osd_canvas` object with requested columns/rows, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
 Successful OSD canvas writes include an `osd_canvas` side effect.
 `osd set-general-json` returns an `osd_general_config` object with the requested patch, merged config, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.

@@ -203,6 +203,8 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
 `vtx set-config` writes VTX band, channel, power, pit mode, low-power-disarm mode, and pit-mode frequency through `MSP_SET_VTX_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `vtx set-config-json` writes VTX band, channel, power, pit mode, low-power-disarm mode, and pit-mode frequency through `MSP_SET_VTX_CONFIG`, accepts either a VTX config object or an object with `vtx_config`, `vtx`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
+`vtxtable status` reads VTX table summary, band rows, and power rows over typed MSP commands.
+If the target does not expose VTX MSP, `vtxtable status` returns `supported: false` with a warning instead of failing the whole command.
 `osd set-canvas` writes OSD canvas columns and rows through `MSP_SET_OSD_CANVAS`, requires `--yes`, and reports that firmware may save and reboot when switching an HD target to MSP displayport.
 `osd set-general-json` accepts a partial JSON object for general OSD fields, merges it with the current `MSP_OSD_CONFIG` response, writes the resulting general config through `MSP_SET_OSD_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `osd set-video-system` reads the current general OSD config, changes only `video_system`, writes it back through `MSP_SET_OSD_CONFIG`, requires `--yes`, and reports that firmware may resize canvas or change displayport behavior when switching SD and HD modes.

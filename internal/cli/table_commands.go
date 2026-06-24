@@ -15,6 +15,23 @@ import (
 
 func (a *app) vtxTableCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "vtxtable", Short: "Inspect and change VTX table CLI rows"}
+	cmd.AddCommand(&cobra.Command{
+		Use:   "status",
+		Short: "Read VTX table rows over MSP",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				status, err := bfcommands.ReadVTXTableStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtxtable": status})
+				if !status.Supported {
+					env.Warnings = append(env.Warnings, output.Warning{Code: "unsupported_msp", Message: status.UnsupportedReason})
+				}
+				return env
+			})
+		},
+	})
 	cmd.AddCommand(a.configListCommand("list", "List VTX table rows", func(doc bfconfig.Document) any {
 		return map[string]any{"vtx_table": doc.VTXTable, "vtx": doc.VTX, "lines": doc.Sections["vtx_table"]}
 	}))

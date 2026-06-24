@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
@@ -27,6 +28,28 @@ type VTXTableSummary struct {
 	Bands       uint8 `json:"bands"`
 	Channels    uint8 `json:"channels"`
 	PowerLevels uint8 `json:"power_levels"`
+}
+
+type VTXTableStatus struct {
+	Supported         bool                 `json:"supported"`
+	UnsupportedReason string               `json:"unsupported_reason,omitempty"`
+	Summary           *VTXTableSummary     `json:"summary,omitempty"`
+	Bands             []VTXTableBandStatus `json:"bands,omitempty"`
+	Powers            []VTXTablePowerLevel `json:"powers,omitempty"`
+}
+
+type VTXTableBandStatus struct {
+	Band           uint8    `json:"band"`
+	Name           string   `json:"name"`
+	Letter         string   `json:"letter"`
+	Factory        bool     `json:"factory"`
+	FrequenciesMHz []uint16 `json:"frequencies_mhz"`
+}
+
+type VTXTablePowerLevel struct {
+	Level uint8  `json:"level"`
+	Value uint16 `json:"value"`
+	Label string `json:"label"`
 }
 
 type VTXConfigSetConfig struct {
@@ -98,6 +121,44 @@ func ReadVTXConfig(ctx context.Context, client *connection.Client) (*VTXConfig, 
 		return nil, fmt.Errorf("vtx config unavailable: %w", err)
 	}
 	return DecodeVTXConfig(frame.Payload)
+}
+
+func ReadVTXTableStatus(ctx context.Context, client *connection.Client) (*VTXTableStatus, error) {
+	config, err := ReadVTXConfig(ctx, client)
+	if err != nil {
+		var coded *connection.CodedError
+		if errors.As(err, &coded) && coded.Code == "unsupported_msp" {
+			return &VTXTableStatus{Supported: false, UnsupportedReason: coded.Message}, nil
+		}
+		return nil, err
+	}
+	status := &VTXTableStatus{Supported: true, Summary: config.Table}
+	if config.Table == nil || !config.Table.Available {
+		return status, nil
+	}
+	for band := uint8(1); band <= config.Table.Bands; band++ {
+		frame, err := client.Request(ctx, msp.MSPVtxtableBand, []byte{band})
+		if err != nil {
+			return nil, fmt.Errorf("vtx table band %d unavailable: %w", band, err)
+		}
+		row, err := DecodeVTXTableBand(frame.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("decode vtx table band %d: %w", band, err)
+		}
+		status.Bands = append(status.Bands, *row)
+	}
+	for level := uint8(1); level <= config.Table.PowerLevels; level++ {
+		frame, err := client.Request(ctx, msp.MSPVtxtablePowerlevel, []byte{level})
+		if err != nil {
+			return nil, fmt.Errorf("vtx table power level %d unavailable: %w", level, err)
+		}
+		row, err := DecodeVTXTablePowerLevel(frame.Payload)
+		if err != nil {
+			return nil, fmt.Errorf("decode vtx table power level %d: %w", level, err)
+		}
+		status.Powers = append(status.Powers, *row)
+	}
+	return status, nil
 }
 
 func SetVTXConfig(ctx context.Context, client *connection.Client, config VTXConfigSetConfig) (*VTXConfigSetResult, error) {
@@ -325,6 +386,80 @@ func DecodeVTXConfig(payload []byte) (*VTXConfig, error) {
 		}
 	}
 	return config, nil
+}
+
+func DecodeVTXTableBand(payload []byte) (*VTXTableBandStatus, error) {
+	r := msp.NewPayloadReader(payload)
+	band, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table band")
+	}
+	nameLen, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table band name length")
+	}
+	nameBytes, err := r.Bytes(int(nameLen))
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table band name")
+	}
+	letter, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table band letter")
+	}
+	factory, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table band factory flag")
+	}
+	channelCount, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table band channel count")
+	}
+	frequencies := make([]uint16, 0, channelCount)
+	for i := uint8(0); i < channelCount; i++ {
+		frequency, err := r.U16()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "VTX table band frequency")
+		}
+		frequencies = append(frequencies, frequency)
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("VTX table band returned %d trailing byte(s)", r.Remaining())
+	}
+	return &VTXTableBandStatus{
+		Band:           band,
+		Name:           string(nameBytes),
+		Letter:         string([]byte{letter}),
+		Factory:        factory != 0,
+		FrequenciesMHz: frequencies,
+	}, nil
+}
+
+func DecodeVTXTablePowerLevel(payload []byte) (*VTXTablePowerLevel, error) {
+	r := msp.NewPayloadReader(payload)
+	level, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table power level")
+	}
+	value, err := r.U16()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table power value")
+	}
+	labelLen, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table power label length")
+	}
+	labelBytes, err := r.Bytes(int(labelLen))
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX table power label")
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("VTX table power level returned %d trailing byte(s)", r.Remaining())
+	}
+	return &VTXTablePowerLevel{
+		Level: level,
+		Value: value,
+		Label: string(labelBytes),
+	}, nil
 }
 
 func lookupVTXType(v uint8) string {

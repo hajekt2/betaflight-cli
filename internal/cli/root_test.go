@@ -1165,8 +1165,13 @@ func TestDangerousCommandOutputRootsMatchCapabilities(t *testing.T) {
 		{command: "betaflight-cli motors test-plan", args: []string{"motors", "test-plan", "--motor", "1", "--value", "1000", "--duration", "1s"}},
 		{command: "betaflight-cli storage erase", args: []string{"storage", "erase", "--yes"}, wantSideEffect: "dataflash_erase"},
 		{command: "betaflight-cli save", args: []string{"save", "--yes"}, wantSideEffect: "save"},
+		{command: "betaflight-cli sensors calibrate-accelerometer", args: []string{"sensors", "calibrate-accelerometer", "--yes"}, wantSideEffect: "sensor_calibration"},
+		{command: "betaflight-cli sensors calibrate-magnetometer", args: []string{"sensors", "calibrate-magnetometer", "--yes"}, wantSideEffect: "sensor_calibration"},
 		{command: "betaflight-cli reboot firmware", args: []string{"reboot", "firmware", "--yes"}, wantSideEffect: "firmware_reboot"},
+		{command: "betaflight-cli reboot bootloader", args: []string{"reboot", "bootloader", "--yes"}, wantSideEffect: "bootloader_reboot"},
+		{command: "betaflight-cli reboot bootloader-flash", args: []string{"reboot", "bootloader-flash", "--yes"}, wantSideEffect: "bootloader_reboot"},
 		{command: "betaflight-cli reboot msc", args: []string{"reboot", "msc", "--yes"}, wantSideEffect: "msc_reboot"},
+		{command: "betaflight-cli reboot msc-utc", args: []string{"reboot", "msc-utc", "--yes"}, wantSideEffect: "msc_reboot"},
 	}
 
 	roots := capabilityOutputRoots(t)

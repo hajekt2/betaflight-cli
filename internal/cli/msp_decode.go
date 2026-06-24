@@ -93,6 +93,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPSensorAlignment:          decodeVia(commands.DecodeSensorAlignment),
 	msp.MSPCompassConfig:            decodeVia(commands.DecodeCompassConfig),
 	msp.MSPMotorConfig:              decodeVia(commands.DecodeMotorConfig),
+	msp.MSPESCSensorData:            decodeVia(commands.DecodeESCSensorData),
 	msp.MSPMotorTelemetry:           decodeVia(commands.DecodeMotorTelemetry),
 	msp.MSPMotor3dConfig:            decodeVia(commands.DecodeMotor3DConfig),
 	msp.MSPServoMixRules:            decodeVia(commands.DecodeServoMixRules),

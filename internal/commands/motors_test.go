@@ -58,6 +58,26 @@ func TestDecodeMotorTelemetry(t *testing.T) {
 	}
 }
 
+func TestDecodeESCSensorData(t *testing.T) {
+	payload := []byte{2, 40}
+	payload = appendU16Test(payload, 12000)
+	payload = append(payload, 41)
+	payload = appendU16Test(payload, 12100)
+	data, err := DecodeESCSensorData(payload)
+	if err != nil {
+		t.Fatalf("DecodeESCSensorData() error = %v", err)
+	}
+	if len(data) != 2 || data[0].TemperatureC != 40 || data[0].RPM != 12000 || data[1].RPM != 12100 {
+		t.Fatalf("esc data = %+v", data)
+	}
+}
+
+func TestDecodeESCSensorDataRejectsTrailingBytes(t *testing.T) {
+	if _, err := DecodeESCSensorData([]byte{1, 40, 0xe0, 0x2e, 0}); err == nil {
+		t.Fatal("DecodeESCSensorData() error = nil")
+	}
+}
+
 func TestDecodeMotor3DAndOutputOrder(t *testing.T) {
 	config, err := DecodeMotor3DConfig([]byte{0x7e, 0x05, 0xea, 0x05, 0xb4, 0x05})
 	if err != nil {

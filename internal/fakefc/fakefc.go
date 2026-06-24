@@ -708,6 +708,12 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 240)
 		payload = appendU16(payload, 121)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPESCSensorData:
+		payload := []byte{2, 40}
+		payload = appendU16(payload, 12000)
+		payload = append(payload, 41)
+		payload = appendU16(payload, 12100)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPMotor3dConfig:
 		payload := appendU16(nil, 1406)
 		payload = appendU16(payload, 1514)

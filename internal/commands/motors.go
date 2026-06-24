@@ -9,11 +9,12 @@ import (
 )
 
 type MotorStatus struct {
-	Config      *MotorConfig     `json:"config,omitempty"`
-	Outputs     []uint16         `json:"outputs,omitempty"`
-	Telemetry   []MotorTelemetry `json:"telemetry,omitempty"`
-	Config3D    *Motor3DConfig   `json:"config_3d,omitempty"`
-	OutputOrder []uint8          `json:"output_order,omitempty"`
+	Config        *MotorConfig     `json:"config,omitempty"`
+	Outputs       []uint16         `json:"outputs,omitempty"`
+	Telemetry     []MotorTelemetry `json:"telemetry,omitempty"`
+	ESCSensorData []ESCSensorData  `json:"esc_sensor_data,omitempty"`
+	Config3D      *Motor3DConfig   `json:"config_3d,omitempty"`
+	OutputOrder   []uint8          `json:"output_order,omitempty"`
 }
 
 type MotorConfig struct {
@@ -52,6 +53,12 @@ type MotorTelemetry struct {
 	CurrentRaw        uint16  `json:"current_raw"`
 	CurrentA          float64 `json:"current_a"`
 	ConsumptionMAh    uint16  `json:"consumption_mah"`
+}
+
+type ESCSensorData struct {
+	Index        int    `json:"index"`
+	TemperatureC uint8  `json:"temperature_c"`
+	RPM          uint16 `json:"rpm"`
 }
 
 type Motor3DConfig struct {
@@ -146,6 +153,11 @@ func ReadMotorStatus(ctx context.Context, client *connection.Client) (*MotorStat
 	}
 	if telemetry, err := readMotorTelemetry(ctx, client); err == nil {
 		status.Telemetry = telemetry
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if escSensorData, err := readESCSensorData(ctx, client); err == nil {
+		status.ESCSensorData = escSensorData
 	} else {
 		warnings = append(warnings, err.Error())
 	}
@@ -487,6 +499,37 @@ func DecodeMotorTelemetry(payload []byte) ([]MotorTelemetry, error) {
 	return telemetry, nil
 }
 
+func DecodeESCSensorData(payload []byte) ([]ESCSensorData, error) {
+	if len(payload) == 0 {
+		return nil, nil
+	}
+	r := msp.NewPayloadReader(payload)
+	count, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]ESCSensorData, 0, count)
+	for i := 0; i < int(count); i++ {
+		temp, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		rpm, err := r.U16()
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, ESCSensorData{
+			Index:        i,
+			TemperatureC: temp,
+			RPM:          rpm,
+		})
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP_ESC_SENSOR_DATA returned %d trailing byte(s)", r.Remaining())
+	}
+	return rows, nil
+}
+
 func DecodeMotor3DConfig(payload []byte) (*Motor3DConfig, error) {
 	r := msp.NewPayloadReader(payload)
 	low, err := r.U16()
@@ -628,6 +671,14 @@ func readMotorTelemetry(ctx context.Context, client *connection.Client) ([]Motor
 		return nil, fmt.Errorf("motor telemetry unavailable: %w", err)
 	}
 	return DecodeMotorTelemetry(frame.Payload)
+}
+
+func readESCSensorData(ctx context.Context, client *connection.Client) ([]ESCSensorData, error) {
+	frame, err := client.Request(ctx, msp.MSPESCSensorData, nil)
+	if err != nil {
+		return nil, fmt.Errorf("esc sensor data unavailable: %w", err)
+	}
+	return DecodeESCSensorData(frame.Payload)
 }
 
 func readMotor3DConfig(ctx context.Context, client *connection.Client) (*Motor3DConfig, error) {

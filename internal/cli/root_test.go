@@ -3850,6 +3850,23 @@ func TestMSPRequestWithDecodeForServoAndMotorOutputOrder(t *testing.T) {
 	if len(order) != 4 || order[0] != float64(0) || order[3] != float64(3) {
 		t.Fatalf("order channels = %+v", order)
 	}
+
+	env, err = runTestCommand(t, []string{"msp", "request", "MSP_ESC_SENSOR_DATA", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data = mspResponseData(t, env)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	escData := data["decoded"].([]any)
+	firstESC := escData[0].(map[string]any)
+	if firstESC["temperature_c"] != float64(40) || firstESC["rpm"] != float64(12000) {
+		t.Fatalf("decoded esc sensor data = %+v", escData)
+	}
 }
 
 func TestMSPRequestWithDecodeForRawIMU(t *testing.T) {
@@ -6144,6 +6161,11 @@ func TestMotorsStatusWithFakeFC(t *testing.T) {
 	first := telemetry[0].(map[string]any)
 	if first["rpm"] != float64(12500) || first["voltage_v"] != 16.8 {
 		t.Fatalf("telemetry = %+v", telemetry)
+	}
+	escData := motors["esc_sensor_data"].([]any)
+	firstESC := escData[0].(map[string]any)
+	if firstESC["temperature_c"] != float64(40) || firstESC["rpm"] != float64(12000) {
+		t.Fatalf("esc sensor data = %+v", escData)
 	}
 }
 

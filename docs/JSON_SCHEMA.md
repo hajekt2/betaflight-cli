@@ -438,8 +438,8 @@ The object includes the mixer mode ID, CLI mixer name, display name, expected mo
 `mixer set-config-json` returns a `mixer_config` object with the requested mixer config, decoded mixer mode, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful mixer config writes include a `mixer_config` side effect.
 
-`motors status` returns a `motors` object decoded from `MSP_MOTOR_CONFIG`, `MSP_MOTOR`, `MSP_MOTOR_TELEMETRY`, `MSP_MOTOR_3D_CONFIG`, and `MSP2_MOTOR_OUTPUT_REORDERING`.
-The object includes motor configuration, current motor outputs, telemetry values with raw and scaled units, 3D motor config, and output reordering.
+`motors status` returns a `motors` object decoded from `MSP_MOTOR_CONFIG`, `MSP_MOTOR`, `MSP_MOTOR_TELEMETRY`, `MSP_ESC_SENSOR_DATA`, `MSP_MOTOR_3D_CONFIG`, and `MSP2_MOTOR_OUTPUT_REORDERING`.
+The object includes motor configuration, current motor outputs, modern telemetry values with raw and scaled units, legacy ESC sensor temperature/RPM rows, 3D motor config, and output reordering.
 `motors set-config` returns a `motor_config` object with max throttle, min command, motor pole count, DShot telemetry flag, MSP command name/code, acknowledgement flag, and `save_required`.
 `motors set-config-json` accepts either a motor config object or an object with `motor_config`, `motors`, or `config`.
 It returns the same `motor_config` object as `motors set-config`.

@@ -80,6 +80,51 @@ func TestDecodeVTXTableRowsRejectTrailingBytes(t *testing.T) {
 	}
 }
 
+func TestDecodeVTXDeviceStatus(t *testing.T) {
+	payload := []byte{3, 1, 1, 5, 8, 1, 2, 1}
+	payload = appendU16Payload(payload, 5861)
+	payload = append(payload, 1)
+	payload = appendU32Payload(payload, 0x03)
+	payload = append(payload, 2)
+	payload = appendU16Payload(payload, 1)
+	payload = appendU16Payload(payload, 25)
+	payload = appendU16Payload(payload, 2)
+	payload = appendU16Payload(payload, 200)
+	payload = append(payload, 2, 0xaa, 0x55)
+	status, err := DecodeVTXDeviceStatus(payload)
+	if err != nil {
+		t.Fatalf("DecodeVTXDeviceStatus() error = %v", err)
+	}
+	if !status.Supported || !status.DevicePresent || status.TypeName != "SMARTAUDIO" || !status.Ready {
+		t.Fatalf("status = %+v", status)
+	}
+	if !status.BandChannelAvailable || status.Band != 5 || status.Channel != 8 {
+		t.Fatalf("status = %+v", status)
+	}
+	if !status.PowerIndexAvailable || status.PowerIndex != 2 || !status.FrequencyAvailable || status.FrequencyMHz != 5861 {
+		t.Fatalf("status = %+v", status)
+	}
+	if !status.StatusAvailable || status.StatusRaw != 3 || !status.PitMode || !status.Locked {
+		t.Fatalf("status = %+v", status)
+	}
+	if len(status.PowerLevels) != 2 || status.PowerLevels[1].Power != 200 {
+		t.Fatalf("power levels = %+v", status.PowerLevels)
+	}
+	if status.CustomStatusByteCount != 2 || len(status.CustomStatusBytes) != 2 || status.CustomStatusBytes[0] != 0xaa {
+		t.Fatalf("custom status = %+v", status.CustomStatusBytes)
+	}
+}
+
+func TestDecodeVTXDeviceStatusNoDevice(t *testing.T) {
+	status, err := DecodeVTXDeviceStatus(nil)
+	if err != nil {
+		t.Fatalf("DecodeVTXDeviceStatus() error = %v", err)
+	}
+	if !status.Supported || status.DevicePresent {
+		t.Fatalf("status = %+v", status)
+	}
+}
+
 func TestEncodeVTXTableBand(t *testing.T) {
 	payload := EncodeVTXTableBand(VTXTableBandSetConfig{
 		Band:           1,

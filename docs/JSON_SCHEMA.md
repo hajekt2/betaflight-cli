@@ -198,6 +198,9 @@ When `--reboot-first` is set, the command connects, sends a reboot command first
 
 `vtx config` returns a `vtx` object decoded from `MSP_VTX_CONFIG`.
 The object includes VTX device type, band, channel, power, pit mode, frequency, readiness, low-power-disarm mode, optional pit-mode frequency, and optional VTX table summary fields.
+`vtx device-status` returns a `vtx_device` object decoded from `MSP2_GET_VTX_DEVICE_STATUS`.
+The object includes support status, device presence, type, readiness, active band/channel, power index, frequency, pit-mode and lock flags, advertised power levels, and custom device status bytes when firmware supplies them.
+If the target does not support VTX device status MSP, the command succeeds with `supported: false`, an `unsupported_reason`, and an `unsupported_msp` warning.
 `vtx set-config` returns a `vtx_config` object with the requested VTX fields, MSP command name/code, acknowledgement flag, and `save_required`.
 `vtx set-config-json` accepts either a VTX config object or an object with `vtx_config`, `vtx`, or `config`.
 It returns the same `vtx_config` object as `vtx set-config`.

@@ -799,6 +799,18 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetVTXConfig:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 11))
+	case msp.MSP2GetVTXDeviceStatus:
+		payload := []byte{3, 1, 1, 5, 8, 1, 2, 1}
+		payload = appendU16(payload, 5861)
+		payload = append(payload, 1)
+		payload = appendU32(payload, 0x03)
+		payload = append(payload, 2)
+		payload = appendU16(payload, 1)
+		payload = appendU16(payload, 25)
+		payload = appendU16(payload, 2)
+		payload = appendU16(payload, 200)
+		payload = append(payload, 2, 0xaa, 0x55)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetVtxtableBand:
 		ok := len(frame.Payload) >= 7
 		if ok {

@@ -52,6 +52,34 @@ type VTXTablePowerLevel struct {
 	Label string `json:"label"`
 }
 
+type VTXDeviceStatus struct {
+	Supported             bool                  `json:"supported"`
+	UnsupportedReason     string                `json:"unsupported_reason,omitempty"`
+	DevicePresent         bool                  `json:"device_present"`
+	Type                  uint8                 `json:"type,omitempty"`
+	TypeName              string                `json:"type_name,omitempty"`
+	Ready                 bool                  `json:"ready"`
+	BandChannelAvailable  bool                  `json:"band_channel_available"`
+	Band                  uint8                 `json:"band,omitempty"`
+	Channel               uint8                 `json:"channel,omitempty"`
+	PowerIndexAvailable   bool                  `json:"power_index_available"`
+	PowerIndex            uint8                 `json:"power_index,omitempty"`
+	FrequencyAvailable    bool                  `json:"frequency_available"`
+	FrequencyMHz          uint16                `json:"frequency_mhz,omitempty"`
+	StatusAvailable       bool                  `json:"status_available"`
+	StatusRaw             uint32                `json:"status_raw,omitempty"`
+	PitMode               bool                  `json:"pit_mode,omitempty"`
+	Locked                bool                  `json:"locked,omitempty"`
+	PowerLevels           []VTXDevicePowerLevel `json:"power_levels,omitempty"`
+	CustomStatusByteCount uint8                 `json:"custom_status_byte_count,omitempty"`
+	CustomStatusBytes     []int                 `json:"custom_status_bytes,omitempty"`
+}
+
+type VTXDevicePowerLevel struct {
+	Level uint16 `json:"level"`
+	Power uint16 `json:"power"`
+}
+
 type VTXConfigSetConfig struct {
 	Band             uint8  `json:"band"`
 	Channel          uint8  `json:"channel"`
@@ -158,6 +186,23 @@ func ReadVTXTableStatus(ctx context.Context, client *connection.Client) (*VTXTab
 		}
 		status.Powers = append(status.Powers, *row)
 	}
+	return status, nil
+}
+
+func ReadVTXDeviceStatus(ctx context.Context, client *connection.Client) (*VTXDeviceStatus, error) {
+	frame, err := client.Request(ctx, msp.MSP2GetVTXDeviceStatus, nil)
+	if err != nil {
+		var coded *connection.CodedError
+		if errors.As(err, &coded) && coded.Code == "unsupported_msp" {
+			return &VTXDeviceStatus{Supported: false, UnsupportedReason: coded.Message}, nil
+		}
+		return nil, fmt.Errorf("vtx device status unavailable: %w", err)
+	}
+	status, err := DecodeVTXDeviceStatus(frame.Payload)
+	if err != nil {
+		return nil, err
+	}
+	status.Supported = true
 	return status, nil
 }
 
@@ -459,6 +504,109 @@ func DecodeVTXTablePowerLevel(payload []byte) (*VTXTablePowerLevel, error) {
 		Level: level,
 		Value: value,
 		Label: string(labelBytes),
+	}, nil
+}
+
+func DecodeVTXDeviceStatus(payload []byte) (*VTXDeviceStatus, error) {
+	if len(payload) == 0 {
+		return &VTXDeviceStatus{Supported: true, DevicePresent: false}, nil
+	}
+	r := msp.NewPayloadReader(payload)
+	vtxType, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX device type")
+	}
+	ready, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX device readiness")
+	}
+	bandChannelAvailable, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX band/channel availability")
+	}
+	band, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX band")
+	}
+	channel, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX channel")
+	}
+	powerIndexAvailable, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX power index availability")
+	}
+	powerIndex, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX power index")
+	}
+	frequencyAvailable, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX frequency availability")
+	}
+	frequency, err := r.U16()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX frequency")
+	}
+	statusAvailable, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX status availability")
+	}
+	statusRaw, err := r.U32()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX status")
+	}
+	powerLevelCount, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX power level count")
+	}
+	powerLevels := make([]VTXDevicePowerLevel, 0, powerLevelCount)
+	for i := uint8(0); i < powerLevelCount; i++ {
+		level, err := r.U16()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "VTX power level")
+		}
+		power, err := r.U16()
+		if err != nil {
+			return nil, msp.RequireNoShort(err, "VTX power value")
+		}
+		powerLevels = append(powerLevels, VTXDevicePowerLevel{Level: level, Power: power})
+	}
+	customCount, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX custom status byte count")
+	}
+	customBytesRaw, err := r.Bytes(int(customCount))
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "VTX custom status bytes")
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("VTX device status returned %d trailing byte(s)", r.Remaining())
+	}
+	customBytes := make([]int, len(customBytesRaw))
+	for i, value := range customBytesRaw {
+		customBytes[i] = int(value)
+	}
+	return &VTXDeviceStatus{
+		Supported:             true,
+		DevicePresent:         true,
+		Type:                  vtxType,
+		TypeName:              lookupVTXType(vtxType),
+		Ready:                 ready != 0,
+		BandChannelAvailable:  bandChannelAvailable != 0,
+		Band:                  band,
+		Channel:               channel,
+		PowerIndexAvailable:   powerIndexAvailable != 0,
+		PowerIndex:            powerIndex,
+		FrequencyAvailable:    frequencyAvailable != 0,
+		FrequencyMHz:          frequency,
+		StatusAvailable:       statusAvailable != 0,
+		StatusRaw:             statusRaw,
+		PitMode:               statusRaw&1 != 0,
+		Locked:                statusRaw&2 != 0,
+		PowerLevels:           powerLevels,
+		CustomStatusByteCount: customCount,
+		CustomStatusBytes:     customBytes,
 	}, nil
 }
 

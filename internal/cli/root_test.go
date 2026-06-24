@@ -791,6 +791,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if vtxTableStatus["operation"] != "read_only" || vtxTableStatus["requires_connection"] != true || vtxTableStatus["confirmation"] != "none" || vtxTableStatus["output_root"] != "vtxtable" || vtxTableStatus["runnable"] != true {
 		t.Fatalf("vtxtable status capability = %+v", vtxTableStatus)
 	}
+	vtxDeviceStatus := byCommand["betaflight-cli vtx device-status"]
+	if vtxDeviceStatus["operation"] != "read_only" || vtxDeviceStatus["requires_connection"] != true || vtxDeviceStatus["confirmation"] != "none" || vtxDeviceStatus["output_root"] != "vtx_device" || vtxDeviceStatus["runnable"] != true {
+		t.Fatalf("vtx device status capability = %+v", vtxDeviceStatus)
+	}
 	schema := byCommand["betaflight-cli schema"]
 	if schema["operation"] != "offline" || schema["requires_connection"] != false || schema["confirmation"] != "none" || schema["runnable"] != true {
 		t.Fatalf("schema capability = %+v", schema)
@@ -1128,6 +1132,7 @@ func TestReadOnlyCommandOutputRootsMatchCapabilities(t *testing.T) {
 		{command: "betaflight-cli beeper config", args: []string{"beeper", "config"}},
 		{command: "betaflight-cli transponder config", args: []string{"transponder", "config"}},
 		{command: "betaflight-cli vtx config", args: []string{"vtx", "config"}},
+		{command: "betaflight-cli vtx device-status", args: []string{"vtx", "device-status"}},
 		{command: "betaflight-cli vtxtable status", args: []string{"vtxtable", "status"}},
 		{command: "betaflight-cli osd status", args: []string{"osd", "status"}},
 		{command: "betaflight-cli leds status", args: []string{"leds", "status"}},
@@ -4091,6 +4096,24 @@ func TestMSPRequestWithDecodeForVTXTableRows(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForVTXDeviceStatus(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_GET_VTX_DEVICE_STATUS", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["type_name"] != "SMARTAUDIO" || decoded["frequency_mhz"] != float64(5861) || decoded["pit_mode"] != true {
+		t.Fatalf("decoded = %+v", decoded)
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {
@@ -4204,6 +4227,58 @@ func TestVTXConfigWithFakeFC(t *testing.T) {
 	table := config["table"].(map[string]any)
 	if table["available"] != true || table["bands"] != float64(5) || table["channels"] != float64(8) || table["power_levels"] != float64(3) {
 		t.Fatalf("table = %+v", table)
+	}
+}
+
+func TestVTXDeviceStatusWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtx", "device-status"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	status := data["vtx_device"].(map[string]any)
+	if status["supported"] != true || status["device_present"] != true || status["type_name"] != "SMARTAUDIO" || status["ready"] != true {
+		t.Fatalf("status = %+v", status)
+	}
+	if status["band_channel_available"] != true || status["band"] != float64(5) || status["channel"] != float64(8) {
+		t.Fatalf("status = %+v", status)
+	}
+	if status["frequency_available"] != true || status["frequency_mhz"] != float64(5861) || status["pit_mode"] != true || status["locked"] != true {
+		t.Fatalf("status = %+v", status)
+	}
+	levels := status["power_levels"].([]any)
+	if len(levels) != 2 || levels[1].(map[string]any)["power"] != float64(200) {
+		t.Fatalf("power levels = %+v", levels)
+	}
+	custom := status["custom_status_bytes"].([]any)
+	if len(custom) != 2 || custom[0] != float64(170) {
+		t.Fatalf("custom status bytes = %+v", custom)
+	}
+}
+
+func TestVTXDeviceStatusReportsUnsupportedTarget(t *testing.T) {
+	env, err := runTestCommand(t, []string{"vtx", "device-status"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		fc := fakefc.New()
+		fc.Unsupported[msp.MSP2GetVTXDeviceStatus] = true
+		client, clientErr := connection.NewClient(fc, time.Second)
+		return client, connection.TargetInfo{}, clientErr
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	status := data["vtx_device"].(map[string]any)
+	if status["supported"] != false || status["unsupported_reason"] == "" {
+		t.Fatalf("status = %+v", status)
+	}
+	if len(env.Warnings) != 1 || env.Warnings[0].Code != "unsupported_msp" {
+		t.Fatalf("warnings = %+v", env.Warnings)
 	}
 }
 

@@ -57,6 +57,7 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 	cmd.AddCommand(set)
 	if domain.use == "vtx" {
 		cmd.AddCommand(a.vtxConfigCommand())
+		cmd.AddCommand(a.vtxDeviceStatusCommand())
 		cmd.AddCommand(a.vtxSetConfigCommand())
 		cmd.AddCommand(a.vtxSetConfigJSONCommand())
 	}

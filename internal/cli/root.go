@@ -499,6 +499,26 @@ func (a *app) vtxConfigCommand() *cobra.Command {
 	}
 }
 
+func (a *app) vtxDeviceStatusCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "device-status",
+		Short: "Read VTX device runtime status over MSP2",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				status, err := bfcommands.ReadVTXDeviceStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"vtx_device": status})
+				if !status.Supported {
+					env.Warnings = append(env.Warnings, output.Warning{Code: "unsupported_msp", Message: status.UnsupportedReason})
+				}
+				return env
+			})
+		},
+	}
+}
+
 func (a *app) sensorsCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "sensors", Short: "Inspect sensor configuration and live sensor state"}
 	cmd.AddCommand(&cobra.Command{

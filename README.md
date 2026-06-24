@@ -201,6 +201,8 @@ They skip comments, `batch start`, `batch end`, and `save`; exact `defaults nosa
 `storage export FILE` reads Dataflash contents over MSP into a local file, defaults to the used byte count reported by the firmware, refuses to overwrite unless `--force` is explicit, and returns a `dataflash_export` summary for agents.
 `storage erase` sends `MSP_DATAFLASH_ERASE`, requires `--yes`, captures read-only before and after storage snapshots, emits a `dataflash_erase` side effect, and returns an audit summary with freed bytes.
 `vtx config` reads current VTX state over MSP and returns decoded type, band, channel, power, frequency, pit mode, readiness, and VTX table summary fields.
+`vtx device-status` reads runtime VTX device readiness, band/channel, power index, frequency, status flags, and power levels through `MSP2_GET_VTX_DEVICE_STATUS`.
+If the target does not expose VTX device-status MSP, `vtx device-status` returns `supported: false` with a warning instead of failing the whole command.
 `vtx set-config` writes VTX band, channel, power, pit mode, low-power-disarm mode, and pit-mode frequency through `MSP_SET_VTX_CONFIG`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `vtx set-config-json` writes VTX band, channel, power, pit mode, low-power-disarm mode, and pit-mode frequency through `MSP_SET_VTX_CONFIG`, accepts either a VTX config object or an object with `vtx_config`, `vtx`, or `config`, requires `--yes`, and reports that a separate `save` is still required to persist the change.
 `vtxtable status` reads VTX table summary, band rows, and power rows over typed MSP commands.

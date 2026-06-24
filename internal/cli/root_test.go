@@ -1488,6 +1488,37 @@ func TestCapabilitiesCoverageReportsParityDomains(t *testing.T) {
 	}
 }
 
+func TestCapabilitiesCoverageIncludesRunnableEnvelopeCommands(t *testing.T) {
+	schemaEnv, err := runTestCommand(t, []string{"schema"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("schema unexpectedly connected")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("schema command error = %v", err)
+	}
+	coverageEnv, err := runTestCommand(t, []string{"capabilities", "coverage"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("coverage unexpectedly connected")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("coverage command error = %v", err)
+	}
+
+	covered := coverageCommandSet(t, coverageEnv)
+	for command, row := range schemaCommandContractRows(t, schemaEnv) {
+		if row["runnable"] != true {
+			continue
+		}
+		operation, _ := row["operation"].(string)
+		if operation == "text_output" {
+			continue
+		}
+		if _, ok := covered[command]; !ok {
+			t.Fatalf("runnable envelope command %q is missing from capabilities coverage", command)
+		}
+	}
+}
+
 func TestRegistryCapabilityPathsMatchCommandTree(t *testing.T) {
 	root := (&app{}).rootCommand()
 	commandPaths := make(map[string]struct{})
@@ -10215,6 +10246,28 @@ func capabilityCommandRows(t *testing.T, env output.Envelope) map[string]map[str
 	data := env.Data.(map[string]any)
 	capabilities := data["capabilities"].(map[string]any)
 	return commandRowsByCommand(t, capabilities["commands"].([]any))
+}
+
+func coverageCommandSet(t *testing.T, env output.Envelope) map[string]struct{} {
+	t.Helper()
+	data := env.Data.(map[string]any)
+	coverage := data["coverage"].(map[string]any)
+	domains := coverage["domains"].([]any)
+	out := map[string]struct{}{}
+	for _, item := range domains {
+		domain := item.(map[string]any)
+		for _, field := range []string{"read_commands", "write_commands", "dangerous_commands"} {
+			rows, _ := domain[field].([]any)
+			for _, row := range rows {
+				command, ok := row.(string)
+				if !ok || command == "" {
+					t.Fatalf("coverage command row %s = %+v", field, row)
+				}
+				out[command] = struct{}{}
+			}
+		}
+	}
+	return out
 }
 
 func commandRowsByCommand(t *testing.T, rows []any) map[string]map[string]any {

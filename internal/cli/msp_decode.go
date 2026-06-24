@@ -106,6 +106,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPBeeperConfig:             decodeVia(commands.DecodeBeeperConfig),
 	msp.MSPTransponderConfig:        decodeVia(commands.DecodeTransponderConfig),
 	msp.MSPDebug:                    decodeVia(commands.DecodeDebugValues),
+	msp.MSPTxInfo:                   decodeVia(commands.DecodeTXInfo),
 	msp.MSPLedStripConfig:           decodeVia(commands.DecodeLEDStripConfig),
 	msp.MSPLedColors:                decodeVia(commands.DecodeLEDColors),
 	msp.MSPLedStripModecolor:        decodeVia(commands.DecodeLEDModeColors),
@@ -128,7 +129,6 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 		}, nil
 	}),
 	msp.MSPDisplayport: decodeRawBytes,
-	msp.MSPTxInfo:      decodeRawBytes,
 }
 
 var pidFallbackNames = []string{"ROLL", "PITCH", "YAW", "LEVEL", "MAG"}

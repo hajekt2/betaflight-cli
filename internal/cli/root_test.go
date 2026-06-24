@@ -3712,6 +3712,24 @@ func TestMSPRequestWithDecodeForAttitudeQuaternion(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForTXInfo(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_TX_INFO", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["rssi_source_name"] != "RX_PROTOCOL_CRSF" || decoded["rtc_status_name"] != "SET" || decoded["rtc_is_set"] != true {
+		t.Fatalf("decoded tx info = %+v", decoded)
+	}
+}
+
 func TestMSPRequestWithDecodeForText(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_GET_TEXT", "--decode", "--payload-hex", "01"}, nil)
 	if err != nil {
@@ -4251,6 +4269,10 @@ func TestReceiverStatusWithFakeFC(t *testing.T) {
 	}
 	if receiver["rssi_channel"] != float64(8) {
 		t.Fatalf("receiver = %+v", receiver)
+	}
+	txInfo := receiver["tx_info"].(map[string]any)
+	if txInfo["rssi_source_name"] != "RX_PROTOCOL_CRSF" || txInfo["rtc_status_name"] != "SET" || txInfo["rtc_is_set"] != true {
+		t.Fatalf("tx info = %+v", txInfo)
 	}
 	deadband := receiver["deadband"].(map[string]any)
 	if deadband["deadband"] != float64(5) || deadband["yaw_deadband"] != float64(7) || deadband["deadband_3d_throttle"] != float64(50) {

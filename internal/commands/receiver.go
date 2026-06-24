@@ -8,11 +8,23 @@ import (
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
+var rssiSourceNames = []string{
+	"NONE",
+	"ADC",
+	"RX_CHANNEL",
+	"RX_PROTOCOL",
+	"MSP",
+	"FRAME_ERRORS",
+	"RX_PROTOCOL_CRSF",
+	"RX_PROTOCOL_MAVLINK",
+}
+
 type ReceiverStatus struct {
 	Config      *ReceiverConfig `json:"config,omitempty"`
 	RCMap       []uint8         `json:"rc_map,omitempty"`
 	RCMapNames  []string        `json:"rc_map_names,omitempty"`
 	RSSIChannel *uint8          `json:"rssi_channel,omitempty"`
+	TXInfo      *TXInfo         `json:"tx_info,omitempty"`
 	Deadband    *RCDeadband     `json:"deadband,omitempty"`
 	Channels    []uint16        `json:"channels,omitempty"`
 	Failsafe    []RXFailChannel `json:"failsafe,omitempty"`
@@ -94,6 +106,16 @@ type RSSIChannelSetResult struct {
 	SaveRequired bool   `json:"save_required"`
 }
 
+type TXInfo struct {
+	RSSISource     uint8  `json:"rssi_source"`
+	RSSISourceName string `json:"rssi_source_name,omitempty"`
+	RTCStatus      uint8  `json:"rtc_status"`
+	RTCStatusName  string `json:"rtc_status_name"`
+	RTCIsSet       *bool  `json:"rtc_is_set,omitempty"`
+	RTCSupported   bool   `json:"rtc_supported"`
+	Source         string `json:"source"`
+}
+
 type RCMapSetResult struct {
 	Map          []uint8  `json:"map"`
 	Names        []string `json:"names"`
@@ -138,6 +160,11 @@ func ReadReceiverStatus(ctx context.Context, client *connection.Client) (*Receiv
 	}
 	if rssiChannel, err := readRSSIChannel(ctx, client); err == nil {
 		status.RSSIChannel = &rssiChannel
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if txInfo, err := readTXInfo(ctx, client); err == nil {
+		status.TXInfo = txInfo
 	} else {
 		warnings = append(warnings, err.Error())
 	}
@@ -226,6 +253,34 @@ func SetRSSIChannel(ctx context.Context, client *connection.Client, channel uint
 
 func EncodeRSSIChannel(channel uint8) []byte {
 	return []byte{channel}
+}
+
+func DecodeTXInfo(payload []byte) (*TXInfo, error) {
+	r := msp.NewPayloadReader(payload)
+	rssiSource, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	rtcStatus, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP_TX_INFO returned %d trailing byte(s)", r.Remaining())
+	}
+	info := &TXInfo{
+		RSSISource:     rssiSource,
+		RSSISourceName: indexedName(rssiSourceNames, rssiSource),
+		RTCStatus:      rtcStatus,
+		RTCStatusName:  rtcStatusName(rtcStatus),
+		RTCSupported:   rtcStatus != 0xff,
+		Source:         "MSP_TX_INFO",
+	}
+	if rtcStatus != 0xff {
+		value := rtcStatus != 0
+		info.RTCIsSet = &value
+	}
+	return info, nil
 }
 
 func SetRCMap(ctx context.Context, client *connection.Client, mapping []uint8) (*RCMapSetResult, error) {
@@ -548,6 +603,18 @@ func readRSSIChannel(ctx context.Context, client *connection.Client) (uint8, err
 	return channel, nil
 }
 
+func readTXInfo(ctx context.Context, client *connection.Client) (*TXInfo, error) {
+	frame, err := client.Request(ctx, msp.MSPTxInfo, nil)
+	if err != nil {
+		return nil, fmt.Errorf("tx info unavailable: %w", err)
+	}
+	info, err := DecodeTXInfo(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("tx info decode failed: %w", err)
+	}
+	return info, nil
+}
+
 func readRCDeadband(ctx context.Context, client *connection.Client) (*RCDeadband, error) {
 	frame, err := client.Request(ctx, msp.MSPRCDeadband, nil)
 	if err != nil {
@@ -596,6 +663,19 @@ func rcMapNames(mapping []uint8) []string {
 		out[i] = fmt.Sprintf("AUX%d", int(mapped)-len(names)+1)
 	}
 	return out
+}
+
+func rtcStatusName(status uint8) string {
+	switch status {
+	case 0:
+		return "NOT_SET"
+	case 1:
+		return "SET"
+	case 0xff:
+		return "NOT_SUPPORTED"
+	default:
+		return "UNKNOWN"
+	}
 }
 
 func rxFailChannel(index int, mode uint8, value uint16) RXFailChannel {

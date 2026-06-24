@@ -335,8 +335,8 @@ An empty payload is treated as a successful unavailable state because Betaflight
 `rtc set-json` accepts exactly one timestamp field from `timestamp`, `timestamp_utc`, or `iso_utc`, or `now: true`, optionally nested under `rtc`.
 Successful RTC set responses include an `rtc_set` side effect.
 
-`receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_RC_DEADBAND`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
-The object includes receiver configuration, channel map indexes and names, RSSI channel, RC deadband values, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
+`receiver status` returns a `receiver` object decoded from `MSP_RX_CONFIG`, `MSP_RX_MAP`, `MSP_RSSI_CONFIG`, `MSP_TX_INFO`, `MSP_RC_DEADBAND`, `MSP_RC`, and `MSP_RXFAIL_CONFIG`.
+The object includes receiver configuration, channel map indexes and names, configured RSSI channel, active TX RSSI source and RTC status, RC deadband values, live RC channel values, and RX failsafe channel rows decoded from `MSP_RXFAIL_CONFIG`.
 `receiver set-config-json` returns a `receiver_config` object with the requested receiver config, MSP command name/code, acknowledgement flag, and `save_required`.
 Successful receiver config writes include a `receiver_config` side effect.
 `receiver set-rssi-channel` and `receiver set-rssi-channel-json` return an `rssi_channel` object with the channel, MSP command name/code, acknowledgement flag, and `save_required`.

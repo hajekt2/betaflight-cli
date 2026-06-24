@@ -105,6 +105,35 @@ func TestEncodeRSSIChannel(t *testing.T) {
 	}
 }
 
+func TestDecodeTXInfo(t *testing.T) {
+	info, err := DecodeTXInfo([]byte{6, 1})
+	if err != nil {
+		t.Fatalf("DecodeTXInfo() error = %v", err)
+	}
+	if info.RSSISource != 6 || info.RSSISourceName != "RX_PROTOCOL_CRSF" || info.RTCStatusName != "SET" || !info.RTCSupported {
+		t.Fatalf("info = %+v", info)
+	}
+	if info.RTCIsSet == nil || !*info.RTCIsSet {
+		t.Fatalf("info = %+v", info)
+	}
+}
+
+func TestDecodeTXInfoWithoutRTC(t *testing.T) {
+	info, err := DecodeTXInfo([]byte{0, 0xff})
+	if err != nil {
+		t.Fatalf("DecodeTXInfo() error = %v", err)
+	}
+	if info.RSSISourceName != "NONE" || info.RTCStatusName != "NOT_SUPPORTED" || info.RTCSupported || info.RTCIsSet != nil {
+		t.Fatalf("info = %+v", info)
+	}
+}
+
+func TestDecodeTXInfoRejectsTrailingBytes(t *testing.T) {
+	if _, err := DecodeTXInfo([]byte{1, 0, 3}); err == nil {
+		t.Fatal("DecodeTXInfo() error = nil")
+	}
+}
+
 func TestEncodeRCMap(t *testing.T) {
 	got := EncodeRCMap([]uint8{0, 1, 3, 2})
 	want := []byte{0, 1, 3, 2}

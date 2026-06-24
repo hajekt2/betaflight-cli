@@ -1120,6 +1120,42 @@ func TestPlanOnlyCommandOutputRootsMatchCapabilities(t *testing.T) {
 	}
 }
 
+func TestConfirmedWriteCommandOutputRootsMatchCapabilities(t *testing.T) {
+	cases := []struct {
+		command string
+		args    []string
+		input   string
+	}{
+		{command: "betaflight-cli text set", args: []string{"text", "set", "craft_name", "Quad", "--yes"}},
+		{command: "betaflight-cli rtc set", args: []string{"rtc", "set", "--timestamp", "2026-06-23T12:34:56.789Z", "--yes"}},
+		{command: "betaflight-cli debug set-accelerometer-trim", args: []string{"--yes", "debug", "set-accelerometer-trim", "--", "-12", "34"}},
+		{command: "betaflight-cli features set-mask", args: []string{"features", "set-mask", "0x00040488", "--yes"}},
+		{command: "betaflight-cli vtx set-config", args: []string{"vtx", "set-config", "5", "8", "2", "true", "5861", "2", "5662", "--yes"}},
+		{command: "betaflight-cli receiver set-map", args: []string{"receiver", "set-map", "0", "1", "3", "2", "--yes"}},
+	}
+
+	roots := capabilityOutputRoots(t)
+	for _, tt := range cases {
+		t.Run(tt.command, func(t *testing.T) {
+			want := roots[tt.command]
+			if want == "" {
+				t.Fatalf("missing capability output root for %q", tt.command)
+			}
+			env, err := runTestCommandWithInput(t, tt.args, tt.input, nil)
+			if err != nil {
+				t.Fatalf("command error = %v", err)
+			}
+			if !env.OK {
+				t.Fatalf("env.OK = false: %+v", env.Errors)
+			}
+			data := env.Data.(map[string]any)
+			if _, ok := data[want]; !ok {
+				t.Fatalf("%s data missing advertised output root %q: %+v", tt.command, want, data)
+			}
+		})
+	}
+}
+
 func TestMSPListDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"msp", "list"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

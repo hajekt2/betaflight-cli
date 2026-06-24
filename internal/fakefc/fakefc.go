@@ -799,6 +799,28 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetVTXConfig:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 11))
+	case msp.MSP2CLISetting:
+		name := strings.TrimSpace(string(frame.Payload))
+		if name == "" {
+			f.out.Write(response(frame.Code, nil, true))
+			break
+		}
+		f.out.Write(response(frame.Code, []byte(name+" = 42"), false))
+	case msp.MSP2CLISettingInfo:
+		name, offset, ok := fakeCLISettingInfoRequest(frame.Payload)
+		if !ok {
+			f.out.Write(response(frame.Code, nil, true))
+			break
+		}
+		info := fmt.Sprintf("name: %s\ntype: uint16\nmin: 0\nmax: 16000\n", name)
+		if int(offset) > len(info) {
+			f.out.Write(response(frame.Code, nil, true))
+			break
+		}
+		chunk := info[offset:]
+		payload := appendU16(nil, uint16(len(info)))
+		payload = append(payload, []byte(chunk)...)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSP2GetVTXDeviceStatus:
 		payload := []byte{3, 1, 1, 5, 8, 1, 2, 1}
 		payload = appendU16(payload, 5861)
@@ -965,6 +987,22 @@ func fakeBatchPayload(code uint16) ([]byte, bool) {
 	default:
 		return nil, false
 	}
+}
+
+func fakeCLISettingInfoRequest(payload []byte) (string, uint16, bool) {
+	if len(payload) == 0 {
+		return "", 0, false
+	}
+	nul := bytes.IndexByte(payload, 0)
+	if nul < 0 {
+		return string(payload), 0, true
+	}
+	name := string(payload[:nul])
+	offset := uint16(0)
+	if len(payload)-nul-1 >= 2 {
+		offset = binary.LittleEndian.Uint16(payload[nul+1:])
+	}
+	return name, offset, name != ""
 }
 
 func fakeTextPayload(request []byte) ([]byte, bool) {

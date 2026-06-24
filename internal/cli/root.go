@@ -2976,6 +2976,55 @@ func (a *app) settingsCommand() *cobra.Command {
 		},
 	})
 	cmd.AddCommand(&cobra.Command{
+		Use:   "firmware-get NAME",
+		Short: "Read a setting through MSP2_CLI_SETTING",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				setting, err := bfcommands.ReadFirmwareSetting(cmd.Context(), client, name)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				data := map[string]any{"firmware_setting": setting}
+				if compiled, ok := settings.DefaultRegistry.Lookup(name); ok {
+					data["compiled_metadata"] = compiled
+				}
+				env := output.Success(commandPath(cmd), &target, data)
+				if !setting.Supported {
+					env.Warnings = append(env.Warnings, output.Warning{Code: "unsupported_msp", Message: setting.UnsupportedReason})
+				}
+				return env
+			})
+		},
+	})
+	var infoOffset uint16
+	infoCmd := &cobra.Command{
+		Use:   "firmware-info NAME",
+		Short: "Read firmware setting metadata text through MSP2_CLI_SETTING_INFO",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			name := args[0]
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				info, err := bfcommands.ReadFirmwareSettingInfo(cmd.Context(), client, name, infoOffset)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				data := map[string]any{"firmware_setting_info": info}
+				if compiled, ok := settings.DefaultRegistry.Lookup(name); ok {
+					data["compiled_metadata"] = compiled
+				}
+				env := output.Success(commandPath(cmd), &target, data)
+				if !info.Supported {
+					env.Warnings = append(env.Warnings, output.Warning{Code: "unsupported_msp", Message: info.UnsupportedReason})
+				}
+				return env
+			})
+		},
+	}
+	infoCmd.Flags().Uint16Var(&infoOffset, "offset", 0, "byte offset into firmware setting info text")
+	cmd.AddCommand(infoCmd)
+	cmd.AddCommand(&cobra.Command{
 		Use:   "diff",
 		Short: "Run non-interactive `diff all` and parse response",
 		RunE: func(cmd *cobra.Command, _ []string) error {

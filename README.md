@@ -161,6 +161,11 @@ It also includes CLI-row table commands for VTX tables, LED strips, servos, adju
 It also includes metadata-backed setting domains for PID, rates, filters, receiver, VTX, OSD, GPS, and failsafe.
 Those commands expose domain-specific list and set operations while preserving the same plan/apply/save safety model.
 `settings set-json` accepts either a JSON object map of setting names to values or an array of `{name,value}` rows, validates every known setting against generated metadata, and returns a multi-line `change_plan` unless `--apply --yes` is supplied.
+`settings firmware-get` reads one setting through Betaflight's read-only `MSP2_CLI_SETTING` path and returns the firmware-authored `firmware_setting` value.
+`settings firmware-info` reads chunked setting metadata text through `MSP2_CLI_SETTING_INFO` and returns `firmware_setting_info` with total bytes, chunk bytes, offset, completion state, and raw text.
+These firmware setting commands intentionally expose only read requests.
+If the connected target rejects the optional MSP2 setting message, the command still returns an OK envelope with `supported: false` and an `unsupported_msp` warning.
+Write-mode `MSP2_CLI_SETTING` remains behind the existing plan/apply/save safety flow instead of a direct shortcut.
 `status` reads compact runtime status from `MSP_STATUS_EX`, including active sensor names, active flight mode names, arming-disable state, and reboot-required state.
 It includes a decoded health object for CPU load, cycle time, CPU temperature, I2C errors, arming-blocked state, and configuration-state flags.
 It preserves extended flight-mode bytes so new Betaflight modes beyond the legacy 32-bit mask can still be represented.

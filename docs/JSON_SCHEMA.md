@@ -158,6 +158,9 @@ The object includes the introspected Cobra command tree, per-command runnable st
 `msp request` requires `--yes` for generated write-like commands and for numeric commands without compiled metadata.
 `msp request` returns raw and optionally decoded response details under the `msp` output root.
 When `--decode` is used, `MSP_RSSI_CONFIG` returns a structured `channel` and source object instead of generic payload bytes.
+When `--decode` is used, `MSP2_CLI_SETTING` returns a `firmware_setting`-shaped object with `name`, `value`, raw text, source, and optional MSP fields when called through the high-level settings command.
+When `--decode` is used, `MSP2_CLI_SETTING_INFO` returns total bytes, chunk bytes, completion state, and the firmware-authored metadata text chunk.
+The high-level `settings firmware-get` and `settings firmware-info` commands return `supported: false` with an `unsupported_msp` warning when the connected firmware rejects those optional MSP2 messages.
 `capabilities.safety_model.auto_port_writes_require_opt_in` is retained for compatibility and is `false` under the same policy.
 Agents should prefer this payload over scraping help text when selecting commands.
 `capabilities coverage` returns a `coverage` object without connecting to hardware.
@@ -209,6 +212,7 @@ Successful VTX config writes include a `vtx_config` side effect.
 The object includes the VTX table summary from `MSP_VTX_CONFIG`, band rows from `MSP_VTXTABLE_BAND`, and power rows from `MSP_VTXTABLE_POWERLEVEL`.
 If the target does not support VTX MSP, the command succeeds with `supported: false`, an `unsupported_reason`, and an `unsupported_msp` warning.
 Raw `msp request --decode` supports the same typed row payloads for `MSP_VTXTABLE_BAND` and `MSP_VTXTABLE_POWERLEVEL`.
+Raw `msp request --decode` also supports `MSP2_CLI_SETTING` and `MSP2_CLI_SETTING_INFO` for read-only firmware setting inspection.
 `osd set-canvas` returns an `osd_canvas` object with requested columns/rows, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.
 Successful OSD canvas writes include an `osd_canvas` side effect.
 `osd set-general-json` returns an `osd_general_config` object with the requested patch, merged config, MSP command name/code, acknowledgement flag, `save_required`, and `reboot_possible`.

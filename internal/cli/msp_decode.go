@@ -63,6 +63,8 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPBoardAlignmentConfig:     decodeVia(commands.DecodeBoardAlignment),
 	msp.MSPAccTrim:                  decodeRawAccTrim,
 	msp.MSP2GetText:                 decodeMSP2Text,
+	msp.MSP2CLISetting:              decodeVia(commands.DecodeFirmwareSetting),
+	msp.MSP2CLISettingInfo:          decodeVia(commands.DecodeFirmwareSettingInfo),
 	msp.MSP2SensorConfigActive: decodeVia(func(payload []byte) ([]any, error) {
 		out := make([]any, len(payload))
 		for i, raw := range payload {

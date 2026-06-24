@@ -783,6 +783,14 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if mspMetadata["operation"] != "offline" || mspMetadata["requires_connection"] != false || mspMetadata["confirmation"] != "none" || mspMetadata["output_root"] != "msp" || mspMetadata["runnable"] != true {
 		t.Fatalf("msp metadata capability = %+v", mspMetadata)
 	}
+	settingsFirmwareGet := byCommand["betaflight-cli settings firmware-get"]
+	if settingsFirmwareGet["operation"] != "read_only" || settingsFirmwareGet["requires_connection"] != true || settingsFirmwareGet["confirmation"] != "none" || settingsFirmwareGet["output_root"] != "firmware_setting" || settingsFirmwareGet["runnable"] != true {
+		t.Fatalf("settings firmware-get capability = %+v", settingsFirmwareGet)
+	}
+	settingsFirmwareInfo := byCommand["betaflight-cli settings firmware-info"]
+	if settingsFirmwareInfo["operation"] != "read_only" || settingsFirmwareInfo["requires_connection"] != true || settingsFirmwareInfo["confirmation"] != "none" || settingsFirmwareInfo["output_root"] != "firmware_setting_info" || settingsFirmwareInfo["runnable"] != true {
+		t.Fatalf("settings firmware-info capability = %+v", settingsFirmwareInfo)
+	}
 	mspBatch := byCommand["betaflight-cli msp batch"]
 	if mspBatch["operation"] != "read_only" || mspBatch["requires_connection"] != true || mspBatch["confirmation"] != "none" || mspBatch["output_root"] != "msp" || mspBatch["runnable"] != true {
 		t.Fatalf("msp batch capability = %+v", mspBatch)
@@ -1132,6 +1140,8 @@ func TestReadOnlyCommandOutputRootsMatchCapabilities(t *testing.T) {
 		{command: "betaflight-cli beeper config", args: []string{"beeper", "config"}},
 		{command: "betaflight-cli transponder config", args: []string{"transponder", "config"}},
 		{command: "betaflight-cli vtx config", args: []string{"vtx", "config"}},
+		{command: "betaflight-cli settings firmware-get", args: []string{"settings", "firmware-get", "gyro_lpf1_static_hz"}},
+		{command: "betaflight-cli settings firmware-info", args: []string{"settings", "firmware-info", "gyro_lpf1_static_hz"}},
 		{command: "betaflight-cli vtx device-status", args: []string{"vtx", "device-status"}},
 		{command: "betaflight-cli vtxtable status", args: []string{"vtxtable", "status"}},
 		{command: "betaflight-cli osd status", args: []string{"osd", "status"}},
@@ -2973,6 +2983,92 @@ func TestSettingsGetIncludesMetadataAndLines(t *testing.T) {
 	}
 }
 
+func TestSettingsFirmwareGetWithFakeFC(t *testing.T) {
+	env, err := runTestCommand(t, []string{"settings", "firmware-get", "gyro_lpf1_static_hz"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	setting := data["firmware_setting"].(map[string]any)
+	if setting["supported"] != true || setting["name"] != "gyro_lpf1_static_hz" || setting["value"] != "42" || setting["msp_name"] != "MSP2_CLI_SETTING" || setting["write_scope"] != "read_only_request" {
+		t.Fatalf("firmware_setting = %+v", setting)
+	}
+	metadata := data["compiled_metadata"].(map[string]any)
+	if metadata["name"] != "gyro_lpf1_static_hz" {
+		t.Fatalf("compiled_metadata = %+v", metadata)
+	}
+}
+
+func TestSettingsFirmwareGetReportsUnsupportedTarget(t *testing.T) {
+	env, err := runTestCommand(t, []string{"settings", "firmware-get", "gyro_lpf1_static_hz"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		fc := fakefc.New()
+		fc.Unsupported[msp.MSP2CLISetting] = true
+		client, clientErr := connection.NewClient(fc, time.Second)
+		return client, connection.TargetInfo{}, clientErr
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	setting := data["firmware_setting"].(map[string]any)
+	if setting["supported"] != false || setting["unsupported_reason"] == "" || setting["name"] != "gyro_lpf1_static_hz" {
+		t.Fatalf("firmware_setting = %+v", setting)
+	}
+	if len(env.Warnings) != 1 || env.Warnings[0].Code != "unsupported_msp" {
+		t.Fatalf("warnings = %+v", env.Warnings)
+	}
+}
+
+func TestSettingsFirmwareInfoWithOffset(t *testing.T) {
+	env, err := runTestCommand(t, []string{"settings", "firmware-info", "gyro_lpf1_static_hz", "--offset", "6"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	info := data["firmware_setting_info"].(map[string]any)
+	if info["supported"] != true || info["name"] != "gyro_lpf1_static_hz" || info["offset"] != float64(6) || info["msp_name"] != "MSP2_CLI_SETTING_INFO" {
+		t.Fatalf("firmware_setting_info identity = %+v", info)
+	}
+	if info["total_bytes"].(float64) <= info["chunk_bytes"].(float64) || info["complete"] != true {
+		t.Fatalf("firmware_setting_info chunk = %+v", info)
+	}
+	if !strings.Contains(info["text"].(string), "gyro_lpf1_static_hz") || !strings.Contains(info["text"].(string), "type: uint16") {
+		t.Fatalf("firmware_setting_info text = %q", info["text"])
+	}
+}
+
+func TestSettingsFirmwareInfoReportsUnsupportedTarget(t *testing.T) {
+	env, err := runTestCommand(t, []string{"settings", "firmware-info", "gyro_lpf1_static_hz"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		fc := fakefc.New()
+		fc.Unsupported[msp.MSP2CLISettingInfo] = true
+		client, clientErr := connection.NewClient(fc, time.Second)
+		return client, connection.TargetInfo{}, clientErr
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	info := data["firmware_setting_info"].(map[string]any)
+	if info["supported"] != false || info["unsupported_reason"] == "" || info["name"] != "gyro_lpf1_static_hz" {
+		t.Fatalf("firmware_setting_info = %+v", info)
+	}
+	if len(env.Warnings) != 1 || env.Warnings[0].Code != "unsupported_msp" {
+		t.Fatalf("warnings = %+v", env.Warnings)
+	}
+}
+
 func TestSettingsDiffIncludesConfiguration(t *testing.T) {
 	env, err := runTestCommand(t, []string{"settings", "diff"}, nil)
 	if err != nil {
@@ -3821,6 +3917,42 @@ func TestMSPRequestWithDecodeForText(t *testing.T) {
 	}
 	if decoded["text_length"] != float64(8) {
 		t.Fatalf("decoded text_length = %v", decoded["text_length"])
+	}
+}
+
+func TestMSPRequestWithDecodeForFirmwareSetting(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_CLI_SETTING", "--payload-hex", "6779726f5f6c7066315f7374617469635f687a", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["name"] != "gyro_lpf1_static_hz" || decoded["value"] != "42" || decoded["source"] != "MSP2_CLI_SETTING" {
+		t.Fatalf("decoded firmware setting = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForFirmwareSettingInfo(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_CLI_SETTING_INFO", "--payload-hex", "6779726f5f6c7066315f7374617469635f687a000000", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["complete"] != true || decoded["total_bytes"].(float64) <= 0 || !strings.Contains(decoded["text"].(string), "type: uint16") {
+		t.Fatalf("decoded firmware setting info = %+v", decoded)
 	}
 }
 

@@ -26,6 +26,7 @@ type Inspection struct {
 	FrameSummaryApprox      FrameSummary               `json:"frame_summary_approx"`
 	DecodedFrames           DecodedFrameSummary        `json:"decoded_frames"`
 	Events                  EventSummary               `json:"events"`
+	DecodeSupport           DecodeSupport              `json:"decode_support"`
 	Warnings                []string                   `json:"warnings,omitempty"`
 }
 
@@ -97,6 +98,17 @@ type EventSample struct {
 	Error      string         `json:"error,omitempty"`
 }
 
+type DecodeSupport struct {
+	Status                string   `json:"status"`
+	SupportedFrameTypes   []string `json:"supported_frame_types,omitempty"`
+	UnsupportedFrameTypes []string `json:"unsupported_frame_types,omitempty"`
+	SupportedEncodings    []string `json:"supported_encodings,omitempty"`
+	UnsupportedEncodings  []string `json:"unsupported_encodings,omitempty"`
+	SupportedPredictors   []string `json:"supported_predictors,omitempty"`
+	UnsupportedPredictors []string `json:"unsupported_predictors,omitempty"`
+	Notes                 []string `json:"notes,omitempty"`
+}
+
 type DecodedStat struct {
 	Attempted int `json:"attempted"`
 	Decoded   int `json:"decoded"`
@@ -155,6 +167,7 @@ func Inspect(r io.Reader) (Inspection, error) {
 	decodedCandidates := scanDecodedCandidates(data[headerEnd:], int64(headerEnd), out.Headers, out.FieldDefinitions, 256, 400)
 	out.DecodedFrames = decodeFrames(data[headerEnd:], int64(headerEnd), out.Headers, out.FieldDefinitions, decodedCandidates, 50)
 	out.Events = decodeEvents(data[headerEnd:], int64(headerEnd), decodedCandidates, 50)
+	out.DecodeSupport = summarizeDecodeSupport(out.FieldDefinitions, out.DecodedFrames, out.Events)
 	out.Warnings = validationWarnings(out)
 	return out, nil
 }
@@ -490,6 +503,116 @@ func decodeFrames(data []byte, headerBytes int64, headers map[string]string, def
 		}
 	}
 	sort.Strings(out.Warnings)
+	return out
+}
+
+func summarizeDecodeSupport(definitions map[string]FieldDefinition, decoded DecodedFrameSummary, events EventSummary) DecodeSupport {
+	supportedFrameTypes := sortedKeys(map[string]struct{}{
+		"I": {},
+		"P": {},
+		"H": {},
+		"G": {},
+		"S": {},
+		"E": {},
+	})
+	supportedEncodings := sortedKeys(map[string]struct{}{
+		"0": {},
+		"1": {},
+		"3": {},
+		"6": {},
+		"7": {},
+		"8": {},
+		"9": {},
+	})
+	supportedPredictors := sortedKeys(map[string]struct{}{
+		"0":   {},
+		"1":   {},
+		"2":   {},
+		"3":   {},
+		"4":   {},
+		"5":   {},
+		"6":   {},
+		"7":   {},
+		"8":   {},
+		"9":   {},
+		"10":  {},
+		"11":  {},
+		"256": {},
+	})
+	unsupportedFrames := map[string]struct{}{}
+	unsupportedEncodings := map[string]struct{}{}
+	unsupportedPredictors := map[string]struct{}{}
+	supportedFrameSet := stringSet(supportedFrameTypes)
+	supportedEncodingSet := stringSet(supportedEncodings)
+	supportedPredictorSet := stringSet(supportedPredictors)
+	for frameType, def := range definitions {
+		if _, ok := supportedFrameSet[frameType]; !ok {
+			unsupportedFrames[frameType] = struct{}{}
+		}
+		for _, encoding := range def.Encoding {
+			encoding = strings.TrimSpace(encoding)
+			if encoding == "" {
+				continue
+			}
+			if _, ok := supportedEncodingSet[encoding]; !ok {
+				unsupportedEncodings[encoding] = struct{}{}
+			}
+		}
+		for _, predictor := range def.Predictor {
+			predictor = strings.TrimSpace(predictor)
+			if predictor == "" {
+				continue
+			}
+			if _, ok := supportedPredictorSet[predictor]; !ok {
+				unsupportedPredictors[predictor] = struct{}{}
+			}
+		}
+	}
+	for frameType := range decoded.UnsupportedFrameTypes {
+		unsupportedFrames[frameType] = struct{}{}
+	}
+	for encoding := range decoded.UnsupportedEncodings {
+		unsupportedEncodings[encoding] = struct{}{}
+	}
+	status := "headers_only"
+	switch {
+	case len(unsupportedFrames) > 0 || len(unsupportedEncodings) > 0 || len(unsupportedPredictors) > 0 || decoded.FailedCount > 0 || events.FailedCount > 0 || decoded.Truncated || events.Truncated:
+		status = "partial"
+	case decoded.DecodedCount > 0 || events.DecodedCount > 0:
+		status = "decoded"
+	}
+	notes := []string{
+		"blackbox binary frame decoding is incremental; use decoded counts, unsupported fields, and warnings to judge analysis depth",
+	}
+	return DecodeSupport{
+		Status:                status,
+		SupportedFrameTypes:   supportedFrameTypes,
+		UnsupportedFrameTypes: sortedKeys(unsupportedFrames),
+		SupportedEncodings:    supportedEncodings,
+		UnsupportedEncodings:  sortedKeys(unsupportedEncodings),
+		SupportedPredictors:   supportedPredictors,
+		UnsupportedPredictors: sortedKeys(unsupportedPredictors),
+		Notes:                 notes,
+	}
+}
+
+func stringSet(values []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		out[value] = struct{}{}
+	}
+	return out
+}
+
+func sortedKeys(values map[string]struct{}) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	for value := range values {
+		out = append(out, value)
+	}
+	sort.Strings(out)
 	return out
 }
 

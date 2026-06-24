@@ -138,10 +138,47 @@ func TestInspectDecodesNullEncodingWithPreviousPredictor(t *testing.T) {
 	}
 }
 
+func TestInspectReportsDecodeSupportForUnsupportedEncoding(t *testing.T) {
+	log := strings.Join([]string{
+		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
+		"H Field I name:time,unsupported",
+		"H Field I signed:0,0",
+		"H Field I predictor:0,0",
+		"H Field I encoding:1,10",
+		"I\x02\x04E",
+	}, "\n")
+	inspection, err := Inspect(strings.NewReader(log))
+	if err != nil {
+		t.Fatalf("Inspect() error = %v", err)
+	}
+	support := inspection.DecodeSupport
+	if support.Status != "partial" {
+		t.Fatalf("status = %q, want partial", support.Status)
+	}
+	if !containsString(support.UnsupportedEncodings, "10") {
+		t.Fatalf("unsupported encodings = %+v", support.UnsupportedEncodings)
+	}
+	if !containsString(support.SupportedEncodings, "9") {
+		t.Fatalf("supported encodings = %+v", support.SupportedEncodings)
+	}
+	if len(support.Notes) == 0 {
+		t.Fatalf("notes = %+v", support.Notes)
+	}
+}
+
 func TestInspectRejectsMissingHeader(t *testing.T) {
 	if _, err := Inspect(strings.NewReader("not a blackbox log")); err == nil {
 		t.Fatal("Inspect() error = nil, want error")
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
 
 func TestInspectSkipsLeadingGarbageLines(t *testing.T) {

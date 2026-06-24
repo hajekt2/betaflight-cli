@@ -154,6 +154,7 @@ The object includes the introspected Cobra command tree, per-command runnable st
 `msp list` and `msp metadata` return compiled MSP registry details under the `msp` output root.
 `msp request` requires `--yes` for generated write-like commands and for numeric commands without compiled metadata.
 `msp request` returns raw and optionally decoded response details under the `msp` output root.
+When `--decode` is used, `MSP_RSSI_CONFIG` returns a structured `channel` and source object instead of generic payload bytes.
 `capabilities.safety_model.auto_port_writes_require_opt_in` is retained for compatibility and is `false` under the same policy.
 Agents should prefer this payload over scraping help text when selecting commands.
 `capabilities coverage` returns a `coverage` object without connecting to hardware.

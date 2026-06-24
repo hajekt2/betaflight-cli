@@ -105,6 +105,22 @@ func TestEncodeRSSIChannel(t *testing.T) {
 	}
 }
 
+func TestDecodeRSSIConfig(t *testing.T) {
+	config, err := DecodeRSSIConfig([]byte{8})
+	if err != nil {
+		t.Fatalf("DecodeRSSIConfig() error = %v", err)
+	}
+	if config.Channel != 8 || config.Source != "MSP_RSSI_CONFIG" {
+		t.Fatalf("config = %+v", config)
+	}
+}
+
+func TestDecodeRSSIConfigRejectsTrailingBytes(t *testing.T) {
+	if _, err := DecodeRSSIConfig([]byte{8, 1}); err == nil {
+		t.Fatal("DecodeRSSIConfig() error = nil")
+	}
+}
+
 func TestDecodeTXInfo(t *testing.T) {
 	info, err := DecodeTXInfo([]byte{6, 1})
 	if err != nil {

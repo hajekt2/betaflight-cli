@@ -72,7 +72,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	}),
 	msp.MSP2GyroSensorActive:      decodeVia(commands.DecodeActiveGyros),
 	msp.MSPRXConfig:               decodeVia(commands.DecodeReceiverConfig),
-	msp.MSPRSSIConfig:             decodeRawBytes,
+	msp.MSPRSSIConfig:             decodeVia(commands.DecodeRSSIConfig),
 	msp.MSPRXMap:                  decodeByteSlice(commands.DecodeBoxIDs),
 	msp.MSPRCDeadband:             decodeVia(commands.DecodeRCDeadband),
 	msp.MSPRxfailConfig:           decodeVia(commands.DecodeRXFailConfig),

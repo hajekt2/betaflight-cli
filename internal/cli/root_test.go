@@ -3973,6 +3973,24 @@ func TestMSPRequestWithDecodeForRXMapUsesNumberArray(t *testing.T) {
 	}
 }
 
+func TestMSPRequestWithDecodeForRSSIConfig(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_RSSI_CONFIG", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["channel"] != float64(8) || decoded["source"] != "MSP_RSSI_CONFIG" {
+		t.Fatalf("decoded rssi config = %+v", decoded)
+	}
+}
+
 func TestMSPMetadataByName(t *testing.T) {
 	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, nil)
 	if err != nil {

@@ -106,6 +106,11 @@ type RSSIChannelSetResult struct {
 	SaveRequired bool   `json:"save_required"`
 }
 
+type RSSIConfig struct {
+	Channel uint8  `json:"channel"`
+	Source  string `json:"source"`
+}
+
 type TXInfo struct {
 	RSSISource     uint8  `json:"rssi_source"`
 	RSSISourceName string `json:"rssi_source_name,omitempty"`
@@ -253,6 +258,18 @@ func SetRSSIChannel(ctx context.Context, client *connection.Client, channel uint
 
 func EncodeRSSIChannel(channel uint8) []byte {
 	return []byte{channel}
+}
+
+func DecodeRSSIConfig(payload []byte) (*RSSIConfig, error) {
+	r := msp.NewPayloadReader(payload)
+	channel, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP_RSSI_CONFIG returned %d trailing byte(s)", r.Remaining())
+	}
+	return &RSSIConfig{Channel: channel, Source: "MSP_RSSI_CONFIG"}, nil
 }
 
 func DecodeTXInfo(payload []byte) (*TXInfo, error) {
@@ -595,12 +612,11 @@ func readRSSIChannel(ctx context.Context, client *connection.Client) (uint8, err
 	if err != nil {
 		return 0, fmt.Errorf("rssi config unavailable: %w", err)
 	}
-	r := msp.NewPayloadReader(frame.Payload)
-	channel, err := r.U8()
+	config, err := DecodeRSSIConfig(frame.Payload)
 	if err != nil {
 		return 0, err
 	}
-	return channel, nil
+	return config.Channel, nil
 }
 
 func readTXInfo(ctx context.Context, client *connection.Client) (*TXInfo, error) {

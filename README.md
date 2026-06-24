@@ -7,6 +7,9 @@ The goal is to expose Betaflight configuration, telemetry, and CLI functionality
 The project deliberately does not implement MCP.
 Agents can call the binary directly and parse JSON.
 
+The executable entrypoint lives at `cmd/betaflight-cli/main.go`.
+The default build target compiles `./cmd/betaflight-cli` into the `betaflight-cli` binary.
+
 ## Status
 
 This repository now has a broad executable CLI surface for non-graphical Betaflight Configurator parity.

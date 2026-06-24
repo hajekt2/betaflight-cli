@@ -13,6 +13,26 @@ func TestDecodeAttitude(t *testing.T) {
 	}
 }
 
+func TestDecodeAttitudeQuaternion(t *testing.T) {
+	payload := []byte{0xff, 0x7f, 0x00, 0x00, 0x00, 0xc0, 0x00, 0x40}
+	quaternion, err := DecodeAttitudeQuaternion(payload)
+	if err != nil {
+		t.Fatalf("DecodeAttitudeQuaternion() error = %v", err)
+	}
+	if quaternion.W != 1 || quaternion.X != 0 {
+		t.Fatalf("quaternion = %+v", quaternion)
+	}
+	if quaternion.Y >= -0.5 || quaternion.Y <= -0.51 || quaternion.Z <= 0.5 || quaternion.Z >= 0.51 {
+		t.Fatalf("quaternion = %+v", quaternion)
+	}
+}
+
+func TestDecodeAttitudeQuaternionRejectsTrailingBytes(t *testing.T) {
+	if _, err := DecodeAttitudeQuaternion([]byte{0xff, 0x7f, 0, 0, 0, 0, 0, 0, 1}); err == nil {
+		t.Fatal("DecodeAttitudeQuaternion() error = nil")
+	}
+}
+
 func TestDecodeRC(t *testing.T) {
 	payload := []byte{0x00, 0x01, 0x00, 0x02}
 	channels, err := DecodeRC(payload)

@@ -1636,8 +1636,12 @@ func TestTelemetrySnapshotWithFakeFC(t *testing.T) {
 	}
 	data, ok := env.Data.(map[string]any)
 	telemetry, _ := data["telemetry"].(map[string]any)
-	if !ok || telemetry["attitude"] == nil || telemetry["battery"] == nil || telemetry["rc"] == nil {
+	if !ok || telemetry["attitude"] == nil || telemetry["attitude_quaternion"] == nil || telemetry["battery"] == nil || telemetry["rc"] == nil {
 		t.Fatalf("unexpected telemetry data: %+v", env.Data)
+	}
+	quaternion := telemetry["attitude_quaternion"].(map[string]any)
+	if quaternion["w"] != float64(1) || quaternion["x"] != float64(0) || quaternion["y"] != float64(0) || quaternion["z"] != float64(0) {
+		t.Fatalf("attitude quaternion = %+v", quaternion)
 	}
 }
 
@@ -1658,7 +1662,7 @@ func TestTelemetryDefaultCommandMapsToSnapshot(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected telemetry sources: %+v", data["sources"])
 	}
-	if sources["status"] == nil || sources["attitude"] == nil || sources["battery"] == nil || sources["rc"] == nil {
+	if sources["status"] == nil || sources["attitude"] == nil || sources["attitude_quaternion"] == nil || sources["battery"] == nil || sources["rc"] == nil {
 		t.Fatalf("missing telemetry source keys: %+v", sources)
 	}
 }
@@ -3687,6 +3691,24 @@ func TestMSPRequestWithDecodeForDebugValues(t *testing.T) {
 	decoded := data["decoded"].([]any)
 	if len(decoded) != 8 || decoded[0] != float64(-1) || decoded[7] != float64(8) {
 		t.Fatalf("decoded debug values = %+v", decoded)
+	}
+}
+
+func TestMSPRequestWithDecodeForAttitudeQuaternion(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP_ATTITUDE_QUATERNION", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["decode_supported"] != true {
+		t.Fatalf("decode_supported = %v", data["decode_supported"])
+	}
+	decoded := data["decoded"].(map[string]any)
+	if decoded["w"] != float64(1) || decoded["x"] != float64(0) || decoded["y"] != float64(0) || decoded["z"] != float64(0) {
+		t.Fatalf("decoded quaternion = %+v", decoded)
 	}
 }
 

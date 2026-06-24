@@ -10,7 +10,7 @@ Agents can call the binary directly and parse JSON.
 ## Status
 
 This repository now has a broad executable CLI surface for non-graphical Betaflight Configurator parity.
-Implemented functionality includes machine-readable capability discovery, USB port diagnostics, MSP handshake, identity and firmware support reporting, telemetry snapshots, runtime status, framed CLI exec, backup/diff/restore workflows, generated settings metadata, typed domain commands, Blackbox storage workflows, safety-gated apply/save paths, firmware maintenance, and raw MSP diagnostics.
+Implemented functionality includes machine-readable capability discovery, USB port diagnostics, MSP handshake, identity and firmware support reporting, telemetry snapshots with Euler and quaternion attitude, runtime status, framed CLI exec, backup/diff/restore workflows, generated settings metadata, typed domain commands, Blackbox storage workflows, safety-gated apply/save paths, firmware maintenance, and raw MSP diagnostics.
 The repository also has generated MSP command metadata and generated Betaflight `2025.12.0` setting metadata compiled into the binary.
 `capabilities coverage` is the authoritative local parity map for the current binary and should remain green as new Betaflight releases change MSP messages, settings, or workflows.
 

@@ -20,6 +20,7 @@ The same header defines the core v1 command codes used for the MVP shape:
 - `MSP_ATTITUDE = 108`
 - `MSP_BATTERY_STATE = 130`
 - `MSP_STATUS_EX = 150`
+- `MSP_ATTITUDE_QUATERNION = 167`
 
 `src/main/msp/msp_protocol_v2_betaflight.h` defines Betaflight-specific MSP v2 commands.
 The reviewed branch includes `MSP2_CLI_SETTING = 0x3010` and `MSP2_CLI_SETTING_INFO = 0x3011`, which are promising for typed setting access.

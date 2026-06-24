@@ -307,6 +307,12 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendS16(payload, 20)
 		payload = appendS16(payload, 180)
 		f.out.Write(response(frame.Code, payload, false))
+	case msp.MSPAttitudeQuaternion:
+		payload := appendS16(nil, 32767)
+		payload = appendS16(payload, 0)
+		payload = appendS16(payload, 0)
+		payload = appendS16(payload, 0)
+		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPDebug:
 		payload := appendS16(nil, -1)
 		payload = appendS16(payload, 2)

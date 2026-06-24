@@ -10,11 +10,12 @@ import (
 )
 
 type Telemetry struct {
-	Sources  map[string]string `json:"sources"`
-	Status   *Status           `json:"status,omitempty"`
-	Attitude *Attitude         `json:"attitude,omitempty"`
-	Battery  *Battery          `json:"battery,omitempty"`
-	RC       []uint16          `json:"rc,omitempty"`
+	Sources            map[string]string   `json:"sources"`
+	Status             *Status             `json:"status,omitempty"`
+	Attitude           *Attitude           `json:"attitude,omitempty"`
+	AttitudeQuaternion *AttitudeQuaternion `json:"attitude_quaternion,omitempty"`
+	Battery            *Battery            `json:"battery,omitempty"`
+	RC                 []uint16            `json:"rc,omitempty"`
 }
 
 type Status struct {
@@ -44,6 +45,13 @@ type Attitude struct {
 	YawDegrees   int16   `json:"yaw_degrees"`
 }
 
+type AttitudeQuaternion struct {
+	W float64 `json:"w"`
+	X float64 `json:"x"`
+	Y float64 `json:"y"`
+	Z float64 `json:"z"`
+}
+
 type Battery struct {
 	CellCount      uint8   `json:"cell_count"`
 	CapacityMAh    uint16  `json:"capacity_mah"`
@@ -70,6 +78,13 @@ func ReadTelemetry(ctx context.Context, client *connection.Client) (Telemetry, [
 		out.Sources["attitude"] = "MSP_ATTITUDE"
 	} else {
 		out.Sources["attitude"] = ""
+		warnings = append(warnings, err.Error())
+	}
+	if quaternion, err := readAttitudeQuaternion(ctx, client); err == nil {
+		out.AttitudeQuaternion = quaternion
+		out.Sources["attitude_quaternion"] = "MSP_ATTITUDE_QUATERNION"
+	} else {
+		out.Sources["attitude_quaternion"] = ""
 		warnings = append(warnings, err.Error())
 	}
 	if battery, err := readBattery(ctx, client); err == nil {
@@ -222,6 +237,44 @@ func decodeAttitude(payload []byte) (*Attitude, error) {
 
 func DecodeAttitude(payload []byte) (*Attitude, error) {
 	return decodeAttitude(payload)
+}
+
+func readAttitudeQuaternion(ctx context.Context, client *connection.Client) (*AttitudeQuaternion, error) {
+	frame, err := client.Request(ctx, msp.MSPAttitudeQuaternion, nil)
+	if err != nil {
+		return nil, fmt.Errorf("attitude quaternion unavailable: %w", err)
+	}
+	return DecodeAttitudeQuaternion(frame.Payload)
+}
+
+func DecodeAttitudeQuaternion(payload []byte) (*AttitudeQuaternion, error) {
+	r := msp.NewPayloadReader(payload)
+	w, err := r.S16()
+	if err != nil {
+		return nil, err
+	}
+	x, err := r.S16()
+	if err != nil {
+		return nil, err
+	}
+	y, err := r.S16()
+	if err != nil {
+		return nil, err
+	}
+	z, err := r.S16()
+	if err != nil {
+		return nil, err
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP_ATTITUDE_QUATERNION returned %d trailing byte(s)", r.Remaining())
+	}
+	const scale = 32767.0
+	return &AttitudeQuaternion{
+		W: float64(w) / scale,
+		X: float64(x) / scale,
+		Y: float64(y) / scale,
+		Z: float64(z) / scale,
+	}, nil
 }
 
 func readBattery(ctx context.Context, client *connection.Client) (*Battery, error) {

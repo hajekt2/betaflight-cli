@@ -170,7 +170,7 @@ The `uid` object is decoded from `MSP_UID` and includes three firmware words, a 
 The `build` object is decoded from `MSP_BUILD_INFO` and includes fixed build date, build time, short git revision, raw build option codes, decoded option names, and unknown option codes.
 The `legacy_name` field is decoded from deprecated `MSP_NAME` for compatibility with Configurator and older identity flows.
 
-`telemetry` returns `attitude`, `battery`, `rc`, `status` snapshots and a `sources` map showing which MSP command populated each section.
+`telemetry` returns `attitude`, `attitude_quaternion`, `battery`, `rc`, `status` snapshots and a `sources` map showing which MSP command populated each section.
 When running on older or partial firmware where one telemetry command is missing, `sources` marks the missing section and warning entries indicate the exact failure reason while keeping partial data available.
 
 `blackbox config` returns a `blackbox` object decoded from `MSP_BLACKBOX_CONFIG`.

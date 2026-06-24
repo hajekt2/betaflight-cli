@@ -23,6 +23,7 @@ var mspDecodeRegistry = map[uint16]mspPayloadDecoder{
 	msp.MSPStatus:                   decodeVia(commands.DecodeStatus),
 	msp.MSPStatusEx:                 decodeVia(commands.DecodeStatusEx),
 	msp.MSPAttitude:                 decodeVia(commands.DecodeAttitude),
+	msp.MSPAttitudeQuaternion:       decodeVia(commands.DecodeAttitudeQuaternion),
 	msp.MSPAltitude:                 decodeVia(commands.DecodeAltitude),
 	msp.MSPSonarAltitude:            decodeVia(commands.DecodeRangefinderAltitude),
 	msp.MSPBatteryState:             decodeVia(commands.DecodeBatteryRuntimeState),

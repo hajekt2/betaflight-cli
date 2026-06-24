@@ -85,11 +85,13 @@ func (a *app) presetsFetchCommand() *cobra.Command {
 				return a.render(env)
 			}
 			if !opts.apply {
+				planData := importPlanData(imported, importCommandOptions{includeDefaults: opts.includeDefaults, save: opts.save}, false)
 				env := output.Success(commandPath(cmd), nil, map[string]any{
-					"source":  metadata,
-					"plan":    importPlanData(imported, importCommandOptions{includeDefaults: opts.includeDefaults, save: opts.save}, false),
-					"kind":    imported.Plan.Kind,
-					"applied": false,
+					"source":      metadata,
+					"plan":        planData,
+					"kind":        imported.Plan.Kind,
+					"applied":     false,
+					"change_plan": planData["change_plan"],
 				})
 				addPresetFetchSideEffect(&env, metadata)
 				return a.render(env)
@@ -325,5 +327,5 @@ func importPlanData(imported batch.ImportResult, opts importCommandOptions, appl
 	if opts.source != nil {
 		data["source"] = *opts.source
 	}
-	return data
+	return withChangePlanRoot(data)
 }

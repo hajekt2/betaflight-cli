@@ -398,8 +398,8 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 	readMSP := capabilityMetadata{RequiresConnection: true, Operation: "read_only", Confirmation: "none", Tags: []string{"msp", "read"}}
 	readCLI := capabilityMetadata{RequiresConnection: true, Operation: "read_only", Confirmation: "none", Tags: []string{"cli", "read"}}
 	offline := capabilityMetadata{RequiresConnection: false, Operation: "offline", Confirmation: "none", Tags: []string{"offline"}}
-	writePlan := capabilityMetadata{RequiresConnection: false, Operation: "offline", Confirmation: "none", Input: "plain CLI text or JSON plan", Tags: []string{"plan", "offline"}}
-	writeApply := capabilityMetadata{RequiresConnection: true, Operation: "write", Confirmation: "--yes", Input: "plain CLI text or JSON plan", Tags: []string{"write", "apply"}}
+	writePlan := capabilityMetadata{RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "change_plan", Input: "plain CLI text or JSON plan", Tags: []string{"plan", "offline"}}
+	writeApply := capabilityMetadata{RequiresConnection: true, Operation: "write", Confirmation: "--yes", OutputRoot: "change_plan", Input: "plain CLI text or JSON plan", Tags: []string{"write", "apply"}}
 	dangerous := capabilityMetadata{RequiresConnection: true, Operation: "dangerous", Confirmation: "--yes", Tags: []string{"dangerous"}}
 	registry := map[string]capabilityMetadata{
 		"betaflight-cli capabilities":                    {RequiresConnection: false, Operation: "offline", Confirmation: "none", OutputRoot: "capabilities", Tags: []string{"offline", "discovery"}},

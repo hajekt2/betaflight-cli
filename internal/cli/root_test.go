@@ -1050,6 +1050,7 @@ func TestOfflineCommandOutputRootsMatchCapabilities(t *testing.T) {
 	cases := []struct {
 		command string
 		args    []string
+		input   string
 	}{
 		{command: "betaflight-cli version", args: []string{"version"}},
 		{command: "betaflight-cli schema", args: []string{"schema"}},
@@ -1057,6 +1058,9 @@ func TestOfflineCommandOutputRootsMatchCapabilities(t *testing.T) {
 		{command: "betaflight-cli capabilities coverage", args: []string{"capabilities", "coverage"}},
 		{command: "betaflight-cli msp list", args: []string{"msp", "list", "--name", "MSP_NAME"}},
 		{command: "betaflight-cli msp metadata", args: []string{"msp", "metadata", "MSP_NAME"}},
+		{command: "betaflight-cli batch plan", args: []string{"batch", "plan"}, input: "feature GPS\n"},
+		{command: "betaflight-cli restore plan", args: []string{"restore", "plan"}, input: "feature GPS\n"},
+		{command: "betaflight-cli presets plan", args: []string{"presets", "plan"}, input: "feature GPS\n"},
 		{command: "betaflight-cli firmware flash", args: []string{"firmware", "flash", "--image", image, "--tool", "dfu-util"}},
 	}
 
@@ -1068,7 +1072,7 @@ func TestOfflineCommandOutputRootsMatchCapabilities(t *testing.T) {
 				t.Fatalf("missing capability output root for %q", tt.command)
 			}
 			called := false
-			env, err := runTestCommand(t, tt.args, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+			env, err := runTestCommandWithInput(t, tt.args, tt.input, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 				called = true
 				return nil, connection.TargetInfo{}, nil
 			})
@@ -7382,6 +7386,10 @@ func TestBatchPlanFromStdinDoesNotConnect(t *testing.T) {
 	if len(lines) != 2 || data["applied"] != false {
 		t.Fatalf("plan = %+v", data)
 	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["applied"] != false || len(changePlan["cli_lines"].([]any)) != 2 {
+		t.Fatalf("change_plan = %+v", changePlan)
+	}
 	if called {
 		t.Fatal("connector was called for batch plan")
 	}
@@ -7475,6 +7483,10 @@ func TestRestorePlanSkipsBackupWrappersDoesNotConnect(t *testing.T) {
 	lines := data["cli_lines"].([]any)
 	if len(lines) != 2 || lines[0] != "feature GPS" || lines[1] != "set gyro_lpf1_static_hz = 0" {
 		t.Fatalf("plan = %+v", data)
+	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["applied"] != false || len(changePlan["cli_lines"].([]any)) != 2 {
+		t.Fatalf("change_plan = %+v", changePlan)
 	}
 	skipped := data["skipped_lines"].([]any)
 	if len(skipped) != 5 {
@@ -7615,6 +7627,10 @@ func TestRestoreApplyWithFakeFC(t *testing.T) {
 	if data["applied"] != true || data["saved"] != false {
 		t.Fatalf("data = %+v", data)
 	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["applied"] != true || len(changePlan["cli_lines"].([]any)) != 2 {
+		t.Fatalf("change_plan = %+v", changePlan)
+	}
 	if len(env.SideEffects) != 2 {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
@@ -7631,6 +7647,10 @@ func TestPresetsPlanUsesPresetKind(t *testing.T) {
 	data := env.Data.(map[string]any)
 	if data["kind"] != "preset" || data["source_format"] != "preset_text" {
 		t.Fatalf("data = %+v", data)
+	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["kind"] != "preset" || len(changePlan["cli_lines"].([]any)) != 2 {
+		t.Fatalf("change_plan = %+v", changePlan)
 	}
 }
 
@@ -7669,6 +7689,11 @@ func TestPresetsFetchPlanWithoutApply(t *testing.T) {
 	lines := plan["cli_lines"].([]any)
 	if len(lines) != 2 || lines[0] != "feature GPS" || lines[1] != "set small_angle = 25" {
 		t.Fatalf("plan = %+v", plan)
+	}
+	changePlan := data["change_plan"].(map[string]any)
+	changePlanLines := changePlan["cli_lines"].([]any)
+	if len(changePlanLines) != 2 || changePlanLines[0] != "feature GPS" || changePlanLines[1] != "set small_angle = 25" {
+		t.Fatalf("change_plan = %+v", changePlan)
 	}
 	source := data["source"].(map[string]any)
 	if source["url"] != server.URL || source["http_status"].(float64) != float64(http.StatusOK) || source["content_type"] != "text/plain" {

@@ -1162,7 +1162,7 @@ func isDefaultsNoSave(line string) bool {
 }
 
 func batchPlanData(plan batch.Plan, applied bool) map[string]any {
-	return map[string]any{
+	return withChangePlanRoot(map[string]any{
 		"schema_version": plan.SchemaVersion,
 		"kind":           plan.Kind,
 		"cli_lines":      plan.CLILines,
@@ -1170,7 +1170,7 @@ func batchPlanData(plan batch.Plan, applied bool) map[string]any {
 		"save_requested": plan.Save,
 		"applied":        applied,
 		"saved":          false,
-	}
+	})
 }
 
 func (a *app) configListCommand(use, short string, selectData func(bfconfig.Document) any) *cobra.Command {

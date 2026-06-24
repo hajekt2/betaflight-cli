@@ -40,6 +40,8 @@ func TestCapabilityMetadataOfflineCommandClassifications(t *testing.T) {
 	}{
 		{"betaflight-cli schema", false, "offline"},
 		{"betaflight-cli capabilities coverage", false, "offline"},
+		{"betaflight-cli cli diff", true, "read_only"},
+		{"betaflight-cli cli dump", true, "read_only"},
 		{"betaflight-cli msp list", false, "offline"},
 		{"betaflight-cli msp metadata", false, "offline"},
 		{"betaflight-cli msp request", true, "read_only_or_write_or_dangerous"},

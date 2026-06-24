@@ -147,12 +147,16 @@ If multiple Betaflight-compatible devices answer the handshake, commands fail wi
 
 Configurator parity should be exposed as focused command families rather than one giant command.
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.
+Camera control is exposed as a small action family for analog camera menu key presses.
 `capabilities` prints the command tree plus curated workflow metadata so agents can discover command safety class, connection requirements, output roots, and recommended workflow sequences without scraping help text.
 `capabilities coverage` prints a non-graphical Configurator parity map by domain, including implemented commands and the next known gaps.
 `version` prints the binary version, commit, build date, Go runtime, envelope schema version, generated MSP source firmware, and generated settings source firmware without connecting to hardware.
 `info` reads firmware, board, MCU, device UID, build, build option, configuration state, gyro sample rate, and legacy craft-name identity fields over MSP.
 `firmware status` reads firmware identity, target metadata, build metadata, support-policy status, and compiled settings metadata details over MSP.
 `target status` composes firmware identity, CLI system status, and resource/timer/DMA diagnostics into one hardware inventory payload.
+`camera keys` lists the five upstream camera-control keys without connecting to hardware.
+`camera press KEY` returns a plan by default and only sends `MSP_CAMERA_CONTROL` when `--yes` is supplied.
+Camera key presses are immediate actions and do not require `save`.
 The current CLI includes first domain commands for features, serial ports, AUX modes, resources, and profile selectors.
 These commands read from parsed `dump all` output and use Betaflight CLI text lines for plan/apply writes.
 `features status` reads the active feature mask over MSP and returns decoded feature names with a bit catalog for agent reasoning.

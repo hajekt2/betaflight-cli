@@ -150,6 +150,9 @@ That handshake should produce a compatibility context used by all commands.
 `cli interactive` should enter interactive CLI Mode by sending `#`.
 `cli exec` should use framed CLI command mode with STX and ETX flow control.
 These firmware paths have different prompts, timeouts, and safety implications and should stay separate in the connection layer.
+Camera control uses the same safety posture as other immediate MSP actions.
+The command returns an offline plan by default and sends `MSP_CAMERA_CONTROL` only after explicit confirmation.
+It does not set `save_required` because Betaflight treats the key press as an immediate action rather than configuration state.
 
 ### MSP Layer
 

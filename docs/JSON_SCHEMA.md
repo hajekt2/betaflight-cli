@@ -177,6 +177,13 @@ The `uid` object is decoded from `MSP_UID` and includes three firmware words, a 
 The `build` object is decoded from `MSP_BUILD_INFO` and includes fixed build date, build time, short git revision, raw build option codes, decoded option names, and unknown option codes.
 The `legacy_name` field is decoded from deprecated `MSP_NAME` for compatibility with Configurator and older identity flows.
 
+`camera keys` returns a `camera_keys` array without connecting to hardware.
+Each item includes the Betaflight camera-control key name and numeric MSP key code.
+`camera press KEY` returns a `camera_control` object.
+Without `--yes`, it is a plan with `applied: false` and `confirmation: "--yes"`.
+With `--yes`, it sends one `MSP_CAMERA_CONTROL` key byte and returns `applied: true`, `acknowledged: true`, and `save_required: false`.
+If the target rejects the MSP command, the command returns `supported: false` with an `unsupported_msp` warning.
+
 `telemetry` returns `attitude`, `attitude_quaternion`, `battery`, `rc`, `status` snapshots and a `sources` map showing which MSP command populated each section.
 When running on older or partial firmware where one telemetry command is missing, `sources` marks the missing section and warning entries indicate the exact failure reason while keeping partial data available.
 

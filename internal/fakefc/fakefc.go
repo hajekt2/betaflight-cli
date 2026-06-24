@@ -22,6 +22,7 @@ type FC struct {
 	SaveCloses         bool
 	DataflashUsedBytes uint32
 	DataflashData      []byte
+	CameraKeys         []uint8
 }
 
 func New() *FC {
@@ -342,6 +343,13 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = appendU16(payload, 789)
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetRtc:
+		f.out.Write(response(frame.Code, nil, false))
+	case msp.MSPCameraControl:
+		if len(frame.Payload) != 1 || frame.Payload[0] > 4 {
+			f.out.Write(response(frame.Code, nil, true))
+			break
+		}
+		f.CameraKeys = append(f.CameraKeys, frame.Payload[0])
 		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPAccCalibration, msp.MSPMagCalibration:
 		f.out.Write(response(frame.Code, nil, false))

@@ -995,6 +995,51 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 	}
 }
 
+func TestSchemaCommandContractsMatchCapabilities(t *testing.T) {
+	schemaEnv, err := runTestCommand(t, []string{"schema"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("schema unexpectedly connected")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("schema command error = %v", err)
+	}
+	capabilitiesEnv, err := runTestCommand(t, []string{"capabilities"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("capabilities unexpectedly connected")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("capabilities command error = %v", err)
+	}
+
+	schemaRows := schemaCommandContractRows(t, schemaEnv)
+	capabilityRows := capabilityCommandRows(t, capabilitiesEnv)
+	if len(schemaRows) != len(capabilityRows) {
+		t.Fatalf("schema command rows = %d, capabilities command rows = %d", len(schemaRows), len(capabilityRows))
+	}
+	for command, schemaRow := range schemaRows {
+		capabilityRow, ok := capabilityRows[command]
+		if !ok {
+			t.Fatalf("schema command %q missing from capabilities", command)
+		}
+		for _, field := range []string{"short", "runnable", "requires_connection", "operation", "confirmation", "output_root", "input"} {
+			if schemaRow[field] != capabilityRow[field] {
+				t.Fatalf("%s field %s mismatch: schema=%v capabilities=%v", command, field, schemaRow[field], capabilityRow[field])
+			}
+		}
+		if schemaRow["runnable"] == true && schemaRow["output_root"] == "" {
+			t.Fatalf("%s is runnable without output_root: %+v", command, schemaRow)
+		}
+		operation, _ := schemaRow["operation"].(string)
+		confirmation, _ := schemaRow["confirmation"].(string)
+		if operationNeedsConfirmation(operation) && !strings.Contains(confirmation, "--yes") {
+			t.Fatalf("%s operation %q should advertise --yes confirmation, got %q", command, operation, confirmation)
+		}
+		if operation == "group" && schemaRow["runnable"] == true {
+			t.Fatalf("%s is runnable but classified as group", command)
+		}
+	}
+}
+
 func TestOfflineCommandOutputRootsMatchCapabilities(t *testing.T) {
 	tmp := t.TempDir()
 	image := filepath.Join(tmp, "firmware.bin")
@@ -10130,6 +10175,47 @@ func capabilityOutputRoots(t *testing.T) map[string]string {
 		roots[command["command"].(string)] = root
 	}
 	return roots
+}
+
+func schemaCommandContractRows(t *testing.T, env output.Envelope) map[string]map[string]any {
+	t.Helper()
+	data := env.Data.(map[string]any)
+	schema := data["schema"].(map[string]any)
+	contracts := schema["command_contracts"].(map[string]any)
+	return commandRowsByCommand(t, contracts["commands"].([]any))
+}
+
+func capabilityCommandRows(t *testing.T, env output.Envelope) map[string]map[string]any {
+	t.Helper()
+	data := env.Data.(map[string]any)
+	capabilities := data["capabilities"].(map[string]any)
+	return commandRowsByCommand(t, capabilities["commands"].([]any))
+}
+
+func commandRowsByCommand(t *testing.T, rows []any) map[string]map[string]any {
+	t.Helper()
+	out := map[string]map[string]any{}
+	for _, item := range rows {
+		row := item.(map[string]any)
+		command, ok := row["command"].(string)
+		if !ok || command == "" {
+			t.Fatalf("command row missing command: %+v", row)
+		}
+		if _, exists := out[command]; exists {
+			t.Fatalf("duplicate command row for %q", command)
+		}
+		out[command] = row
+	}
+	return out
+}
+
+func operationNeedsConfirmation(operation string) bool {
+	switch operation {
+	case "write", "write_when_apply_is_set", "plan_or_write", "plan_or_dangerous_execute", "dangerous", "read_only_or_write_or_dangerous":
+		return true
+	default:
+		return false
+	}
 }
 
 func runTestCommand(t *testing.T, args []string, connect connectFunc) (output.Envelope, error) {

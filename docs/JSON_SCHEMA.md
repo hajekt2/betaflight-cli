@@ -62,6 +62,7 @@ Successful entries include `target`, `support`, and `metadata` objects so agents
 - the shared envelope fields and envelope version
 - a draft 2020-12 JSON Schema object in `schema.envelope_json_schema` for validating the top-level response envelope
 - command-contract metadata, including total/runnable/connection-using command counts, operation count map, and operation catalog
+- per-command contract rows under `schema.command_contracts.commands`, matching the command metadata from `capabilities`
 - the canonical output roots exposed by current commands
 - a curated coverage summary with implemented / partial domain counts and next parity gaps.
 

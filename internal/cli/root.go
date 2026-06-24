@@ -143,13 +143,18 @@ func (a *app) withClient(ctx context.Context, command string, op connection.Oper
 	if connect == nil {
 		connect = connection.Connect
 	}
-	client, targetInfo, err := connect(ctx, a.connectionConfig(), op)
+	cfg := a.connectionConfig()
+	client, targetInfo, err := connect(ctx, cfg, op)
 	target := toOutputTarget(targetInfo)
 	if err != nil {
-		return a.render(a.failure(command, &target, err))
+		env := a.failure(command, &target, err)
+		a.addVerboseConnectionDiagnostics(&env, op, cfg, targetInfo, err)
+		return a.render(env)
 	}
 	defer client.Close()
-	return a.render(fn(client, target))
+	env := fn(client, target)
+	a.addVerboseConnectionDiagnostics(&env, op, cfg, targetInfo, nil)
+	return a.render(env)
 }
 
 func (a *app) connectionConfig() connection.Config {
@@ -186,6 +191,69 @@ func (a *app) failure(command string, target *output.Target, err error) output.E
 		return env
 	}
 	return output.Failure(command, target, "error", err.Error())
+}
+
+func (a *app) addVerboseConnectionDiagnostics(env *output.Envelope, op connection.OperationClass, cfg connection.Config, target connection.TargetInfo, err error) {
+	if !a.opts.verbose || env == nil {
+		return
+	}
+	diagnostics := map[string]any{
+		"connection": map[string]any{
+			"operation": operationClassName(op),
+			"config": map[string]any{
+				"port":              cfg.Port,
+				"auto_port":         cfg.AutoPort,
+				"baud":              cfg.Baud,
+				"timeout":           cfg.Timeout.String(),
+				"allow_unsupported": cfg.AllowUnsupported,
+			},
+			"target":  target,
+			"support": probeSupport(target),
+		},
+	}
+	if err != nil {
+		var coded *connection.CodedError
+		if errors.As(err, &coded) {
+			diagnostics["connection"].(map[string]any)["error"] = map[string]any{
+				"code":            coded.Code,
+				"message":         coded.Message,
+				"candidate_count": len(coded.Candidates),
+			}
+		} else {
+			diagnostics["connection"].(map[string]any)["error"] = map[string]any{
+				"code":    "error",
+				"message": err.Error(),
+			}
+		}
+		if ports, listErr := connection.ListPorts(); listErr == nil {
+			diagnostics["port_diagnostics"] = diagnosePorts(ports)
+		}
+	}
+	addEnvelopeDiagnostics(env, diagnostics)
+}
+
+func addEnvelopeDiagnostics(env *output.Envelope, diagnostics map[string]any) {
+	data, ok := env.Data.(map[string]any)
+	if !ok {
+		data = map[string]any{
+			"result": env.Data,
+		}
+		env.Data = data
+	}
+	data["diagnostics"] = diagnostics
+}
+
+func operationClassName(op connection.OperationClass) string {
+	switch op {
+	case connection.ReadOnly:
+		return "read_only"
+	case connection.Write:
+		return "write"
+	case connection.Dangerous:
+		return "dangerous"
+	default:
+		return "unknown"
+	}
 }
 
 func toOutputTarget(target connection.TargetInfo) output.Target {

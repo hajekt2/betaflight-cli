@@ -55,6 +55,8 @@ Errors are returned in the same envelope when JSON output is active.
 Agents should not need to scrape stderr for expected failures.
 When `ok` is `false`, the process exits non-zero.
 Agents should use `errors[].code` to distinguish safe refusals from transport, parse, compatibility, or hardware failures.
+When `--verbose` is set on a command that opens a Flight Controller connection, the command adds `data.diagnostics.connection` with the effective connection config, operation class, target metadata, and firmware support result.
+When a verbose connection attempt fails, the same diagnostics object includes the structured error and best-effort `data.diagnostics.port_diagnostics` from the local serial-port inventory.
 
 `doctor --probe` returns `probe_results` entries for serial-port candidates.
 Successful entries include `target`, `support`, and `metadata` objects so agents can decide whether the detected firmware is inside the compiled metadata support range before running domain commands.

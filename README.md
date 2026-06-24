@@ -147,6 +147,7 @@ When JSON output has `ok: false`, the process should exit non-zero.
 When `--port` is omitted, read-only and write commands may auto-detect and connect to the only Betaflight-compatible serial port that responds.
 If multiple Betaflight-compatible devices answer the handshake, commands fail with a structured candidate list and require explicit `--port`.
 `--auto-port=false` is available if you want explicit selection only.
+`--verbose` enriches connected command JSON with `data.diagnostics.connection`, including effective connection settings, operation class, target metadata, firmware support, and best-effort port diagnostics on connection failures.
 
 Configurator parity should be exposed as focused command families rather than one giant command.
 Expected command families include identity, telemetry, backup, CLI, settings, profiles, presets, ports, receiver, modes, motors, servos, PID, rates, filters, VTX, OSD, GPS, failsafe, Blackbox, firmware maintenance, and diagnostics.

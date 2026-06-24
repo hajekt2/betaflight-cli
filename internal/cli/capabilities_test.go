@@ -83,3 +83,26 @@ func TestCapabilityMetadataOperationSafetyContracts(t *testing.T) {
 		}
 	}
 }
+
+func TestCapabilityMetadataGenericSetCommandsAreWritePlans(t *testing.T) {
+	registry := capabilityMetadataRegistry()
+	for _, path := range []string{
+		"betaflight-cli pid set",
+		"betaflight-cli rates set",
+		"betaflight-cli filters set",
+		"betaflight-cli receiver set",
+		"betaflight-cli vtx set",
+		"betaflight-cli osd set",
+		"betaflight-cli gps set",
+		"betaflight-cli battery set",
+		"betaflight-cli failsafe set",
+	} {
+		meta, ok := registry[path]
+		if !ok {
+			t.Fatalf("missing metadata for %q", path)
+		}
+		if meta.Operation != "plan_or_write" || meta.OutputRoot != "change_plan" || !strings.Contains(meta.Confirmation, "--yes") {
+			t.Fatalf("metadata %q = %+v, want plan_or_write change_plan with --yes confirmation", path, meta)
+		}
+	}
+}

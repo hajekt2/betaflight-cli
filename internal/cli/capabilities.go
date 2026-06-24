@@ -569,6 +569,7 @@ func capabilityMetadataRegistry() map[string]capabilityMetadata {
 		"betaflight-cli configuration apply",
 		"betaflight-cli system status",
 		"betaflight-cli tasks status",
+		"betaflight-cli telemetry",
 		"betaflight-cli telemetry snapshot",
 		"betaflight-cli debug status",
 		"betaflight-cli environment status",

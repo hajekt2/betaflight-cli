@@ -3053,7 +3053,12 @@ func (a *app) saveCommand() *cobra.Command {
 			}
 			return a.withClient(cmd.Context(), commandPath(cmd), connection.Dangerous, func(client *connection.Client, target output.Target) output.Envelope {
 				lines, err := client.ExecCLI(cmd.Context(), "save")
-				env := output.Success(commandPath(cmd), &target, map[string]any{"lines": lines})
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"save": map[string]any{
+						"lines":        lines,
+						"acknowledged": err == nil,
+					},
+				})
 				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
 				if err != nil {
 					addStringWarnings(&env, []string{fmt.Sprintf("save command may have rebooted or disconnected before response completed: %v", err)})

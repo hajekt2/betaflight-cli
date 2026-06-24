@@ -1164,6 +1164,7 @@ func TestDangerousCommandOutputRootsMatchCapabilities(t *testing.T) {
 	}{
 		{command: "betaflight-cli motors test-plan", args: []string{"motors", "test-plan", "--motor", "1", "--value", "1000", "--duration", "1s"}},
 		{command: "betaflight-cli storage erase", args: []string{"storage", "erase", "--yes"}, wantSideEffect: "dataflash_erase"},
+		{command: "betaflight-cli save", args: []string{"save", "--yes"}, wantSideEffect: "save"},
 		{command: "betaflight-cli reboot firmware", args: []string{"reboot", "firmware", "--yes"}, wantSideEffect: "firmware_reboot"},
 		{command: "betaflight-cli reboot msc", args: []string{"reboot", "msc", "--yes"}, wantSideEffect: "msc_reboot"},
 	}

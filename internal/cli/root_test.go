@@ -946,6 +946,28 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 	if contract["runnable_commands"] == nil || contract["requires_connection_commands"] == nil {
 		t.Fatalf("command_contracts missing counts = %+v", contract)
 	}
+	contractCommands := contract["commands"].([]any)
+	if len(contractCommands) == 0 {
+		t.Fatalf("command_contracts.commands = %+v", contractCommands)
+	}
+	contractByCommand := map[string]map[string]any{}
+	for _, item := range contractCommands {
+		row := item.(map[string]any)
+		contractByCommand[row["command"].(string)] = row
+	}
+	for command, outputRoot := range map[string]string{
+		"betaflight-cli info":              "info",
+		"betaflight-cli motors test-apply": "motor_test_plan",
+		"betaflight-cli save":              "save",
+	} {
+		row, ok := contractByCommand[command]
+		if !ok {
+			t.Fatalf("command_contracts.commands missing %q", command)
+		}
+		if row["output_root"] != outputRoot || row["operation"] == "" || row["confirmation"] == "" {
+			t.Fatalf("command_contracts.commands[%s] = %+v", command, row)
+		}
+	}
 	operations := contract["operations"].([]any)
 	if len(operations) < 6 {
 		t.Fatalf("operations = %+v", operations)

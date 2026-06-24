@@ -319,6 +319,7 @@ func (a *app) schemaCommand() *cobra.Command {
 						"operation_counts":             operationCounts,
 						"operations":                   operations,
 						"requires_connection_default":  "when command touches transport",
+						"commands":                     capabilities,
 					},
 					"capabilities": map[string]any{
 						"coverage": map[string]any{

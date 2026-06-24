@@ -3166,10 +3166,32 @@ func (a *app) mspCommand() *cobra.Command {
 	cmd.AddCommand(listCmd)
 
 	cmd.AddCommand(&cobra.Command{
-		Use:   "metadata CODE",
-		Short: "Show compiled metadata for one MSP command",
-		Args:  cobra.ExactArgs(1),
+		Use:   "metadata [CODE]",
+		Short: "Show compiled MSP registry metadata",
+		Args:  cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				commands := msp.ListCommands()
+				directions := map[string]int{}
+				protocols := map[string]int{}
+				sources := map[string]int{}
+				for _, command := range commands {
+					directions[string(command.Direction)]++
+					protocols[strconv.Itoa(int(command.Protocol))]++
+					if command.Source != "" {
+						sources[command.Source]++
+					}
+				}
+				return a.render(output.Success(commandPath(cmd), nil, map[string]any{
+					"msp": map[string]any{
+						"registry_version": msp.GeneratedMSPSourceVersion,
+						"count":            len(commands),
+						"directions":       directions,
+						"protocols":        protocols,
+						"sources":          sources,
+					},
+				}))
+			}
 			code, meta, err := parseMSPCode(args[0])
 			if err != nil {
 				return err

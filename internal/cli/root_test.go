@@ -1057,7 +1057,7 @@ func TestOfflineCommandOutputRootsMatchCapabilities(t *testing.T) {
 		{command: "betaflight-cli capabilities", args: []string{"capabilities"}},
 		{command: "betaflight-cli capabilities coverage", args: []string{"capabilities", "coverage"}},
 		{command: "betaflight-cli msp list", args: []string{"msp", "list", "--name", "MSP_NAME"}},
-		{command: "betaflight-cli msp metadata", args: []string{"msp", "metadata", "MSP_NAME"}},
+		{command: "betaflight-cli msp metadata", args: []string{"msp", "metadata"}},
 		{command: "betaflight-cli batch plan", args: []string{"batch", "plan"}, input: "feature GPS\n"},
 		{command: "betaflight-cli restore plan", args: []string{"restore", "plan"}, input: "feature GPS\n"},
 		{command: "betaflight-cli presets plan", args: []string{"presets", "plan"}, input: "feature GPS\n"},
@@ -1299,7 +1299,7 @@ func TestMSPListDoesNotConnect(t *testing.T) {
 
 func TestMSPMetadataDoesNotConnect(t *testing.T) {
 	called := false
-	env, err := runTestCommand(t, []string{"msp", "metadata", "MSP_NAME"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+	env, err := runTestCommand(t, []string{"msp", "metadata"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -1313,7 +1313,7 @@ func TestMSPMetadataDoesNotConnect(t *testing.T) {
 		t.Fatalf("env.OK = false: %+v", env.Errors)
 	}
 	data := mspResponseData(t, env)
-	if data["code"] == nil || data["code_name"] != "MSP_NAME" {
+	if data["count"] == nil || data["registry_version"] != msp.GeneratedMSPSourceVersion {
 		t.Fatalf("msp metadata payload = %+v", data)
 	}
 }
@@ -4008,6 +4008,32 @@ func TestMSPMetadataByName(t *testing.T) {
 	}
 	if data["direction"] != string(msp.DirectionRead) {
 		t.Fatalf("direction = %+v", data["direction"])
+	}
+}
+
+func TestMSPMetadataSummary(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "metadata"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = %v: %+v", env.OK, env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["registry_version"] != msp.GeneratedMSPSourceVersion || data["count"].(float64) < 100 {
+		t.Fatalf("summary = %+v", data)
+	}
+	directions := data["directions"].(map[string]any)
+	if directions[string(msp.DirectionRead)].(float64) == 0 || directions[string(msp.DirectionWrite)].(float64) == 0 {
+		t.Fatalf("directions = %+v", directions)
+	}
+	protocols := data["protocols"].(map[string]any)
+	if protocols["1"].(float64) == 0 || protocols["2"].(float64) == 0 {
+		t.Fatalf("protocols = %+v", protocols)
+	}
+	sources := data["sources"].(map[string]any)
+	if sources["src/main/msp/msp_protocol.h"].(float64) == 0 {
+		t.Fatalf("sources = %+v", sources)
 	}
 }
 

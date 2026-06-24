@@ -1156,6 +1156,49 @@ func TestConfirmedWriteCommandOutputRootsMatchCapabilities(t *testing.T) {
 	}
 }
 
+func TestDangerousCommandOutputRootsMatchCapabilities(t *testing.T) {
+	cases := []struct {
+		command        string
+		args           []string
+		wantSideEffect string
+	}{
+		{command: "betaflight-cli motors test-plan", args: []string{"motors", "test-plan", "--motor", "1", "--value", "1000", "--duration", "1s"}},
+		{command: "betaflight-cli storage erase", args: []string{"storage", "erase", "--yes"}, wantSideEffect: "dataflash_erase"},
+		{command: "betaflight-cli reboot firmware", args: []string{"reboot", "firmware", "--yes"}, wantSideEffect: "firmware_reboot"},
+		{command: "betaflight-cli reboot msc", args: []string{"reboot", "msc", "--yes"}, wantSideEffect: "msc_reboot"},
+	}
+
+	roots := capabilityOutputRoots(t)
+	for _, tt := range cases {
+		t.Run(tt.command, func(t *testing.T) {
+			want := roots[tt.command]
+			if want == "" {
+				t.Fatalf("missing capability output root for %q", tt.command)
+			}
+			env, err := runTestCommand(t, tt.args, nil)
+			if err != nil {
+				t.Fatalf("command error = %v", err)
+			}
+			if !env.OK {
+				t.Fatalf("env.OK = false: %+v", env.Errors)
+			}
+			data := env.Data.(map[string]any)
+			if _, ok := data[want]; !ok {
+				t.Fatalf("%s data missing advertised output root %q: %+v", tt.command, want, data)
+			}
+			if tt.wantSideEffect == "" {
+				if len(env.SideEffects) != 0 {
+					t.Fatalf("%s side effects = %+v, want none", tt.command, env.SideEffects)
+				}
+				return
+			}
+			if len(env.SideEffects) != 1 || env.SideEffects[0].Type != tt.wantSideEffect {
+				t.Fatalf("%s side effects = %+v, want type %q", tt.command, env.SideEffects, tt.wantSideEffect)
+			}
+		})
+	}
+}
+
 func TestMSPListDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"msp", "list"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

@@ -48,6 +48,7 @@ type options struct {
 	baud             int
 	timeout          time.Duration
 	format           string
+	verbose          bool
 	yes              bool
 }
 
@@ -88,6 +89,7 @@ func (a *app) rootCommand() *cobra.Command {
 	root.PersistentFlags().IntVar(&a.opts.baud, "baud", 115200, "serial baud rate")
 	root.PersistentFlags().DurationVar(&a.opts.timeout, "timeout", 2*time.Second, "serial read timeout")
 	root.PersistentFlags().StringVar(&a.opts.format, "format", "json", "output format: json or text")
+	root.PersistentFlags().BoolVar(&a.opts.verbose, "verbose", false, "enable verbose diagnostics")
 	root.PersistentFlags().BoolVar(&a.opts.yes, "yes", false, "confirm non-interactive write or dangerous action")
 
 	root.AddCommand(a.versionCommand())

@@ -154,6 +154,7 @@ The object includes the introspected Cobra command tree, per-command runnable st
 `msp list` and `msp metadata` return compiled MSP registry details under the `msp` output root.
 `msp metadata` without an argument returns registry summary counts by direction, protocol, and source file.
 `msp metadata CODE` returns the compiled metadata for one MSP command.
+`msp batch CODE...` sends a read-only `MSP_MULTIPLE_MSP` request for generated MSP v1 read commands and returns length-prefixed response payloads in request order.
 `msp request` requires `--yes` for generated write-like commands and for numeric commands without compiled metadata.
 `msp request` returns raw and optionally decoded response details under the `msp` output root.
 When `--decode` is used, `MSP_RSSI_CONFIG` returns a structured `channel` and source object instead of generic payload bytes.

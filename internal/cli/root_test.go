@@ -783,6 +783,10 @@ func TestCapabilitiesDoesNotConnect(t *testing.T) {
 	if mspMetadata["operation"] != "offline" || mspMetadata["requires_connection"] != false || mspMetadata["confirmation"] != "none" || mspMetadata["output_root"] != "msp" || mspMetadata["runnable"] != true {
 		t.Fatalf("msp metadata capability = %+v", mspMetadata)
 	}
+	mspBatch := byCommand["betaflight-cli msp batch"]
+	if mspBatch["operation"] != "read_only" || mspBatch["requires_connection"] != true || mspBatch["confirmation"] != "none" || mspBatch["output_root"] != "msp" || mspBatch["runnable"] != true {
+		t.Fatalf("msp batch capability = %+v", mspBatch)
+	}
 	schema := byCommand["betaflight-cli schema"]
 	if schema["operation"] != "offline" || schema["requires_connection"] != false || schema["confirmation"] != "none" || schema["runnable"] != true {
 		t.Fatalf("schema capability = %+v", schema)
@@ -3501,6 +3505,62 @@ func TestMSPRequestByNameReturnsMetadata(t *testing.T) {
 	}
 	if data["direction_hint"] != "read" {
 		t.Fatalf("direction_hint = %+v", data["direction_hint"])
+	}
+}
+
+func TestMSPBatchReturnsLengthPrefixedResponses(t *testing.T) {
+	env, err := runTestCommand(t, []string{"msp", "batch", "MSP_NAME", "MSP_ATTITUDE", "--decode"}, nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := mspResponseData(t, env)
+	if data["code"].(float64) != float64(msp.MSPMultipleMsp) || data["request_count"].(float64) != 2 || data["response_count"].(float64) != 2 {
+		t.Fatalf("msp batch payload = %+v", data)
+	}
+	if data["truncated"] != false {
+		t.Fatalf("truncated = %+v", data["truncated"])
+	}
+	responses := data["responses"].([]any)
+	name := responses[0].(map[string]any)
+	if name["code_name"] != "MSP_NAME" || name["decoded"] != "Fake FC" || name["decode_supported"] != true {
+		t.Fatalf("name response = %+v", name)
+	}
+	attitude := responses[1].(map[string]any)
+	if attitude["code_name"] != "MSP_ATTITUDE" || attitude["decode_supported"] != true {
+		t.Fatalf("attitude response = %+v", attitude)
+	}
+	decoded := attitude["decoded"].(map[string]any)
+	if decoded["roll_degrees"] != 12.3 || decoded["pitch_degrees"] != -4.5 || decoded["yaw_degrees"] != float64(1800) {
+		t.Fatalf("decoded attitude = %+v", decoded)
+	}
+}
+
+func TestMSPBatchRejectsWriteAndV2Commands(t *testing.T) {
+	cases := [][]string{
+		{"msp", "batch", "MSP_SET_NAME"},
+		{"msp", "batch", "MSP2_GET_TEXT"},
+		{"msp", "batch", "0xFFFF"},
+	}
+	for _, args := range cases {
+		t.Run(strings.Join(args, "_"), func(t *testing.T) {
+			called := false
+			env, err := runTestCommand(t, args, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+				called = true
+				return nil, connection.TargetInfo{}, nil
+			})
+			if err == nil {
+				t.Fatal("command error = nil, want validation failure")
+			}
+			if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "validation_error" {
+				t.Fatalf("unexpected envelope = %+v", env)
+			}
+			if called {
+				t.Fatalf("transport called for invalid batch args")
+			}
+		})
 	}
 }
 

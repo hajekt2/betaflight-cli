@@ -3215,6 +3215,41 @@ func (a *app) mspCommand() *cobra.Command {
 	})
 
 	cmd.AddCommand(&cobra.Command{
+		Use:   "batch CODE...",
+		Short: "Send an MSP_MULTIPLE_MSP read-only batch request",
+		Args:  cobra.MinimumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			requests, payload, err := buildMSPBatchRequest(args)
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				frame, err := client.Request(cmd.Context(), msp.MSPMultipleMsp, payload)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				responses, warnings := parseMSPBatchResponses(requests, frame.Payload, decodePayload)
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"msp": map[string]any{
+						"code":           frame.Code,
+						"code_name":      "MSP_MULTIPLE_MSP",
+						"protocol":       frame.Version,
+						"version":        frame.Version,
+						"direction_hint": string(msp.DirectionRead),
+						"command_source": "src/main/msp/msp_protocol.h",
+						"request_count":  len(requests),
+						"response_count": len(responses),
+						"truncated":      len(responses) < len(requests),
+						"responses":      responses,
+					},
+				})
+				env.Warnings = append(env.Warnings, warnings...)
+				return env
+			})
+		},
+	})
+
+	cmd.AddCommand(&cobra.Command{
 		Use:   "request CODE",
 		Short: "Send a raw MSP request and return raw payload hex",
 		Args:  cobra.ExactArgs(1),
@@ -3289,6 +3324,98 @@ func (a *app) mspCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&payloadHex, "payload-hex", "", "hex payload bytes")
 	cmd.PersistentFlags().BoolVar(&decodePayload, "decode", false, "decode known payloads into structured JSON")
 	return cmd
+}
+
+type mspBatchRequest struct {
+	Code      uint16 `json:"code"`
+	CodeName  string `json:"code_name"`
+	Protocol  uint8  `json:"protocol"`
+	Direction string `json:"direction"`
+	Source    string `json:"source"`
+	Line      int    `json:"line"`
+}
+
+func buildMSPBatchRequest(args []string) ([]mspBatchRequest, []byte, error) {
+	requests := make([]mspBatchRequest, 0, len(args))
+	payload := make([]byte, 0, len(args))
+	for _, arg := range args {
+		code, meta, err := parseMSPCode(arg)
+		if err != nil {
+			return nil, nil, err
+		}
+		if code > 0xff {
+			return nil, nil, fmt.Errorf("%s uses MSP v%d code 0x%x; MSP_MULTIPLE_MSP supports only one-byte MSP v1 codes", meta.Name, meta.Protocol, code)
+		}
+		if meta.Source == "" {
+			return nil, nil, fmt.Errorf("%s has no compiled metadata; use msp request --yes for raw diagnostics", arg)
+		}
+		if meta.Protocol != 1 {
+			return nil, nil, fmt.Errorf("%s uses MSP protocol v%d; MSP_MULTIPLE_MSP supports MSP v1 command codes", meta.Name, meta.Protocol)
+		}
+		if meta.Direction != msp.DirectionRead {
+			return nil, nil, fmt.Errorf("%s is %s; MSP batch accepts generated read-only commands only", meta.Name, meta.Direction)
+		}
+		if code == msp.MSPMultipleMsp {
+			return nil, nil, errors.New("MSP_MULTIPLE_MSP cannot be nested in an MSP batch request")
+		}
+		requests = append(requests, mspBatchRequest{
+			Code:      code,
+			CodeName:  meta.Name,
+			Protocol:  meta.Protocol,
+			Direction: string(meta.Direction),
+			Source:    meta.Source,
+			Line:      meta.Line,
+		})
+		payload = append(payload, byte(code))
+	}
+	return requests, payload, nil
+}
+
+func parseMSPBatchResponses(requests []mspBatchRequest, payload []byte, decode bool) ([]map[string]any, []output.Warning) {
+	responses := make([]map[string]any, 0, len(requests))
+	var warnings []output.Warning
+	offset := 0
+	for i, request := range requests {
+		if offset >= len(payload) {
+			warnings = append(warnings, output.Warning{Code: "batch_response_missing", Message: fmt.Sprintf("missing MSP batch response for %s", request.CodeName)})
+			break
+		}
+		length := int(payload[offset])
+		offset++
+		if offset+length > len(payload) {
+			warnings = append(warnings, output.Warning{Code: "batch_response_truncated", Message: fmt.Sprintf("truncated MSP batch response for %s", request.CodeName)})
+			length = len(payload) - offset
+		}
+		responsePayload := payload[offset : offset+length]
+		offset += length
+		entry := map[string]any{
+			"index":          i,
+			"code":           request.Code,
+			"code_name":      request.CodeName,
+			"protocol":       request.Protocol,
+			"direction_hint": request.Direction,
+			"command_source": request.Source,
+			"command_line":   request.Line,
+			"payload_hex":    hex.EncodeToString(responsePayload),
+			"length":         len(responsePayload),
+		}
+		if decode {
+			decoded, supported, decodeErr := decodeMSPPayload(request.Code, responsePayload)
+			if decodeErr != nil {
+				warnings = append(warnings, output.Warning{Code: "decode_failed", Message: fmt.Sprintf("%s: %s", request.CodeName, decodeErr.Error())})
+			}
+			entry["decode_requested"] = true
+			entry["decode_supported"] = supported
+			if supported {
+				entry["decoded"] = decoded
+			}
+		}
+		responses = append(responses, entry)
+	}
+	if offset < len(payload) {
+		warnings = append(warnings, output.Warning{Code: "batch_extra_bytes", Message: fmt.Sprintf("%d trailing bytes after MSP batch responses", len(payload)-offset)})
+	}
+	return responses, warnings
 }
 
 func parseMSPCode(raw string) (uint16, msp.CommandMeta, error) {

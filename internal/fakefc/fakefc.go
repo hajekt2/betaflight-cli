@@ -751,6 +751,19 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 13))
 	case msp.MSPSetServoMixRule:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 8))
+	case msp.MSPMultipleMsp:
+		var payload []byte
+		unsupported := len(frame.Payload) == 0
+		for _, code := range frame.Payload {
+			part, ok := fakeBatchPayload(uint16(code))
+			if !ok || len(part) > 255 {
+				unsupported = true
+				break
+			}
+			payload = append(payload, byte(len(part)))
+			payload = append(payload, part...)
+		}
+		f.out.Write(response(frame.Code, payload, unsupported))
 	case msp.MSPVTXConfig:
 		payload := []byte{3, 5, 8, 2, 1}
 		payload = appendU16(payload, 5861)
@@ -892,6 +905,28 @@ func response(code uint16, payload []byte, unsupported bool) []byte {
 func appendPString(dst []byte, s string) []byte {
 	dst = append(dst, byte(len(s)))
 	return append(dst, []byte(s)...)
+}
+
+func fakeBatchPayload(code uint16) ([]byte, bool) {
+	switch code {
+	case msp.MSPName:
+		return []byte("Fake FC"), true
+	case msp.MSPAttitude:
+		payload := appendS16(nil, 123)
+		payload = appendS16(payload, -45)
+		payload = appendS16(payload, 1800)
+		return payload, true
+	case msp.MSPBatteryState:
+		payload := []byte{3, 0}
+		payload = appendU16(payload, 161)
+		payload = append(payload, 0, 1)
+		payload = appendU16(payload, 120)
+		payload = appendS16(payload, 345)
+		payload = append(payload, 2, 0, 0, 0, 0, 0, 0)
+		return payload, true
+	default:
+		return nil, false
+	}
 }
 
 func fakeTextPayload(request []byte) ([]byte, bool) {

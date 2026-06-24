@@ -2,6 +2,7 @@
 
 Every non-interactive command emits a versioned JSON Response Envelope by default.
 The envelope is stable for AI agents and scripts.
+Commands advertised with operation `text_output`, such as `help` and shell completion generators, intentionally emit plain text or shell script output and do not advertise a JSON `output_root`.
 
 ## Envelope
 

@@ -1026,10 +1026,10 @@ func TestSchemaCommandContractsMatchCapabilities(t *testing.T) {
 				t.Fatalf("%s field %s mismatch: schema=%v capabilities=%v", command, field, schemaRow[field], capabilityRow[field])
 			}
 		}
-		if schemaRow["runnable"] == true && schemaRow["output_root"] == "" {
+		operation, _ := schemaRow["operation"].(string)
+		if schemaRow["runnable"] == true && schemaRow["output_root"] == "" && operation != "text_output" {
 			t.Fatalf("%s is runnable without output_root: %+v", command, schemaRow)
 		}
-		operation, _ := schemaRow["operation"].(string)
 		confirmation, _ := schemaRow["confirmation"].(string)
 		if operationNeedsConfirmation(operation) && !strings.Contains(confirmation, "--yes") {
 			t.Fatalf("%s operation %q should advertise --yes confirmation, got %q", command, operation, confirmation)

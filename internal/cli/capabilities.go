@@ -250,6 +250,18 @@ func sortedCommands(commands []*cobra.Command) []*cobra.Command {
 }
 
 func inferCapabilityMetadata(path string, runnable bool, meta capabilityMetadata) capabilityMetadata {
+	if strings.HasPrefix(path, "betaflight-cli completion ") && meta.Operation == "" {
+		meta.Operation = "text_output"
+		meta.RequiresConnection = false
+		meta.Confirmation = "none"
+		meta.Tags = []string{"completion", "shell"}
+	}
+	if path == "betaflight-cli help" && meta.Operation == "" {
+		meta.Operation = "text_output"
+		meta.RequiresConnection = false
+		meta.Confirmation = "none"
+		meta.Tags = []string{"help", "text"}
+	}
 	if !runnable && meta.Operation == "" {
 		meta.Operation = "group"
 	}
@@ -259,7 +271,7 @@ func inferCapabilityMetadata(path string, runnable bool, meta capabilityMetadata
 	if meta.Confirmation == "" {
 		meta.Confirmation = "none"
 	}
-	if meta.OutputRoot == "" {
+	if meta.OutputRoot == "" && meta.Operation != "group" && meta.Operation != "text_output" {
 		meta.OutputRoot = defaultOutputRoot(path)
 	}
 	if len(meta.Tags) == 0 {

@@ -13,6 +13,7 @@ func TestCapabilityMetadataUsesKnownOperations(t *testing.T) {
 		"offline_dangerous_plan":          true,
 		"read_only":                       true,
 		"read_only_or_write_or_dangerous": true,
+		"text_output":                     true,
 		"write":                           true,
 		"write_when_apply_is_set":         true,
 		"plan":                            true,

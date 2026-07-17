@@ -322,9 +322,9 @@ func SetBoardAlignment(ctx context.Context, client *connection.Client, alignment
 
 func EncodeBoardAlignment(alignment BoardAlignment) []byte {
 	payload := make([]byte, 0, boardAlignmentConfigLength)
-	payload = append(payload, byte(alignment.RollDegrees), byte(uint16(alignment.RollDegrees)>>8))
-	payload = append(payload, byte(alignment.PitchDegrees), byte(uint16(alignment.PitchDegrees)>>8))
-	payload = append(payload, byte(alignment.YawDegrees), byte(uint16(alignment.YawDegrees)>>8))
+	payload = appendS16Payload(payload, alignment.RollDegrees)
+	payload = appendS16Payload(payload, alignment.PitchDegrees)
+	payload = appendS16Payload(payload, alignment.YawDegrees)
 	return payload
 }
 

@@ -324,8 +324,8 @@ func SetCurrentMeterConfig(ctx context.Context, client *connection.Client, confi
 
 func EncodeCurrentMeterConfig(config CurrentMeterConfig) []byte {
 	payload := []byte{config.ID}
-	payload = append(payload, byte(config.Scale), byte(uint16(config.Scale)>>8))
-	payload = append(payload, byte(config.Offset), byte(uint16(config.Offset)>>8))
+	payload = appendS16Payload(payload, config.Scale)
+	payload = appendS16Payload(payload, config.Offset)
 	return payload
 }
 

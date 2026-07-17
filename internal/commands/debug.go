@@ -107,7 +107,7 @@ func SetAccelerometerTrim(ctx context.Context, client *connection.Client, trim A
 
 func EncodeAccelerometerTrim(trim AccelerometerTrim) []byte {
 	payload := make([]byte, 0, 4)
-	payload = append(payload, byte(trim.Pitch), byte(uint16(trim.Pitch)>>8))
-	payload = append(payload, byte(trim.Roll), byte(uint16(trim.Roll)>>8))
+	payload = appendS16Payload(payload, trim.Pitch)
+	payload = appendS16Payload(payload, trim.Roll)
 	return payload
 }

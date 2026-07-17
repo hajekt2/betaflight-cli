@@ -170,6 +170,9 @@ func (a *app) mspCommand() *cobra.Command {
 			if err != nil {
 				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
 			}
+			if blockedRawMSPCode(code) {
+				return a.render(output.Failure(commandPath(cmd), nil, "dangerous_action_blocked", "raw motor, DShot, and receiver override MSP commands are blocked; use a bounded domain-specific workflow"))
+			}
 			payload, err := hex.DecodeString(strings.TrimPrefix(payloadHex, "0x"))
 			if err != nil {
 				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
@@ -236,6 +239,15 @@ func (a *app) mspCommand() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&payloadHex, "payload-hex", "", "hex payload bytes")
 	cmd.PersistentFlags().BoolVar(&decodePayload, "decode", false, "decode known payloads into structured JSON")
 	return cmd
+}
+
+func blockedRawMSPCode(code uint16) bool {
+	switch code {
+	case msp.MSPSetRawRC, msp.MSPSetMotor, msp.MSP2SendDshotCommand:
+		return true
+	default:
+		return false
+	}
 }
 
 type mspBatchRequest struct {

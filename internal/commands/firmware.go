@@ -147,24 +147,12 @@ func ReadFirmwareStatus(ctx context.Context, client *connection.Client) (*Firmwa
 }
 
 func EvaluateFirmwareSupport(variant, firmwareVersion, apiVersion string) FirmwareSupport {
+	supported, reason := support.EvaluateFirmwareCompatibility(variant, firmwareVersion, apiVersion)
 	result := FirmwareSupport{
 		Policy:               supportedFirmwarePolicy,
 		AllowUnsupportedFlag: "--allow-unsupported",
-	}
-	switch {
-	case variant != "" && variant != "BTFL":
-		result.Reason = "non-Betaflight firmware variant"
-	case apiVersion == "":
-		result.Reason = "missing MSP API version"
-	case !strings.HasPrefix(apiVersion, "1."):
-		result.Reason = "unsupported MSP API major version"
-	case support.IsSupportedFirmwareVersion(firmwareVersion):
-		result.Supported = true
-		result.Reason = "firmware is inside the supported metadata range"
-	case firmwareVersion == "":
-		result.Reason = "missing firmware version"
-	default:
-		result.Reason = "firmware is outside the supported metadata range"
+		Supported:            supported,
+		Reason:               reason,
 	}
 	return result
 }

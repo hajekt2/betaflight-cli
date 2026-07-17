@@ -12,6 +12,7 @@ import (
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/output"
+	"github.com/hajekt2/betaflight-cli/internal/support"
 )
 
 type BuildInfo struct {
@@ -153,8 +154,21 @@ func (a *app) withClient(ctx context.Context, command string, op connection.Oper
 	}
 	defer client.Close()
 	env := fn(client, target)
+	a.addUnsupportedFirmwareWarning(&env, targetInfo)
 	a.addVerboseConnectionDiagnostics(&env, op, cfg, targetInfo, nil)
 	return a.render(env)
+}
+
+func (a *app) addUnsupportedFirmwareWarning(env *output.Envelope, target connection.TargetInfo) {
+	if env == nil || !a.opts.allowUnsupported {
+		return
+	}
+	if supported, reason := support.EvaluateFirmwareCompatibility(target.Variant, target.FirmwareVersion, target.MSPAPIVersion); !supported {
+		env.Warnings = append(env.Warnings, output.Warning{
+			Code:    "unsupported_firmware",
+			Message: reason + "; command ran because --allow-unsupported was provided",
+		})
+	}
 }
 
 func (a *app) connectionConfig() connection.Config {

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/fakefc"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
 func TestBlackboxInspectDoesNotConnect(t *testing.T) {
@@ -378,6 +380,43 @@ func TestStorageEraseUsesDangerousOperation(t *testing.T) {
 	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "dataflash_erase" {
 		t.Fatalf("side effects = %+v", env.SideEffects)
 	}
+}
+
+func TestStorageEraseReportsSideEffectWhenPostflightFails(t *testing.T) {
+	env, err := runTestCommand(t, []string{"storage", "erase", "--yes"}, func(ctx context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		port := &postEraseFailurePort{FC: fakefc.New()}
+		client, clientErr := connection.NewClient(port, time.Second)
+		if clientErr != nil {
+			return nil, connection.TargetInfo{}, clientErr
+		}
+		target, handshakeErr := client.Handshake(ctx)
+		return client, target, handshakeErr
+	})
+	if err == nil || env.OK {
+		t.Fatalf("expected postflight failure: env=%+v err=%v", env, err)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Type != "dataflash_erase" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+	data := env.Data.(map[string]any)
+	plan := data["storage_erase"].(map[string]any)
+	if plan["applied"] != true {
+		t.Fatalf("storage erase plan = %+v", plan)
+	}
+}
+
+type postEraseFailurePort struct {
+	*fakefc.FC
+}
+
+func (p *postEraseFailurePort) Write(data []byte) (int, error) {
+	frame, parseErr := msp.ReadFrame(bytes.NewReader(data))
+	n, err := p.FC.Write(data)
+	if parseErr == nil && frame.Code == msp.MSPDataflashErase && err == nil {
+		p.Unsupported[msp.MSPDataflashSummary] = true
+		p.Unsupported[msp.MSPSdcardSummary] = true
+	}
+	return n, err
 }
 
 func writeTempBlackboxLog(t *testing.T) string {

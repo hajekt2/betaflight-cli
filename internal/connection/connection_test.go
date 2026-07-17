@@ -145,8 +145,29 @@ func TestCheckSupportedRequiresExplicitOverride(t *testing.T) {
 	}
 }
 
+func TestCheckSupportedRejectsNonBetaflightVariant(t *testing.T) {
+	target := TargetInfo{Variant: "INAV", FirmwareVersion: "2025.12.1", MSPAPIVersion: "1.48"}
+	if err := checkSupported(target, false); err == nil {
+		t.Fatal("checkSupported() error = nil, want unsupported firmware")
+	}
+	if err := checkSupported(target, true); err != nil {
+		t.Fatalf("checkSupported(..., allow=true) error = %v", err)
+	}
+}
+
 func TestConnectWriteRequiresPortWhenAutoPortDisabled(t *testing.T) {
 	_, _, err := Connect(context.Background(), Config{AutoPort: false}, Write)
+	if err == nil {
+		t.Fatal("Connect() error = nil, want auto_port_required")
+	}
+	coded, ok := err.(*CodedError)
+	if !ok || coded.Code != "auto_port_required" {
+		t.Fatalf("Connect() error = %T %v, want auto_port_required", err, err)
+	}
+}
+
+func TestConnectReadRequiresPortWhenAutoPortDisabled(t *testing.T) {
+	_, _, err := Connect(context.Background(), Config{AutoPort: false}, ReadOnly)
 	if err == nil {
 		t.Fatal("Connect() error = nil, want auto_port_required")
 	}

@@ -1,6 +1,42 @@
 package msp
 
-import "testing"
+import (
+	"bytes"
+	"testing"
+)
+
+func TestIsLikelyWriteCodeFallsBackForUnknownMSP2Direction(t *testing.T) {
+	for _, code := range []uint16{MSP2CommonSetSerialConfig, MSP2BetaflightBind, MSP2SetMotorOutputReordering, MSP2SendDshotCommand, MSP2SetText, MSP2SetLedStripConfigValues, MSP2SetBatteryProfile} {
+		if !IsLikelyWriteCode(code) {
+			t.Fatalf("IsLikelyWriteCode(%#x) = false, want true", code)
+		}
+	}
+	if IsLikelyWriteCode(MSP2GetText) {
+		t.Fatal("MSP2_GET_TEXT classified as write")
+	}
+}
+
+func TestIsLikelyWriteCodeWithCapturedMSP2Frames(t *testing.T) {
+	frames := []struct {
+		name      string
+		wire      []byte
+		wantWrite bool
+	}{
+		{name: "MSP2_SET_TEXT", wire: []byte{'$', 'X', '<', 0, 0x07, 0x30, 0, 0, 0x25}, wantWrite: true},
+		{name: "MSP2_GET_TEXT", wire: []byte{'$', 'X', '<', 0, 0x06, 0x30, 0, 0, 0x60}, wantWrite: false},
+	}
+	for _, tt := range frames {
+		t.Run(tt.name, func(t *testing.T) {
+			frame, err := ReadFrame(bytes.NewReader(tt.wire))
+			if err != nil {
+				t.Fatalf("ReadFrame() error = %v", err)
+			}
+			if got := IsLikelyWriteCode(frame.Code); got != tt.wantWrite {
+				t.Fatalf("IsLikelyWriteCode(%#x) = %v, want %v", frame.Code, got, tt.wantWrite)
+			}
+		})
+	}
+}
 
 func TestLookupCommandByName(t *testing.T) {
 	meta, ok := LookupCommandByName("msp_name")

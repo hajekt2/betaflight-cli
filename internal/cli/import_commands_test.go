@@ -290,6 +290,36 @@ func TestRestoreApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestRestoreApplyReportsPartialSideEffects(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--yes"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", failingCLIConnector(2))
+	if err == nil || env.OK {
+		t.Fatalf("expected failed partial apply: env=%+v err=%v", env, err)
+	}
+	data := env.Data.(map[string]any)
+	if data["partially_applied"] != true || data["failed_cli_line"] != "set gyro_lpf1_static_hz = 0" {
+		t.Fatalf("partial apply data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "feature GPS" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
+func TestRestoreApplyAllowUnsupportedAddsWarning(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"--allow-unsupported", "restore", "apply", "--yes"}, "feature GPS\n", func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		client, clientErr := connection.NewClient(fakefc.New(), time.Second)
+		if clientErr != nil {
+			return nil, connection.TargetInfo{}, clientErr
+		}
+		return client, connection.TargetInfo{Port: "fake", Variant: "INAV", FirmwareVersion: "2025.12.1", MSPAPIVersion: "1.48"}, nil
+	})
+	if err != nil || !env.OK {
+		t.Fatalf("unexpected result: env=%+v err=%v", env, err)
+	}
+	if len(env.Warnings) == 0 || env.Warnings[len(env.Warnings)-1].Code != "unsupported_firmware" {
+		t.Fatalf("warnings = %+v, want unsupported_firmware", env.Warnings)
+	}
+}
+
 func TestPresetsPlanUsesPresetKind(t *testing.T) {
 	env, err := runTestCommandWithInput(t, []string{"presets", "plan"}, "feature GPS\nset small_angle = 25\n", nil)
 	if err != nil {

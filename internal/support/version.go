@@ -9,6 +9,25 @@ import (
 
 const SupportedFirmwarePolicy = "official Betaflight 2025.12.x and newer"
 
+func EvaluateFirmwareCompatibility(variant, firmwareVersion, apiVersion string) (bool, string) {
+	switch {
+	case variant == "":
+		return false, "missing Betaflight firmware variant"
+	case variant != "BTFL":
+		return false, "non-Betaflight firmware variant"
+	case apiVersion == "":
+		return false, "missing MSP API version"
+	case !strings.HasPrefix(apiVersion, "1."):
+		return false, "unsupported MSP API major version"
+	case firmwareVersion == "":
+		return false, "missing firmware version"
+	case !IsSupportedFirmwareVersion(firmwareVersion):
+		return false, "firmware is outside the supported metadata range"
+	default:
+		return true, "firmware is inside the supported metadata range"
+	}
+}
+
 func IsSupportedFirmwareVersion(version string) bool {
 	parts := strings.Split(version, ".")
 	if len(parts) < 2 {

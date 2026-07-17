@@ -420,6 +420,8 @@ High-risk CLI commands such as `save`, `defaults`, motor operations, reboot, boo
 `cli interactive` should enter Betaflight interactive CLI Mode with `#`.
 `cli exec` should use framed STX and ETX command mode.
 `cli exec` classifies semicolon and newline-separated raw command strings before connecting, so any writable or dangerous segment requires the same confirmation as a single raw command.
+Raw motor and DShot actuation commands are rejected even with `--yes`; use the bounded `motors test-plan` and `motors test-apply` workflow instead.
+Raw MSP motor, DShot, and receiver override commands are rejected for the same reason.
 Motor testing is implemented as bounded `motors test-plan` and `motors test-apply` workflows.
 It uses the strictest safety gate, explicit props-off and battery-awareness confirmations, low defaults, stop-command attempts, and fake Flight Controller tests.
 

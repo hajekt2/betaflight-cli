@@ -1436,6 +1436,21 @@ func TestFeaturesSetJSONApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestFeaturesSetJSONReportsPartialSideEffects(t *testing.T) {
+	input := `{"enable":["gps"],"disable":["airmode"]}`
+	env, err := runTestCommandWithInput(t, []string{"features", "set-json", "-", "--apply", "--yes"}, input, failingCLIConnector(2))
+	if err == nil || env.OK {
+		t.Fatalf("expected failed partial apply: env=%+v err=%v", env, err)
+	}
+	data := env.Data.(map[string]any)
+	if data["partially_applied"] != true || data["failed_cli_line"] != "feature -AIRMODE" {
+		t.Fatalf("partial apply data = %+v", data)
+	}
+	if len(env.SideEffects) != 1 || env.SideEffects[0].Command != "feature GPS" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestReceiverRXFailPlanDoesNotConnect(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"receiver", "rxfail", "2", "s", "1100"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {

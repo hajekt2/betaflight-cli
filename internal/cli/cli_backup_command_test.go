@@ -59,11 +59,12 @@ func TestCLIExecUnknownCommandIsWriteClassified(t *testing.T) {
 
 func TestCLIExecClassifiesCommandSequencesBeforeConnect(t *testing.T) {
 	tests := []struct {
-		name    string
-		command string
+		name     string
+		command  string
+		wantCode string
 	}{
-		{"semicolon", "diff all; save"},
-		{"newline", "get small_angle\nmotor 0 1100"},
+		{"semicolon", "diff all; save", "confirmation_required"},
+		{"newline", "get small_angle\nmotor 0 1100", "dangerous_action_blocked"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,11 +76,29 @@ func TestCLIExecClassifiesCommandSequencesBeforeConnect(t *testing.T) {
 			if err == nil {
 				t.Fatal("command error = nil, want non-zero exit")
 			}
-			if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+			if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != tt.wantCode {
 				t.Fatalf("unexpected envelope: %+v", env)
 			}
 			if called {
 				t.Fatal("cli exec sequence was allowed without --yes")
+			}
+		})
+	}
+}
+
+func TestCLIExecBlocksRawMotorCommandsEvenWithYes(t *testing.T) {
+	for _, command := range []string{"motor 0 1100", "get small_angle; dshotprog 0 1"} {
+		t.Run(command, func(t *testing.T) {
+			called := false
+			env, err := runTestCommand(t, []string{"cli", "exec", command, "--yes"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+				called = true
+				return nil, connection.TargetInfo{}, nil
+			})
+			if err == nil || env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "dangerous_action_blocked" {
+				t.Fatalf("unexpected envelope: %+v, err: %v", env, err)
+			}
+			if called {
+				t.Fatal("blocked raw actuation command attempted transport")
 			}
 		})
 	}

@@ -60,7 +60,7 @@ func (a *app) schemaCommand() *cobra.Command {
 					"description": "connected target metadata when a serial transport was involved",
 				},
 				"data": map[string]any{
-					"type":        "object",
+					"type":        []string{"object", "array", "string", "number", "boolean", "null"},
 					"description": "command-specific payload",
 				},
 				"warnings": map[string]any{
@@ -121,7 +121,7 @@ func (a *app) schemaCommand() *cobra.Command {
 						},
 					},
 					"data": map[string]any{
-						"type": "object",
+						"type": []string{"object", "array", "string", "number", "boolean", "null"},
 					},
 					"warnings": map[string]any{
 						"type": "array",

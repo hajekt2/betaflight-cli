@@ -15,6 +15,9 @@ import (
 func (a *app) cliCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "cli", Short: "Run Betaflight CLI commands"}
 	runCLIRaw := func(cmd *cobra.Command, raw string) error {
+		if blockedRawCLISequence(raw) {
+			return a.render(output.Failure(commandPath(cmd), nil, "dangerous_action_blocked", "raw motor, DShot, and receiver override commands are blocked; use a bounded domain-specific workflow"))
+		}
 		class := classifyCLISequence(raw)
 		if class != cliReadOnly && !a.opts.yes {
 			reason := fmt.Sprintf("%q is classified as writable; pass --yes or use safer domain-specific commands", raw)
@@ -92,6 +95,20 @@ func (a *app) cliCommand() *cobra.Command {
 		},
 	})
 	return cmd
+}
+
+func blockedRawCLISequence(raw string) bool {
+	for _, command := range splitCLISequence(raw) {
+		fields := strings.Fields(strings.ToLower(command))
+		if len(fields) == 0 {
+			continue
+		}
+		switch fields[0] {
+		case "motor", "motors", "dshotprog":
+			return true
+		}
+	}
+	return false
 }
 
 func (a *app) backupCommand() *cobra.Command {

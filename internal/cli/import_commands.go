@@ -246,7 +246,7 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 	if opts.save {
 		op = connection.Dangerous
 	}
-	data := importPlanData(imported, opts, true)
+	data := importPlanData(imported, opts, false)
 	connect := a.connect
 	if connect == nil {
 		connect = connection.Connect
@@ -256,26 +256,39 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 	if err != nil {
 		env := a.failure(commandPath(cmd), &target, err)
 		env.Data = data
+		if opts.source != nil {
+			addPresetFetchSideEffect(&env, *opts.source)
+		}
 		return a.render(env)
 	}
 	defer client.Close()
-
-	responses := map[string][]string{}
-	for _, line := range imported.Plan.CLILines {
-		responseLines, err := client.ExecCLI(cmd.Context(), line)
-		if err != nil {
-			return a.render(a.failure(commandPath(cmd), &target, err))
-		}
-		responses[line] = responseLines
+	renderConnected := func(env output.Envelope) error {
+		a.addUnsupportedFirmwareWarning(&env, targetInfo)
+		return a.render(env)
 	}
+
+	responses, appliedLines, failedLine, err := executeCLIPlan(cmd.Context(), client, imported.Plan.CLILines)
 	data["response_lines"] = responses
+	data["applied_cli_lines"] = appliedLines
+	if err != nil {
+		data["partially_applied"] = len(appliedLines) > 0
+		data["failed_cli_line"] = failedLine
+		refreshChangePlan(data)
+		env := a.failure(commandPath(cmd), &target, err)
+		env.Data = data
+		if opts.source != nil {
+			addPresetFetchSideEffect(&env, *opts.source)
+		}
+		addCLIApplySideEffects(&env, appliedLines)
+		return renderConnected(env)
+	}
+	data["applied"] = true
+	refreshChangePlan(data)
 	env := output.Success(commandPath(cmd), &target, data)
 	if opts.source != nil {
 		addPresetFetchSideEffect(&env, *opts.source)
 	}
-	for _, line := range imported.Plan.CLILines {
-		env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
-	}
+	addCLIApplySideEffects(&env, appliedLines)
 	if opts.save {
 		saveLines, err := client.ExecCLI(cmd.Context(), "save")
 		if err != nil {
@@ -285,7 +298,7 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 		data["save_response_lines"] = saveLines
 		env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
 	}
-	return a.render(env)
+	return renderConnected(env)
 }
 
 func addPresetFetchSideEffect(env *output.Envelope, metadata presetFetchMetadata) {

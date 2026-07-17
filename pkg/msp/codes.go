@@ -65,7 +65,12 @@ func LookupCommandByName(name string) (CommandMeta, bool) {
 
 func IsLikelyWriteCode(code uint16) bool {
 	if command, ok := LookupCommand(code); ok {
-		return command.Direction == DirectionWrite || command.Direction == DirectionBoth
+		switch command.Direction {
+		case DirectionWrite, DirectionBoth:
+			return true
+		case DirectionRead:
+			return false
+		}
 	}
 	if code >= 200 && code <= 252 {
 		return true
@@ -73,7 +78,10 @@ func IsLikelyWriteCode(code uint16) bool {
 	switch code {
 	case 11, 33, 35, 37, 39, 41, 43, 45, 47, 49, 51, 53, 55, 57, 60, 62, 65, 68, 72, 76, 78, 81, 85, 87, 89, 91, 93, 95, 97, 99:
 		return true
-	case 0x100a, 0x3002, 0x3003, 0x3007, 0x3009, 0x300f:
+	// The pinned upstream MSP2 headers do not encode direction metadata.
+	// Keep explicit setters and actuators conservative until generation can infer it.
+	case MSP2CommonSetSerialConfig, MSP2BetaflightBind, MSP2SetMotorOutputReordering,
+		MSP2SendDshotCommand, MSP2SetText, MSP2SetLedStripConfigValues, MSP2SetBatteryProfile:
 		return true
 	default:
 		return false

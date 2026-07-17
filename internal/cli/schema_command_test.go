@@ -38,6 +38,10 @@ func TestSchemaCommandDoesNotConnect(t *testing.T) {
 		t.Fatalf("envelope_json_schema = %+v", envelopeJSONSchema)
 	}
 	properties := envelopeJSONSchema["properties"].(map[string]any)
+	dataTypes := properties["data"].(map[string]any)["type"].([]any)
+	if !containsAnyString(dataTypes, "object") || !containsAnyString(dataTypes, "string") {
+		t.Fatalf("envelope_json_schema data types = %+v", dataTypes)
+	}
 	schemaVersionProperty := properties["schema_version"].(map[string]any)
 	if schemaVersionProperty["const"] != output.SchemaVersion {
 		t.Fatalf("envelope_json_schema schema_version = %+v", schemaVersionProperty)

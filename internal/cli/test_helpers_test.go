@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -53,4 +54,36 @@ func runTestCommandWithInput(t *testing.T, args []string, input string, connect 
 		t.Fatalf("invalid JSON %q: %v", buf.String(), decodeErr)
 	}
 	return env, err
+}
+
+type failNthCLIWritePort struct {
+	connection.Port
+	failAt    int
+	cliWrites int
+}
+
+func (p *failNthCLIWritePort) Write(data []byte) (int, error) {
+	if len(data) > 0 && data[0] == 0x02 {
+		p.cliWrites++
+		if p.cliWrites == p.failAt {
+			return 0, errors.New("injected CLI transport failure")
+		}
+	}
+	return p.Port.Write(data)
+}
+
+func failingCLIConnector(failAt int) connectFunc {
+	return func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		port := &failNthCLIWritePort{Port: fakefc.New(), failAt: failAt}
+		client, err := connection.NewClient(port, time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	}
 }

@@ -6,11 +6,6 @@ on:
       - main
   pull_request:
   workflow_dispatch:
-    inputs:
-      betaflight_src:
-        description: "Optional checked-out Betaflight source path for metadata verification"
-        required: false
-        type: string
 
 permissions:
   contents: read
@@ -31,6 +26,16 @@ jobs:
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
+
+      - name: Check out Betaflight metadata source
+        uses: actions/checkout@v4
+        with:
+          repository: betaflight/betaflight
+          ref: "2025.12.0"
+          path: upstream-betaflight
+
+      - name: Verify generated metadata
+        run: make verify-metadata BETAFLIGHT_SRC="$GITHUB_WORKSPACE/upstream-betaflight"
 
       - name: Verify formatting
         run: |
@@ -64,20 +69,3 @@ jobs:
           name: betaflight-cli-dist
           path: dist/
           if-no-files-found: error
-
-  verify-metadata:
-    name: Verify Generated Metadata
-    runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.betaflight_src != '' }}
-    steps:
-      - name: Check out
-        uses: actions/checkout@v4
-
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Verify metadata
-        run: make verify-metadata BETAFLIGHT_SRC="${{ inputs.betaflight_src }}"

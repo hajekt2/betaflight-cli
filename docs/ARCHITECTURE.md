@@ -271,6 +271,8 @@ Raw MSP writes are dangerous when they bypass reviewed domain workflows.
 Those commands should require `--yes` plus command-specific confirmation text or an interactive prompt.
 Raw CLI commands are also dangerous when they bypass reviewed workflows.
 `cli exec` should intercept high-risk commands such as `save`, `defaults`, motor operations, reboot, bootloader, and erase.
+Unbounded raw motor, DShot, and receiver override commands must be rejected before transport, including when `--yes` is present.
+Actuation must use a bounded domain workflow with command-specific safety evidence.
 Reviewed reboot commands use `MSP_REBOOT`, require `--yes`, use the dangerous operation class, and report reboot or USB-mode changes in `side_effects`.
 `cli interactive` can allow unrestricted input because the user intentionally entered an interactive terminal session.
 Read-only CLI-backed diagnostics such as `tasks status`, `system status`, and `resources status` should preserve raw text and report firmware diagnostic side effects such as statistic counters being reset.

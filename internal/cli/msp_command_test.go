@@ -69,6 +69,38 @@ func TestMSPRequestUnknownCodeWithYesUsesDangerousOperation(t *testing.T) {
 	}
 }
 
+func TestMSPRequestBlocksRawActuationEvenWithYes(t *testing.T) {
+	for _, code := range []string{"MSP_SET_RAW_RC", "MSP_SET_MOTOR", "MSP2_SEND_DSHOT_COMMAND"} {
+		t.Run(code, func(t *testing.T) {
+			called := false
+			env, err := runTestCommand(t, []string{"msp", "request", code, "--yes"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+				called = true
+				return nil, connection.TargetInfo{}, nil
+			})
+			if err == nil || env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "dangerous_action_blocked" {
+				t.Fatalf("unexpected envelope: %+v, err: %v", env, err)
+			}
+			if called {
+				t.Fatal("blocked raw MSP actuation attempted transport")
+			}
+		})
+	}
+}
+
+func TestMSP2SetterWithUnknownDirectionRequiresYes(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"msp", "request", "MSP2_SET_TEXT"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil || env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v, err: %v", env, err)
+	}
+	if called {
+		t.Fatal("MSP2 setter attempted transport without --yes")
+	}
+}
+
 func TestMSPRequestInvalidCodeReturnsValidationError(t *testing.T) {
 	// invalid code that cannot be resolved must fail before attempting transport
 	called := false

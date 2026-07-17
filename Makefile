@@ -10,16 +10,24 @@ RELEASE_ARTIFACTS := \
 	$(BINARY)-windows-arm64.exe
 
 BETAFLIGHT_VERSION ?= 2025.12.0
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+DATE ?= $(shell git show -s --format=%cI HEAD 2>/dev/null || echo unknown)
+BUILD_LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
+HOST_GOOS := $(shell $(GO) env GOOS)
+HOST_GOARCH := $(shell $(GO) env GOARCH)
+HOST_EXE := $(if $(filter windows,$(HOST_GOOS)),.exe,)
+HOST_ARTIFACT := $(BINDIR)/$(BINARY)-$(HOST_GOOS)-$(HOST_GOARCH)$(HOST_EXE)
 
 .PHONY: all
 all: build
 
 .PHONY: build
 build:
-	$(GO) build -o $(BINARY) ./cmd/betaflight-cli
+	$(GO) build -ldflags="$(BUILD_LDFLAGS)" -o $(BINARY) ./cmd/betaflight-cli
 
 .PHONY: build-release
-build-release: clean-dist build-static checksums verify-release-artifacts
+build-release: clean-dist build-static verify-release-metadata checksums verify-release-artifacts
 
 .PHONY: clean-dist
 clean-dist:
@@ -28,12 +36,37 @@ clean-dist:
 .PHONY: build-static
 build-static:
 	mkdir -p $(BINDIR)
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-linux-amd64 ./cmd/$(BINARY)
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-linux-arm64 ./cmd/$(BINARY)
-	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-amd64 ./cmd/$(BINARY)
-	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-darwin-arm64 ./cmd/$(BINARY)
-	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-amd64.exe ./cmd/$(BINARY)
-	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GO) build -trimpath -ldflags="-s -w" -o $(BINDIR)/$(BINARY)-windows-arm64.exe ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO) build -trimpath -ldflags="$(BUILD_LDFLAGS)" -o $(BINDIR)/$(BINARY)-linux-amd64 ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 $(GO) build -trimpath -ldflags="$(BUILD_LDFLAGS)" -o $(BINDIR)/$(BINARY)-linux-arm64 ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 $(GO) build -trimpath -ldflags="$(BUILD_LDFLAGS)" -o $(BINDIR)/$(BINARY)-darwin-amd64 ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 $(GO) build -trimpath -ldflags="$(BUILD_LDFLAGS)" -o $(BINDIR)/$(BINARY)-darwin-arm64 ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=windows GOARCH=amd64 $(GO) build -trimpath -ldflags="$(BUILD_LDFLAGS)" -o $(BINDIR)/$(BINARY)-windows-amd64.exe ./cmd/$(BINARY)
+	CGO_ENABLED=0 GOOS=windows GOARCH=arm64 $(GO) build -trimpath -ldflags="$(BUILD_LDFLAGS)" -o $(BINDIR)/$(BINARY)-windows-arm64.exe ./cmd/$(BINARY)
+
+.PHONY: verify-release-metadata
+verify-release-metadata:
+	@set -eu; \
+	if [ -z "$(VERSION)" ] || [ -z "$(COMMIT)" ] || [ -z "$(DATE)" ]; then \
+		echo "error: VERSION, COMMIT, and DATE must all be non-empty"; \
+		exit 1; \
+	fi; \
+	case "$(VERSION) $(COMMIT) $(DATE)" in \
+		*dev*|*unknown*) echo "error: release metadata contains placeholder values"; exit 1 ;; \
+	esac; \
+	if [ ! -x "$(HOST_ARTIFACT)" ]; then \
+		echo "error: host release artifact is missing or not executable: $(HOST_ARTIFACT)"; \
+		exit 1; \
+	fi; \
+	OUTPUT=$$("$(HOST_ARTIFACT)" version); \
+	printf '%s\n' "$$OUTPUT" | grep -F '"version": "$(VERSION)"' >/dev/null || { echo "error: host artifact version metadata does not match $(VERSION)"; exit 1; }; \
+	printf '%s\n' "$$OUTPUT" | grep -F '"commit": "$(COMMIT)"' >/dev/null || { echo "error: host artifact commit metadata does not match $(COMMIT)"; exit 1; }; \
+	printf '%s\n' "$$OUTPUT" | grep -F '"date": "$(DATE)"' >/dev/null || { echo "error: host artifact date metadata does not match $(DATE)"; exit 1; }; \
+	for artifact in $(RELEASE_ARTIFACTS); do \
+		for value in "$(VERSION)" "$(COMMIT)" "$(DATE)"; do \
+			strings -a "$(BINDIR)/$$artifact" | grep -F "$$value" >/dev/null || { echo "error: $$artifact is missing release metadata value $$value"; exit 1; }; \
+		done; \
+	done; \
+	echo "verified release metadata in all release artifacts"
 
 .PHONY: checksums
 checksums:

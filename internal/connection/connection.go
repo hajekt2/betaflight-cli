@@ -123,10 +123,10 @@ func Connect(ctx context.Context, cfg Config, op OperationClass) (*Client, Targe
 		}
 		return client, target, nil
 	}
-	if op != ReadOnly && !cfg.AutoPort {
+	if !cfg.AutoPort {
 		return nil, TargetInfo{}, &CodedError{
 			Code:    "auto_port_required",
-			Message: "writes require explicit --port or explicit --auto-port",
+			Message: "port is required when auto-port is disabled",
 		}
 	}
 	client, target, err := autoDetect(ctx, cfg)
@@ -141,16 +141,14 @@ func Connect(ctx context.Context, cfg Config, op OperationClass) (*Client, Targe
 }
 
 func checkSupported(target TargetInfo, allow bool) error {
-	if target.MSPAPIVersion == "" {
-		return &CodedError{Code: "unsupported_firmware", Message: "missing MSP API version"}
-	}
+	supported, reason := support.EvaluateFirmwareCompatibility(target.Variant, target.FirmwareVersion, target.MSPAPIVersion)
 	if allow {
 		return nil
 	}
-	if !isSupportedFirmwareVersion(target.FirmwareVersion) {
+	if !supported {
 		return &CodedError{
 			Code:    "unsupported_firmware",
-			Message: fmt.Sprintf("firmware %q is outside the supported metadata set; pass --allow-unsupported to continue", target.FirmwareVersion),
+			Message: fmt.Sprintf("%s; pass --allow-unsupported to continue", reason),
 		}
 	}
 	return nil

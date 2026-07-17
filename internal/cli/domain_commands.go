@@ -1246,20 +1246,20 @@ func (a *app) planOrApplyCLIWithOperation(cmd *cobra.Command, lines []string, ki
 		op = connection.Dangerous
 	}
 	return a.withClient(cmd.Context(), commandPath(cmd), op, func(client *connection.Client, target output.Target) output.Envelope {
-		responses := map[string][]string{}
-		for _, line := range lines {
-			responseLines, err := client.ExecCLI(cmd.Context(), line)
-			if err != nil {
-				return a.failure(commandPath(cmd), &target, err)
-			}
-			responses[line] = responseLines
+		responses, appliedLines, failedLine, err := executeCLIPlan(cmd.Context(), client, lines)
+		plan["response_lines"] = responses
+		plan["applied_cli_lines"] = appliedLines
+		if err != nil {
+			plan["partially_applied"] = len(appliedLines) > 0
+			plan["failed_cli_line"] = failedLine
+			env := a.failure(commandPath(cmd), &target, err)
+			env.Data = withChangePlanRoot(plan)
+			addCLIApplySideEffects(&env, appliedLines)
+			return env
 		}
 		plan["applied"] = true
-		plan["response_lines"] = responses
 		env := output.Success(commandPath(cmd), &target, withChangePlanRoot(plan))
-		for _, line := range lines {
-			env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "cli_command", Command: line, Detail: "configuration change applied but not saved"})
-		}
+		addCLIApplySideEffects(&env, appliedLines)
 		if flags.save {
 			saveLines, err := client.ExecCLI(cmd.Context(), "save")
 			if err != nil {

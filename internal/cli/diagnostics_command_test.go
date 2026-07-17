@@ -186,6 +186,22 @@ func TestAllowUnsupportedFlagIsForwarded(t *testing.T) {
 	}
 }
 
+func TestAllowUnsupportedAddsTopLevelWarning(t *testing.T) {
+	env, err := runTestCommand(t, []string{"--allow-unsupported", "features", "status"}, func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		client, clientErr := connection.NewClient(fakefc.New(), time.Second)
+		if clientErr != nil {
+			return nil, connection.TargetInfo{}, clientErr
+		}
+		return client, connection.TargetInfo{Port: "fake", Variant: "INAV", FirmwareVersion: "2025.12.1", MSPAPIVersion: "1.48"}, nil
+	})
+	if err != nil || !env.OK {
+		t.Fatalf("unexpected result: env=%+v err=%v", env, err)
+	}
+	if len(env.Warnings) == 0 || env.Warnings[len(env.Warnings)-1].Code != "unsupported_firmware" {
+		t.Fatalf("warnings = %+v, want unsupported_firmware", env.Warnings)
+	}
+}
+
 func TestUnsupportedFirmwareFailureIncludesTarget(t *testing.T) {
 	unsupportedTarget := connection.TargetInfo{
 		Port:            "fake",

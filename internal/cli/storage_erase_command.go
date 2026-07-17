@@ -63,7 +63,14 @@ func (a *app) storageEraseCommand() *cobra.Command {
 				}
 				after, postWarnings, err := readStorageEraseSnapshot(cmd.Context(), client)
 				if err != nil {
-					return a.failure(commandPath(cmd), &target, fmt.Errorf("storage post-erase status unavailable: %w", err))
+					plan.Applied = true
+					plan.Warnings = append(plan.Warnings, "dataflash erase succeeded but post-erase status could not be captured")
+					plan.Audit = buildStorageEraseAudit(plan)
+					env := a.failure(commandPath(cmd), &target, fmt.Errorf("storage post-erase status unavailable: %w", err))
+					env.Data = map[string]any{"storage_erase": plan, "erase_result": result}
+					env.SideEffects = append(env.SideEffects, storageEraseSideEffect(plan.Command))
+					addStringWarnings(&env, plan.Warnings)
+					return env
 				}
 				plan.After = after
 				plan.Warnings = append(plan.Warnings, postWarnings...)
@@ -73,16 +80,16 @@ func (a *app) storageEraseCommand() *cobra.Command {
 					"storage_erase": plan,
 					"erase_result":  result,
 				})
-				env.SideEffects = append(env.SideEffects, output.SideEffect{
-					Type:    "dataflash_erase",
-					Command: plan.Command,
-					Detail:  "dataflash erase request sent",
-				})
+				env.SideEffects = append(env.SideEffects, storageEraseSideEffect(plan.Command))
 				addStringWarnings(&env, plan.Warnings)
 				return env
 			})
 		},
 	}
+}
+
+func storageEraseSideEffect(command string) output.SideEffect {
+	return output.SideEffect{Type: "dataflash_erase", Command: command, Detail: "dataflash erase request sent"}
 }
 
 func readStorageEraseSnapshot(ctx context.Context, client *connection.Client) (*storageEraseSnapshot, []string, error) {

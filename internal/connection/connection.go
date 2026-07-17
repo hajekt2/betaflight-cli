@@ -208,14 +208,15 @@ func autoDetect(ctx context.Context, cfg Config) (*Client, TargetInfo, error) {
 }
 
 func classifyPort(name string) (bool, string) {
+	return classifyPortForOS(name, runtime.GOOS)
+}
+
+func classifyPortForOS(name, goos string) (bool, string) {
 	lower := strings.ToLower(name)
 	if strings.Contains(lower, "bluetooth") || strings.Contains(lower, "debug-console") {
 		return false, "ignored non-USB or debug port"
 	}
-	if strings.Contains(lower, "usb") {
-		return true, "USB serial candidate"
-	}
-	switch runtime.GOOS {
+	switch goos {
 	case "darwin":
 		if !strings.Contains(lower, "/dev/cu.") {
 			return false, "macOS incoming tty device; prefer /dev/cu.* for USB serial"
@@ -224,6 +225,9 @@ func classifyPort(name string) (bool, string) {
 			return true, "macOS USB serial candidate"
 		}
 	case "linux":
+		if strings.Contains(lower, "/dev/cu.") {
+			return false, "macOS serial path on Linux"
+		}
 		if strings.Contains(lower, "ttyacm") || strings.Contains(lower, "ttyusb") {
 			return true, "Linux USB serial candidate"
 		}
@@ -231,6 +235,12 @@ func classifyPort(name string) (bool, string) {
 		if strings.HasPrefix(strings.ToUpper(name), "COM") {
 			return true, "Windows COM port candidate"
 		}
+		if strings.HasPrefix(lower, "/dev/") {
+			return false, "Unix serial path on Windows"
+		}
+	}
+	if strings.Contains(lower, "usb") {
+		return true, "USB serial candidate"
 	}
 	return false, "not a typical Betaflight USB serial port"
 }

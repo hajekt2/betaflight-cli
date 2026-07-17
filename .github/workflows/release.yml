@@ -1,0 +1,108 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  GO_VERSION: "1.26.x"
+  BETAFLIGHT_VERSION: "2025.12.0"
+
+jobs:
+  release:
+    name: Publish release
+    if: github.repository == 'hajekt2/betaflight-cli'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Check out Betaflight metadata source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: betaflight/betaflight
+          ref: ${{ env.BETAFLIGHT_VERSION }}
+          path: upstream-betaflight
+
+      - name: Validate release tag
+        shell: bash
+        run: |
+          ./scripts/validate-version.sh "$GITHUB_REF_NAME"
+          if [ "$(git rev-list -n 1 "$GITHUB_REF_NAME")" != "$GITHUB_SHA" ]; then
+            echo "release tag does not resolve to the workflow commit" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "release tag commit is not reachable from origin/main" >&2
+            exit 1
+          fi
+
+      - name: Verify source
+        run: |
+          make test
+          make vet
+          make audit
+          make verify-metadata BETAFLIGHT_SRC="$GITHUB_WORKSPACE/upstream-betaflight"
+          test -z "$(git status --short --untracked-files=no)"
+
+      - name: Build release archives
+        shell: bash
+        run: |
+          release_date=$(git show -s --format=%cI "$GITHUB_SHA")
+          make release VERSION="$GITHUB_REF_NAME" COMMIT="$GITHUB_SHA" DATE="$release_date"
+
+      - name: Attest release archives
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        with:
+          subject-path: |
+            dist/release/*.tar.gz
+            dist/release/*.zip
+            dist/release/SHA256SUMS
+            dist/release/go-modules.txt
+
+      - name: Create draft GitHub release with all assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          release_flags=(--draft --fail-on-no-commits)
+          if [[ "$GITHUB_REF_NAME" == *-* ]]; then
+            release_flags+=(--prerelease --latest=false)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            dist/release/*.tar.gz \
+            dist/release/*.zip \
+            dist/release/SHA256SUMS \
+            dist/release/go-modules.txt \
+            --verify-tag \
+            --generate-notes \
+            --title "betaflight-cli $GITHUB_REF_NAME" \
+            "${release_flags[@]}"
+
+      - name: Publish immutable-ready GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release edit "$GITHUB_REF_NAME" --draft=false

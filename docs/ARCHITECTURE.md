@@ -315,7 +315,8 @@ CI should build Windows, macOS, Linux, amd64, and arm64 release targets early.
 
 Release artifacts should include SHA256 checksums from day one.
 Build metadata should include version, commit, date, supported Betaflight metadata versions, and schema version.
-Signing and provenance should be added after the initial release process is reliable.
+GitHub releases should publish provenance attestations for versioned archives.
+Platform-native Apple Developer ID and Windows Authenticode signing remain separate follow-up work because they require protected signing identities.
 Builds should use the latest stable Go release.
 
 ## Privacy

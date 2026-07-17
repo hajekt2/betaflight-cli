@@ -1,5 +1,9 @@
 # betaflight-cli
 
+[![CI](https://github.com/hajekt2/betaflight-cli/actions/workflows/ci.yml/badge.svg)](https://github.com/hajekt2/betaflight-cli/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/hajekt2/betaflight-cli)](https://github.com/hajekt2/betaflight-cli/releases)
+[![License: GPL-3.0-or-later](https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg)](LICENSE)
+
 `betaflight-cli` is a fast, native, multiplatform command-line tool for Betaflight flight controllers.
 It is designed for AI agents first and for humans second, without making the human workflow painful.
 
@@ -12,6 +16,8 @@ The default build target compiles `./cmd/betaflight-cli` into the `betaflight-cl
 
 ## Status
 
+The first public release line starts at `v0.1.0`.
+The `0.x` series is usable but may make documented breaking changes between minor releases while the command and machine-facing contracts settle.
 This repository now has a broad executable CLI surface for non-graphical Betaflight Configurator parity.
 Implemented functionality includes machine-readable capability discovery, USB port diagnostics, MSP handshake, identity and firmware support reporting, telemetry snapshots with Euler and quaternion attitude, runtime status, framed CLI exec, backup/diff/restore workflows, generated settings metadata, typed domain commands, Blackbox storage workflows, safety-gated apply/save paths, firmware maintenance, and raw MSP diagnostics.
 The repository also has generated MSP command metadata and generated Betaflight `2025.12.0` setting metadata compiled into the binary.
@@ -27,6 +33,50 @@ Raw MSP requests for generated write-like commands and numeric commands without 
 The first implementation targets USB serial connections to already-running Betaflight firmware.
 Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of scope.
 
+This is an independent open source project and is not an official Betaflight project.
+
+## Install
+
+Download the archive for your operating system and architecture from [GitHub Releases](https://github.com/hajekt2/betaflight-cli/releases).
+Release archives are available for Linux, macOS, and Windows on amd64 and arm64.
+Each archive includes the executable, project license, third-party notices and license texts, and the exact Go module inventory.
+
+Verify the downloaded archive against `SHA256SUMS` before extracting it.
+Release assets also have GitHub build-provenance attestations that can be verified with:
+
+```sh
+gh attestation verify betaflight-cli_0.1.0_linux_amd64.tar.gz --repo hajekt2/betaflight-cli
+```
+
+Go users can install directly from source after the first public tag is available:
+
+```sh
+go install github.com/hajekt2/betaflight-cli/cmd/betaflight-cli@v0.1.0
+```
+
+The initial release artifacts are not Apple Developer ID or Windows Authenticode signed.
+GitHub provenance verifies their source and build workflow, but it does not replace platform code signing.
+
+## Quick Start
+
+Inspect the binary and discover commands without connecting to hardware:
+
+```sh
+betaflight-cli version
+betaflight-cli capabilities
+betaflight-cli schema
+betaflight-cli ports list
+```
+
+Run a read-only target diagnostic with an explicit port:
+
+```sh
+betaflight-cli doctor --probe --port /dev/tty.usbmodem01
+```
+
+JSON is the default for non-interactive commands.
+Use `--format text` only when a human-readable or raw-text artifact is required.
+
 ## Design Principles
 
 - JSON is the default output for every non-interactive command, including `cli exec`.
@@ -39,7 +89,7 @@ Bluetooth, TCP, UDP, browser bridges, and other non-USB transports are out of sc
 - Large command and setting registries should be generated where practical.
 - MSP framing, serial connection management, high-level commands, safety checks, and output formatting are separate concerns.
 
-## Proposed Command Surface
+## Command Examples
 
 ```sh
 betaflight-cli ports list
@@ -137,8 +187,7 @@ printf 'feature GPS\nset small_angle = 25\n' | betaflight-cli batch apply --port
 betaflight-cli save --port /dev/tty.usbmodem01 --yes
 ```
 
-The exact command names are still open for review.
-The important contract is that every non-interactive command can emit stable JSON.
+Every non-interactive command can emit versioned JSON.
 Raw CLI text should require `--format text` or interactive mode.
 JSON output should use a versioned response envelope from the first release.
 The envelope schema is documented in [docs/JSON_SCHEMA.md](docs/JSON_SCHEMA.md).
@@ -345,7 +394,7 @@ The project uses Go and Cobra and produces a single native binary for each targe
 
 For AI-agent-first usage, JSON is always the default output format unless `--format text` is explicitly selected.
 
-## Proposed Project Structure
+## Project Structure
 
 ```text
 cmd/betaflight-cli/      Cobra entrypoint and command wiring.
@@ -428,9 +477,8 @@ It uses the strictest safety gate, explicit props-off and battery-awareness conf
 ## Development
 
 The implementation target is the latest stable Go release.
-The CLI will use Cobra.
-CI runs formatting, unit and command-contract tests, and the release artifact matrix verification.
-The optional generated-metadata verification workflow can be dispatched when a checked-out Betaflight source path is available.
+The CLI uses Cobra.
+CI runs formatting, unit and command-contract tests, vulnerability checks, generated-metadata verification, native smoke tests on Linux, macOS, and Windows, and the six-target release build.
 Serial transport should use `go.bug.st/serial`.
 Initial transport support is USB serial only.
 Windows COM ports, macOS `/dev/tty.*`, Linux `/dev/ttyACM*`, Linux `/dev/ttyUSB*`, and ARM64 builds are first-class targets from day one.
@@ -442,7 +490,9 @@ The hardware test target requires the `hardware` build tag internally and perfor
 Release artifacts should include SHA256 checksums from day one.
 Use `make build-release` to create static release binaries in `dist/` and write `dist/SHA256SUMS`.
 The release target also runs `make verify-release-artifacts` to confirm the expected six-platform matrix and checksum manifest are present.
-Signing and provenance should be planned soon after the initial release process is working.
+Use `make release VERSION=v0.1.0` to create versioned archives with license materials and a separate checksum manifest under `dist/release/`.
+Tag-driven GitHub releases include build-provenance attestations.
+Apple Developer ID and Windows Authenticode signing are not yet configured.
 The CLI should not collect telemetry or analytics.
 Diagnostics should be explicit user-controlled command output.
 Backups should be faithful by default.
@@ -476,3 +526,22 @@ When you need local overrides you can pass an explicit source path:
 ```sh
 make update-metadata BETAFLIGHT_SRC=/path/to/betaflight
 ```
+
+## Contributing and Support
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+Use [SUPPORT.md](SUPPORT.md) for supported environments and diagnostic guidance.
+Report vulnerabilities privately according to [SECURITY.md](SECURITY.md).
+
+## Versioning and Releases
+
+The project follows the policy in [docs/VERSIONING.md](docs/VERSIONING.md).
+Maintainer release steps are documented in [docs/RELEASING.md](docs/RELEASING.md).
+Published release tags and assets are immutable and must never be replaced.
+
+## License
+
+Copyright 2026 Tomas Hajek and contributors.
+
+This project is licensed under [GPL-3.0-or-later](LICENSE).
+Generated metadata is derived from GPL-3.0-or-later Betaflight source files, and release archives include applicable third-party notices and license texts.

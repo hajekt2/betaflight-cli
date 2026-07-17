@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/hajekt2/betaflight-cli/security/advisories/new
+    about: Report vulnerabilities privately.
+  - name: Support policy
+    url: https://github.com/hajekt2/betaflight-cli/blob/main/SUPPORT.md
+    about: Check supported firmware, platforms, and diagnostic guidance.

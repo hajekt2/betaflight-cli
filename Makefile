@@ -10,14 +10,24 @@ RELEASE_ARTIFACTS := \
 	$(BINARY)-windows-arm64.exe
 
 BETAFLIGHT_VERSION ?= 2025.12.0
+VULNCHECK_VERSION ?= v1.6.0
+ACTIONLINT_VERSION ?= v1.7.12
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
+COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || echo unknown)
 DATE ?= $(shell git show -s --format=%cI HEAD 2>/dev/null || echo unknown)
 BUILD_LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 HOST_GOOS := $(shell $(GO) env GOOS)
 HOST_GOARCH := $(shell $(GO) env GOARCH)
 HOST_EXE := $(if $(filter windows,$(HOST_GOOS)),.exe,)
 HOST_ARTIFACT := $(BINDIR)/$(BINARY)-$(HOST_GOOS)-$(HOST_GOARCH)$(HOST_EXE)
+RELEASE_VERSION := $(patsubst v%,%,$(VERSION))
+RELEASE_PACKAGES := \
+	$(BINARY)_$(RELEASE_VERSION)_linux_amd64.tar.gz \
+	$(BINARY)_$(RELEASE_VERSION)_linux_arm64.tar.gz \
+	$(BINARY)_$(RELEASE_VERSION)_darwin_amd64.tar.gz \
+	$(BINARY)_$(RELEASE_VERSION)_darwin_arm64.tar.gz \
+	$(BINARY)_$(RELEASE_VERSION)_windows_amd64.zip \
+	$(BINARY)_$(RELEASE_VERSION)_windows_arm64.zip
 
 .PHONY: all
 all: build
@@ -28,6 +38,12 @@ build:
 
 .PHONY: build-release
 build-release: clean-dist build-static verify-release-metadata checksums verify-release-artifacts
+
+.PHONY: release
+release: clean-dist build-static verify-release-metadata checksums verify-release-artifacts package-release verify-release-packages
+
+.PHONY: release-check
+release-check: test test-release-scripts vet audit lint-workflows verify-metadata release
 
 .PHONY: clean-dist
 clean-dist:
@@ -53,6 +69,10 @@ verify-release-metadata:
 	case "$(VERSION) $(COMMIT) $(DATE)" in \
 		*dev*|*unknown*) echo "error: release metadata contains placeholder values"; exit 1 ;; \
 	esac; \
+	if ! printf '%s\n' "$(COMMIT)" | grep -Eq '^[0-9a-f]{40}$$'; then \
+		echo "error: COMMIT must be a full 40-character Git SHA"; \
+		exit 1; \
+	fi; \
 	if [ ! -x "$(HOST_ARTIFACT)" ]; then \
 		echo "error: host release artifact is missing or not executable: $(HOST_ARTIFACT)"; \
 		exit 1; \
@@ -67,6 +87,32 @@ verify-release-metadata:
 		done; \
 	done; \
 	echo "verified release metadata in all release artifacts"
+
+.PHONY: package-release
+package-release:
+	GO="$(GO)" DIST_DIR="$(BINDIR)" VERSION="$(VERSION)" ./scripts/package-release.sh
+
+.PHONY: verify-release-packages
+verify-release-packages:
+	@set -eu; \
+	for package in $(RELEASE_PACKAGES); do \
+		if [ ! -f "$(BINDIR)/release/$$package" ]; then \
+			echo "error: missing release package $(BINDIR)/release/$$package"; \
+			exit 1; \
+		fi; \
+	done; \
+	if [ ! -s "$(BINDIR)/release/go-modules.txt" ] || [ ! -f "$(BINDIR)/release/SHA256SUMS" ]; then \
+		echo "error: release dependency inventory or checksums are missing"; \
+		exit 1; \
+	fi; \
+	expected_count=$$(printf '%s\n' $(RELEASE_PACKAGES) go-modules.txt | wc -l | tr -d ' '); \
+	actual_count=$$(wc -l < "$(BINDIR)/release/SHA256SUMS" | tr -d ' '); \
+	if [ "$$actual_count" != "$$expected_count" ]; then \
+		echo "error: release SHA256SUMS has $$actual_count entries, expected $$expected_count"; \
+		exit 1; \
+	fi; \
+	(cd "$(BINDIR)/release" && if command -v sha256sum >/dev/null 2>&1; then sha256sum -c SHA256SUMS; else shasum -a 256 -c SHA256SUMS; fi); \
+	echo "verified $(BINDIR)/release packages"
 
 .PHONY: checksums
 checksums:
@@ -132,6 +178,22 @@ verify-release-artifacts:
 .PHONY: test
 test:
 	$(GO) test ./...
+
+.PHONY: test-release-scripts
+test-release-scripts:
+	./scripts/test-release-scripts.sh
+
+.PHONY: vet
+vet:
+	$(GO) vet ./...
+
+.PHONY: audit
+audit:
+	$(GO) run golang.org/x/vuln/cmd/govulncheck@$(VULNCHECK_VERSION) ./...
+
+.PHONY: lint-workflows
+lint-workflows:
+	$(GO) run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION)
 
 .PHONY: test-hardware-readonly
 test-hardware-readonly:

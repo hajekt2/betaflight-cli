@@ -54,4 +54,7 @@ func TestWriteMSPRegistry(t *testing.T) {
 	if !strings.Contains(got, "Direction: DirectionRead") {
 		t.Fatalf("generated registry missing direction:\n%s", got)
 	}
+	if !strings.Contains(got, "Betaflight 2025.12.0 under GPL-3.0-or-later") {
+		t.Fatalf("generated registry missing upstream attribution:\n%s", got)
+	}
 }

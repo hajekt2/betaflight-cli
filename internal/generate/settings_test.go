@@ -114,4 +114,7 @@ func TestWriteSettingsRegistry(t *testing.T) {
 	if !strings.Contains(got, `Name: "small_angle"`) || !strings.Contains(got, "Min: int64Ptr(0)") {
 		t.Fatalf("generated settings missing metadata:\n%s", got)
 	}
+	if !strings.Contains(got, "Betaflight 2025.12.0 under GPL-3.0-or-later") {
+		t.Fatalf("generated settings missing upstream attribution:\n%s", got)
+	}
 }

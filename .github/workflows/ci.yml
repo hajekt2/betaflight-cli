@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: "1.25.x"
+  GO_VERSION: "1.26.x"
 
 jobs:
   test:
@@ -19,16 +19,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Check out Betaflight metadata source
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: betaflight/betaflight
           ref: "2025.12.0"
@@ -42,30 +42,72 @@ jobs:
           test -z "$(git ls-files '*.go' | xargs gofmt -l)"
 
       - name: Test
-        run: make test
+        run: make test test-release-scripts
+
+      - name: Vet
+        run: make vet
+
+      - name: Check known vulnerabilities
+        run: make audit
+
+      - name: Lint GitHub Actions workflows
+        run: make lint-workflows
 
       - name: Check diff whitespace
         run: git diff --check
+
+  platform-smoke:
+    name: Platform smoke tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build and run offline commands
+        shell: bash
+        run: |
+          go build ./cmd/betaflight-cli
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            ./betaflight-cli.exe version
+            ./betaflight-cli.exe schema > /dev/null
+          else
+            ./betaflight-cli version
+            ./betaflight-cli schema > /dev/null
+          fi
 
   release-build:
     name: Release Build
     runs-on: ubuntu-latest
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
       - name: Build and verify release artifacts
-        run: make build-release
+        run: make release VERSION=v0.0.0-ci
 
       - name: Upload release artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: betaflight-cli-dist
           path: dist/
           if-no-files-found: error
+          retention-days: 7

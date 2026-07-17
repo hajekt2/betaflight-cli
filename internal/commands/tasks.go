@@ -99,12 +99,12 @@ func looksLikeTaskRow(line string) bool {
 	if len(line) < 4 {
 		return false
 	}
-	_, err := strconv.Atoi(line[:2])
+	_, err := strconv.ParseUint(line[:2], 10, 8)
 	return err == nil && strings.Contains(line, " - (")
 }
 
 func parseTaskRow(line string) (TaskRow, bool) {
-	id, err := strconv.Atoi(line[:2])
+	id, err := strconv.ParseUint(line[:2], 10, 8)
 	if err != nil {
 		return TaskRow{}, false
 	}

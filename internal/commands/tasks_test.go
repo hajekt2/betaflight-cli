@@ -49,3 +49,9 @@ func TestParseTaskStatusWithoutStatistics(t *testing.T) {
 		t.Fatalf("unexpected max execution = %+v", status.Tasks[0])
 	}
 }
+
+func TestParseTaskRowRejectsNegativeID(t *testing.T) {
+	if _, ok := parseTaskRow("-1 - (         SYSTEM)    1000"); ok {
+		t.Fatal("parseTaskRow() accepted a negative task ID")
+	}
+}

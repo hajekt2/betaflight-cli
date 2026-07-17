@@ -519,15 +519,16 @@ func (a *app) receiverRSSIChannelCommand() *cobra.Command {
 		Short: "Set RSSI channel through MSP_SET_RSSI_CONFIG",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			channel, err := strconv.Atoi(args[0])
-			if err != nil || channel < 0 || channel > 18 {
+			channelValue, err := strconv.ParseUint(args[0], 10, 8)
+			if err != nil || channelValue > 18 {
 				return validationFailureMessage(a, cmd, "channel must be an integer in [0..18]")
 			}
+			channel := uint8(channelValue)
 			if !a.opts.yes {
 				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "RSSI channel changes receiver configuration; pass --yes"))
 			}
 			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
-				result, err := bfcommands.SetRSSIChannel(cmd.Context(), client, uint8(channel))
+				result, err := bfcommands.SetRSSIChannel(cmd.Context(), client, channel)
 				if err != nil {
 					return a.failure(commandPath(cmd), &target, err)
 				}

@@ -51,6 +51,18 @@ func TestLookupCommandByName(t *testing.T) {
 	}
 }
 
+func TestForwardCommandsRecordExactUpstreamSource(t *testing.T) {
+	for _, code := range []uint16{MSPAttitudeQuaternion, MSP2BatteryProfile, MSP2SetBatteryProfile, MSP2CLISetting, MSP2CLISettingInfo} {
+		meta, ok := LookupCommand(code)
+		if !ok {
+			t.Fatalf("LookupCommand(%#x) missing", code)
+		}
+		if meta.SourceVersion != ForwardMSPSourceVersion {
+			t.Fatalf("LookupCommand(%#x).SourceVersion = %q, want %q", code, meta.SourceVersion, ForwardMSPSourceVersion)
+		}
+	}
+}
+
 func TestListCommandsSortedByCode(t *testing.T) {
 	commands := ListCommands()
 	if len(commands) == 0 {

@@ -17,12 +17,13 @@ const (
 )
 
 type CommandMeta struct {
-	Name      string           `json:"name"`
-	Code      uint16           `json:"code"`
-	Protocol  uint8            `json:"protocol"`
-	Direction CommandDirection `json:"direction"`
-	Source    string           `json:"source"`
-	Line      int              `json:"line"`
+	Name          string           `json:"name"`
+	Code          uint16           `json:"code"`
+	Protocol      uint8            `json:"protocol"`
+	Direction     CommandDirection `json:"direction"`
+	SourceVersion string           `json:"source_version"`
+	Source        string           `json:"source"`
+	Line          int              `json:"line"`
 }
 
 var commandRegistry = map[uint16]CommandMeta{}

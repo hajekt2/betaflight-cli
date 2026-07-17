@@ -20,7 +20,8 @@ The first public release line starts at `v0.1.0`.
 The `0.x` series is usable but may make documented breaking changes between minor releases while the command and machine-facing contracts settle.
 This repository now has a broad executable CLI surface for non-graphical Betaflight Configurator parity.
 Implemented functionality includes machine-readable capability discovery, USB port diagnostics, MSP handshake, identity and firmware support reporting, telemetry snapshots with Euler and quaternion attitude, runtime status, framed CLI exec, backup/diff/restore workflows, generated settings metadata, typed domain commands, Blackbox storage workflows, safety-gated apply/save paths, firmware maintenance, and raw MSP diagnostics.
-The repository also has generated MSP command metadata and generated Betaflight `2025.12.0` setting metadata compiled into the binary.
+The repository also has generated MSP command metadata and generated Betaflight `2025.12.5` setting metadata compiled into the binary.
+Five optional forward-compatible MSP commands are tracked separately from the exact Betaflight `2026.6.0-rc2` source tag and report unsupported status on older firmware.
 `capabilities coverage` is the authoritative local parity map for the current binary and should remain green as new Betaflight releases change MSP messages, settings, or workflows.
 
 The product target is full non-graphical Betaflight Configurator parity.
@@ -510,7 +511,7 @@ Optional external metadata updates can be added later, but runtime network acces
 For the current generated registry refresh, run:
 
 ```sh
-export BETAFLIGHT_VERSION=2025.12.0
+export BETAFLIGHT_VERSION=2025.12.5
 export BETAFLIGHT_SRC="$(opensrc path betaflight/betaflight@${BETAFLIGHT_VERSION})"
 go generate ./pkg/msp
 ```

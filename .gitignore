@@ -1,5 +1,4 @@
 .tools/
-betaflight-cli
+/betaflight-cli
 dist/
 coverage.out
-

@@ -20,11 +20,12 @@ func WriteMSPRegistry(commands []MSPCommand, sourceVersion string) ([]byte, erro
 	b.WriteString("func init() {\n")
 	b.WriteString("\tRegisterCommands([]CommandMeta{\n")
 	for _, command := range commands {
-		fmt.Fprintf(&b, "\t\t{Name: %q, Code: %s, Protocol: %d, Direction: Direction%s, Source: %q, Line: %d},\n",
+		fmt.Fprintf(&b, "\t\t{Name: %q, Code: %s, Protocol: %d, Direction: Direction%s, SourceVersion: %q, Source: %q, Line: %d},\n",
 			command.Name,
 			goConstName(command.Name),
 			command.Protocol,
 			directionConst(command.Direction),
+			sourceVersion,
 			command.Source,
 			command.Line,
 		)

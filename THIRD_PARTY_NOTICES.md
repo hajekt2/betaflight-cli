@@ -1,10 +1,8 @@
 # Third-Party Notices
 
-`betaflight-cli` includes generated protocol and setting metadata derived from the official Betaflight 2025.12.5 source release.
-It also includes five optional forward-compatible MSP command codes derived from the official Betaflight 2026.6.0-rc2 source prerelease.
+`betaflight-cli` includes generated protocol and setting metadata derived from the official Betaflight 2026.6.1 source release.
 The relevant Betaflight source files are licensed under GPL version 3 or, at the recipient's option, any later version.
-See [betaflight/betaflight](https://github.com/betaflight/betaflight/tree/2025.12.5) for the corresponding upstream source.
-See [betaflight/betaflight 2026.6.0-rc2](https://github.com/betaflight/betaflight/tree/2026.6.0-rc2) for the forward-compatible MSP command source.
+See [betaflight/betaflight](https://github.com/betaflight/betaflight/tree/2026.6.1) for the corresponding upstream source.
 The corresponding source for each `betaflight-cli` binary release is available from the source archive for the same GitHub release tag.
 
 The compiled binary also includes the following Go modules:

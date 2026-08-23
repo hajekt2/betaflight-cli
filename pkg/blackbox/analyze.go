@@ -85,10 +85,9 @@ type MotorStats struct {
 }
 
 type MotorBalanceAnalysis struct {
-	Motors              []MotorStats `json:"motors"`
-	MaxSpreadPercent    *float64     `json:"max_spread_percent,omitempty"`
-	OutlierMotorIndex   *int         `json:"outlier_motor_index,omitempty"`
-	OutlierSpreadPerent *float64     `json:"-"`
+	Motors            []MotorStats `json:"motors"`
+	MaxSpreadPercent  *float64     `json:"max_spread_percent,omitempty"`
+	OutlierMotorIndex *int         `json:"outlier_motor_index,omitempty"`
 }
 
 // Analyze decodes a Blackbox log and computes offline flight-performance metrics.
@@ -125,16 +124,22 @@ func Analyze(r io.Reader, opts AnalysisOptions) (Analysis, error) {
 
 	gyroAxes, setpointAxes, motorAxes := splitAxes(series)
 
-	out.GyroNoise, err = analyzeGyroNoise(gyroAxes, out.Meta.AxisRateHz, opts)
+	gyroNoise, gyroCaveat, err := analyzeGyroNoise(gyroAxes, out.Meta.AxisRateHz, opts)
 	if err != nil {
 		return Analysis{}, err
 	}
-	if out.GyroNoise == nil {
+	out.GyroNoise = gyroNoise
+	if gyroCaveat != "" {
+		out.Caveats = append(out.Caveats, gyroCaveat)
+	} else if out.GyroNoise == nil {
 		out.Caveats = append(out.Caveats, "gyro streams absent or too short for spectral analysis; gyro noise skipped")
 	}
-	out.StepResponse = analyzeStepResponse(setpointAxes, gyroAxes, opts)
+	step, stepCaveat := analyzeStepResponse(setpointAxes, gyroAxes, out.Meta.AxisRateHz, opts)
+	out.StepResponse = step
 	if out.StepResponse == nil {
 		out.Caveats = append(out.Caveats, fmt.Sprintf("setpoint/gyro streams absent or fewer than %d detectable step edges; step response skipped", minStepEdgeCount(opts)))
+	} else if stepCaveat != "" {
+		out.Caveats = append(out.Caveats, stepCaveat)
 	}
 	out.MotorBalance = analyzeMotorBalance(motorAxes, opts)
 	if out.MotorBalance == nil {
@@ -145,7 +150,7 @@ func Analyze(r io.Reader, opts AnalysisOptions) (Analysis, error) {
 }
 
 // decodeAllMainFrames walks every frame in the log body and collects per-field
-// value series from I/P frames without any sample cap.
+// value series from I/P frames, stopping after maxSamples frames when positive.
 func decodeAllMainFrames(data []byte, headers map[string]string, definitions map[string]FieldDefinition, maxSamples int) (map[string][]float64, int, []string) {
 	series := map[string][]float64{}
 	ctx := newDecodeContext(headers, definitions)
@@ -165,7 +170,7 @@ func decodeAllMainFrames(data []byte, headers map[string]string, definitions map
 			continue
 		}
 		if maxSamples > 0 && sampleCount >= maxSamples {
-			warnings = append(warnings, fmt.Sprintf("analysis stopped at --max-samples limit of %d frames", maxSamples))
+			warnings = append(warnings, fmt.Sprintf("analysis covers only the first %d main frames (MaxSamples cap); remaining frames ignored", maxSamples))
 			break
 		}
 		payload, ok := candidatePayload(data, candidate)
@@ -199,19 +204,47 @@ func decodeAllMainFrames(data []byte, headers map[string]string, definitions map
 
 func buildMeta(series map[string][]float64, sampleCount int, headers map[string]string) AnalysisMeta {
 	meta := AnalysisMeta{SampleCount: sampleCount}
-	rate := loopFrequency(headers)
 	timeSeries := firstPresent(series, "time", "Time")
+	rate := axisFrameRate(timeSeries, headers)
 	if len(timeSeries) >= 2 {
 		durationUs := timeSeries[len(timeSeries)-1] - timeSeries[0]
 		meta.DurationS = durationUs / 1e6
-		if rate <= 0 && durationUs > 0 {
-			rate = float64(len(timeSeries)-1) / (durationUs / 1e6)
-		}
 	} else if rate > 0 {
 		meta.DurationS = float64(sampleCount) / rate
 	}
 	meta.AxisRateHz = rate
 	return meta
+}
+
+// axisFrameRate derives the per-axis sampling rate in Hz. A decoded time
+// stream with at least two monotonic samples wins: the median of consecutive
+// deltas reflects the actual logged frame cadence even when it is decimated
+// relative to the loop rate. Otherwise fall back to the looptime header,
+// scaled by the blackbox P-interval logging decimation when present.
+func axisFrameRate(timeSeries []float64, headers map[string]string) float64 {
+	if len(timeSeries) >= 2 {
+		deltas := make([]float64, 0, len(timeSeries)-1)
+		monotonic := true
+		for i := 1; i < len(timeSeries); i++ {
+			delta := timeSeries[i] - timeSeries[i-1]
+			if delta <= 0 {
+				monotonic = false
+				break
+			}
+			deltas = append(deltas, delta)
+		}
+		if monotonic && len(deltas) > 0 {
+			return 1e6 / medianFloat(deltas)
+		}
+	}
+	rate := loopFrequency(headers)
+	if rate <= 0 {
+		return 0
+	}
+	if factor := pIntervalFactor(headers); factor > 0 {
+		rate *= factor
+	}
+	return rate
 }
 
 func loopFrequency(headers map[string]string) float64 {
@@ -224,6 +257,49 @@ func loopFrequency(headers map[string]string) float64 {
 		return 0
 	}
 	return 1e6 / loopUs
+}
+
+// pIntervalFactor parses the blackbox logging decimation header into a
+// multiplier applied to the loop rate. Betaflight writes 'P interval:num/denom'
+// meaning every denom-th loop iteration (times num) produces one logged frame;
+// a bare integer N means every Nth frame. Returns 0 when no usable header exists.
+func pIntervalFactor(headers map[string]string) float64 {
+	if raw := strings.TrimSpace(headers["P interval"]); raw != "" {
+		if numStr, denomStr, ok := strings.Cut(raw, "/"); ok {
+			num, err1 := strconv.ParseFloat(strings.TrimSpace(numStr), 64)
+			denom, err2 := strconv.ParseFloat(strings.TrimSpace(denomStr), 64)
+			if err1 == nil && err2 == nil && num > 0 && denom > 0 {
+				return num / denom
+			}
+			return 0
+		}
+		if n, err := strconv.ParseFloat(raw, 64); err == nil && n > 0 {
+			return 1 / n
+		}
+		return 0
+	}
+	var num, denom = 1.0, 1.0
+	sawAny := false
+	if raw := strings.TrimSpace(headers["P num"]); raw != "" {
+		sawAny = true
+		v, err := strconv.ParseFloat(raw, 64)
+		if err != nil || v <= 0 {
+			return 0
+		}
+		num = v
+	}
+	if raw := strings.TrimSpace(headers["P denom"]); raw != "" {
+		sawAny = true
+		v, err := strconv.ParseFloat(raw, 64)
+		if err != nil || v <= 0 {
+			return 0
+		}
+		denom = v
+	}
+	if !sawAny {
+		return 0
+	}
+	return num / denom
 }
 
 func firstPresent(series map[string][]float64, names ...string) []float64 {
@@ -332,8 +408,9 @@ func fftRadix2(re, im []float64) {
 
 // welchPSD estimates the power spectral density of x sampled at fs Hz using a
 // Hann-windowed Welch average with 50% segment overlap. It returns the averaged
-// periodogram (one value per bin, bin width fs/segmentSize) and the number of
-// averaged segments.
+// periodogram (one value per bin, bin width fs/effectiveSegment) and the
+// effective FFT size actually used, which falls back to prevPowerOfTwo(len(x))
+// when the requested segment is too small or longer than x.
 func welchPSD(x []float64, fs float64, segmentSize int) ([]float64, int) {
 	n := segmentSize
 	if n < minWelchSegment || len(x) < n {
@@ -378,7 +455,7 @@ func welchPSD(x []float64, fs float64, segmentSize int) ([]float64, int) {
 	for k := range psd {
 		psd[k] *= scale
 	}
-	return psd, segments
+	return psd, n
 }
 
 func hannWindow(n int) []float64 {
@@ -405,8 +482,8 @@ func prevPowerOfTwo(n int) int {
 }
 
 // dominantSpectralPeak returns the frequency and power of the strongest
-// non-DC bin.
-func dominantSpectralPeak(psd []float64, fs float64, segmentSize int) (freqHz, power float64) {
+// non-DC bin. effectiveSegSize must be the FFT size welchPSD actually used.
+func dominantSpectralPeak(psd []float64, fs float64, effectiveSegSize int) (freqHz, power float64) {
 	bestBin := -1
 	bestPower := 0.0
 	half := len(psd) / 2 // bins above N/2 are the conjugate mirror
@@ -419,14 +496,17 @@ func dominantSpectralPeak(psd []float64, fs float64, segmentSize int) (freqHz, p
 	if bestBin < 0 {
 		return 0, 0
 	}
-	binWidth := fs / float64(segmentSize)
+	binWidth := fs / float64(effectiveSegSize)
 	return float64(bestBin) * binWidth, bestPower
 }
 
-// spectralBands sums PSD energy into fixed bands: <100, 100-300, 300-600, >600 Hz.
-func spectralBands(psd []float64, fs float64, segmentSize int) SpectralBands {
+// spectralBands sums Welch PSD power into fixed bands: <100, 100-300, 300-600,
+// >600 Hz. The PSD is a power density (unit-amplitude sine at bin center yields
+// ~A^2/2 peak density), so each bin contributes density x binWidth to report
+// approximate band power; DC and the conjugate mirror above N/2 are excluded.
+func spectralBands(psd []float64, fs float64, effectiveSegSize int) SpectralBands {
 	var bands SpectralBands
-	binWidth := fs / float64(segmentSize)
+	binWidth := fs / float64(effectiveSegSize)
 	for k, power := range psd {
 		if k == 0 || k > len(psd)/2 {
 			continue // exclude DC and the conjugate mirror above N/2
@@ -434,52 +514,52 @@ func spectralBands(psd []float64, fs float64, segmentSize int) SpectralBands {
 		freq := float64(k) * binWidth
 		switch {
 		case freq < 100:
-			bands.Below100Hz += power
+			bands.Below100Hz += power * binWidth
 		case freq < 300:
-			bands.Hz100To300 += power
+			bands.Hz100To300 += power * binWidth
 		case freq < 600:
-			bands.Hz300To600 += power
+			bands.Hz300To600 += power * binWidth
 		default:
-			bands.Above600Hz += power
+			bands.Above600Hz += power * binWidth
 		}
 	}
 	return bands
 }
 
-func analyzeGyroNoise(gyros map[int]axisSeries, rateHz float64, opts AnalysisOptions) (*GyroNoiseAnalysis, error) {
+func analyzeGyroNoise(gyros map[int]axisSeries, rateHz float64, opts AnalysisOptions) (*GyroNoiseAnalysis, string, error) {
 	if len(gyros) == 0 {
-		return nil, nil
+		return nil, "", nil
 	}
 	if rateHz <= 0 {
-		return nil, fmt.Errorf("cannot compute spectral metrics: neither looptime header nor usable time stream present")
+		return nil, "unknown axis rate: neither looptime header nor usable time stream present; gyro noise skipped", nil
 	}
 	segment := opts.SegmentSize
 	if segment <= 0 {
 		segment = defaultWelchSegment
 	}
 	if segment&(segment-1) != 0 {
-		return nil, fmt.Errorf("segment size %d is not a power of two", segment)
+		return nil, "", fmt.Errorf("segment size %d is not a power of two", segment)
 	}
 	analysis := &GyroNoiseAnalysis{PerAxis: map[string]GyroNoiseAxis{}}
 	indices := sortedAxisIndices(gyros)
 	for _, idx := range indices {
 		axis := gyros[idx]
-		psd, segments := welchPSD(axis.values, rateHz, segment)
-		if segments == 0 {
+		psd, effSeg := welchPSD(axis.values, rateHz, segment)
+		if len(psd) == 0 {
 			continue
 		}
-		peakHz, peakPower := dominantSpectralPeak(psd, rateHz, segment)
+		peakHz, peakPower := dominantSpectralPeak(psd, rateHz, effSeg)
 		analysis.PerAxis[axis.field] = GyroNoiseAxis{
 			Samples:        len(axis.values),
 			DominantPeakHz: peakHz,
 			PeakPower:      peakPower,
-			Bands:          spectralBands(psd, rateHz, segment),
+			Bands:          spectralBands(psd, rateHz, effSeg),
 		}
 	}
 	if len(analysis.PerAxis) == 0 {
-		return nil, nil
+		return nil, "", nil
 	}
-	return analysis, nil
+	return analysis, "", nil
 }
 
 func sortedAxisIndices(axes map[int]axisSeries) []int {
@@ -513,10 +593,7 @@ func findStepEdges(setpoint []float64, deltaFraction float64) []stepEdge {
 			maxAbs = math.Abs(v)
 		}
 	}
-	threshold := defaultStepDeltaFrac * maxAbs
-	if deltaFraction > 0 {
-		threshold = deltaFraction * maxAbs
-	}
+	threshold := deltaFraction * maxAbs
 	if threshold <= 0 {
 		return nil
 	}
@@ -536,10 +613,12 @@ func findStepEdges(setpoint []float64, deltaFraction float64) []stepEdge {
 	return edges
 }
 
-// analyzeSingleStep measures overshoot% and settle time of the gyro response
-// following one setpoint edge. Returns ok=false when the response does not
-// settle inside the observation window.
-func analyzeSingleStep(gyro []float64, edge stepEdge) (overshootPercent, settleMs float64, ok bool) {
+// analyzeSingleStep measures overshoot% of the gyro response following one
+// setpoint edge. The settle value is the sample index (relative to the edge)
+// at which the response first enters and stays inside a +/-10% band; callers
+// convert it to milliseconds using the axis frame rate. Returns ok=false when
+// the response does not settle inside the observation window.
+func analyzeSingleStep(gyro []float64, edge stepEdge) (overshootPercent, settleSamples float64, ok bool) {
 	preStart := edge.sampleIndex - 16
 	if preStart < 0 {
 		preStart = 0
@@ -606,56 +685,72 @@ func analyzeSingleStep(gyro []float64, edge stepEdge) (overshootPercent, settleM
 	if settleIdx < 0 {
 		return overshoot, 0, false
 	}
-	// Assume 1 kHz sampling for ms conversion when no absolute clock is available;
-	// callers rescale using the meta rate where known.
+	// settleIdx is a sample offset from the edge; analyzeStepResponse converts
+	// it to milliseconds using the axis frame rate.
 	return overshoot, float64(settleIdx), true
 }
 
-func analyzeStepResponse(setpoints, gyros map[int]axisSeries, opts AnalysisOptions) *StepResponseAnalysis {
+// analyzeStepResponse correlates gyro responses with setpoint edges and
+// reports per-axis and overall medians. Settle times are converted from
+// samples to milliseconds using rateHz (ms = samples / rate * 1000). When
+// rateHz is unknown, settle fields stay nil and a caveat is returned so the
+// caller can explain that settle times are unavailable in physical units.
+func analyzeStepResponse(setpoints, gyros map[int]axisSeries, rateHz float64, opts AnalysisOptions) (*StepResponseAnalysis, string) {
 	if len(setpoints) == 0 || len(gyros) == 0 {
-		return nil
+		return nil, ""
 	}
 	minEdges := minStepEdgeCount(opts)
 	analysis := &StepResponseAnalysis{PerAxis: map[string]StepResponseAxis{}}
-	var allOvershoots, allSettles []float64
+	var allOvershoots, allSettlesMs []float64
 	totalEdges := 0
 	for _, idx := range sortedAxisIndices(setpoints) {
-		sp, hasGyro := gyros[idx]
+		gyroSeries, hasGyro := gyros[idx]
 		if !hasGyro {
 			continue
 		}
 		setpointSeries := setpoints[idx].values
 		edges := findStepEdges(setpointSeries, opts.StepDeltaFraction)
 		totalEdges += len(edges)
-		var overshoots, settles []float64
+		var overshoots, settlesMs []float64
 		for _, edge := range edges {
-			overshoot, settleSamples, ok := analyzeSingleStep(sp.values, edge)
+			overshoot, settleSamples, ok := analyzeSingleStep(gyroSeries.values, edge)
 			if !ok {
 				continue
 			}
 			overshoots = append(overshoots, overshoot)
-			settles = append(settles, settleSamples)
 			allOvershoots = append(allOvershoots, overshoot)
-			allSettles = append(allSettles, settleSamples)
+			if rateHz > 0 {
+				settleMs := settleSamples / rateHz * 1000
+				settlesMs = append(settlesMs, settleMs)
+				allSettlesMs = append(allSettlesMs, settleMs)
+			}
 		}
 		axisResult := StepResponseAxis{}
 		if len(overshoots) > 0 {
 			medianOvershoot := medianFloat(overshoots)
-			medianSettle := medianFloat(settles)
 			axisResult.OvershootPercent = &medianOvershoot
+		}
+		if len(settlesMs) > 0 {
+			medianSettle := medianFloat(settlesMs)
 			axisResult.SettleMs = &medianSettle
 		}
-		analysis.PerAxis[sp.field] = axisResult
+		analysis.PerAxis[gyroSeries.field] = axisResult
 	}
 	if totalEdges < minEdges || len(allOvershoots) == 0 {
-		return nil
+		return nil, ""
 	}
 	medianOvershoot := medianFloat(allOvershoots)
-	medianSettle := medianFloat(allSettles)
 	analysis.EdgesAnalyzed = len(allOvershoots)
 	analysis.MedianOvershootPercent = &medianOvershoot
-	analysis.MedianSettleMs = &medianSettle
-	return analysis
+	if len(allSettlesMs) > 0 {
+		medianSettle := medianFloat(allSettlesMs)
+		analysis.MedianSettleMs = &medianSettle
+	}
+	caveat := ""
+	if rateHz <= 0 {
+		caveat = "unknown axis frame rate: settle times reported in samples; settle_ms fields omitted"
+	}
+	return analysis, caveat
 }
 
 func minStepEdgeCount(opts AnalysisOptions) int {

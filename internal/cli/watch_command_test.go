@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -126,7 +127,7 @@ func TestWatchCommandConnectionFailureEnvelope(t *testing.T) {
 
 // TestWatchCommandNDJSONStream runs against the fake FC and asserts that each
 // sample lands as one compact, independently decodable JSON envelope line with
-// a 1-based seq in data and no extra nesting level around the payload.
+// a 1-based seq in data and the payload nested under a stable data.sample key.
 func TestWatchCommandNDJSONStream(t *testing.T) {
 	fakeConnect := func(_ context.Context, _ connection.Config, class connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		if class != connection.ReadOnly {
@@ -163,22 +164,16 @@ func TestWatchCommandNDJSONStream(t *testing.T) {
 		if err := json.Unmarshal([]byte(line), &envelope); err != nil {
 			t.Fatalf("line %d %q is not valid JSON: %v", i, line, err)
 		}
-		if !envelope.OK || !strings.HasSuffix(envelope.Command, "watch") {
-			t.Fatalf("line %d envelope = ok:%v command:%q", i, envelope.OK, envelope.Command)
-		}
-		seq, ok := envelope.Data["seq"].(float64)
+		sample, ok := envelope.Data["sample"].(map[string]any)
 		if !ok {
-			t.Fatalf("line %d missing data.seq: %s", i, line)
+			t.Fatalf("line %d missing data.sample object: %s", i, line)
 		}
-		if int(seq) != i+1 {
-			t.Fatalf("line %d data.seq = %v, want %d", i, seq, i+1)
-		}
-		telemetry, ok := envelope.Data["telemetry"].(map[string]any)
+		telemetry, ok := sample["telemetry"].(map[string]any)
 		if !ok {
-			t.Fatalf("line %d missing data.telemetry object: %s", i, line)
+			t.Fatalf("line %d missing data.sample.telemetry object: %s", i, line)
 		}
 		if _, nested := telemetry["telemetry"]; nested {
-			t.Fatalf("line %d data.telemetry must not be double-nested: %s", i, line)
+			t.Fatalf("line %d data.sample.telemetry must not be double-nested: %s", i, line)
 		}
 	}
 }
@@ -230,5 +225,64 @@ func TestWatchCommandSampleErrorLine(t *testing.T) {
 		if len(envelope.Errors) == 0 || envelope.Errors[0].Code != "sample_error" {
 			t.Fatalf("line %d lacks sample_error code: %s", i, line)
 		}
+	}
+}
+
+// failOnceWriter fails the first Write (the first sample envelope) and
+// forwards later writes to next so the loop's rendered error envelope can
+// still land.
+type failOnceWriter struct {
+	next   *bytes.Buffer
+	failed bool
+}
+
+func (w *failOnceWriter) Write(p []byte) (int, error) {
+	if !w.failed {
+		w.failed = true
+		return 0, errors.New("sink closed")
+	}
+	return w.next.Write(p)
+}
+
+// TestWatchCommandLoopErrorRendersWatchErrorEnvelope verifies that a loop
+// failure (here: the first sample write fails) is rendered as an ok=false
+// watch_error envelope instead of bubbling up as a bare cobra usage error.
+func TestWatchCommandLoopErrorRendersWatchErrorEnvelope(t *testing.T) {
+	var buf bytes.Buffer
+	a := &app{
+		build: BuildInfo{Version: "test", Commit: "test", Date: "test"},
+		out:   &failOnceWriter{next: &buf},
+		in:    strings.NewReader(""),
+	}
+	a.connect = func(_ context.Context, _ connection.Config, _ connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	}
+
+	root := &cobra.Command{
+		Use:           "betaflight-cli",
+		SilenceUsage:  true,
+		SilenceErrors: true,
+	}
+	root.AddCommand(a.watchCommand())
+	root.SetArgs([]string{"watch", "telemetry", "--count", "2", "--interval", "50ms"})
+	if err := root.Execute(); err != nil && !isExitError(err) {
+		t.Fatalf("Execute = %v, want nil or exit error after rendering watch_error", err)
+	}
+	raw := strings.TrimSpace(buf.String())
+	env := decodeEnvelope(t, raw)
+	if env.OK {
+		t.Fatalf("envelope ok=true, want failed watch_error envelope: %+v", env)
+	}
+	if len(env.Errors) == 0 || env.Errors[0].Code != "watch_error" {
+		t.Fatalf("errors = %+v, want code watch_error", env.Errors)
 	}
 }

@@ -127,13 +127,13 @@ func (a *app) configurationApplyCommand() *cobra.Command {
 }
 
 func (a *app) configurationResetCommand() *cobra.Command {
-	var save bool
+	var flags changeFlags
 	cmd := &cobra.Command{
 		Use:   "reset",
 		Short: "Reset flight controller configuration to factory defaults",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			if !a.opts.yes {
-				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "configuration reset requires --yes because it erases all configuration on the flight controller"))
+			if flags.save {
+				flags.apply = true
 			}
 			imported, err := batch.ImportCLI([]byte("defaults nosave\n"), batch.ImportOptions{
 				Kind:            "restore",
@@ -146,8 +146,14 @@ func (a *app) configurationResetCommand() *cobra.Command {
 			if env, ok := a.validateChangePlan(cmd, imported.Plan, planValidationOptions{allowDefaultsNoSave: true}); !ok {
 				return a.render(env)
 			}
-			opts := importCommandOptions{includeDefaults: true, save: save}
+			opts := importCommandOptions{includeDefaults: true, save: flags.save}
 			data := importPlanData(imported, opts, false)
+			if !flags.apply {
+				return a.render(output.Success(commandPath(cmd), nil, data))
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "configuration reset requires --yes because it erases all configuration on the flight controller"))
+			}
 			connect := a.connect
 			if connect == nil {
 				connect = connection.Connect
@@ -180,7 +186,7 @@ func (a *app) configurationResetCommand() *cobra.Command {
 			refreshChangePlan(data)
 			env := output.Success(commandPath(cmd), &target, data)
 			addCLIApplySideEffects(&env, appliedLines)
-			if save {
+			if flags.save {
 				saveLines, err := client.ExecCLI(cmd.Context(), "save")
 				if err != nil {
 					addStringWarnings(&env, []string{fmt.Sprintf("save command may have rebooted or disconnected before response completed: %v", err)})
@@ -188,12 +194,14 @@ func (a *app) configurationResetCommand() *cobra.Command {
 				data["saved"] = true
 				data["save_response_lines"] = saveLines
 				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
+				refreshChangePlan(data)
 			}
 			addStringWarnings(&env, []string{"factory reset erases all configuration on the flight controller; run 'backup create --raw-cli' beforehand to keep a restorable copy"})
 			return renderConnected(env)
 		},
 	}
-	cmd.Flags().BoolVar(&save, "save", false, "persist defaults after resetting; requires --yes")
+	cmd.Flags().BoolVar(&flags.apply, "apply", false, "execute the factory reset against the connected flight controller")
+	cmd.Flags().BoolVar(&flags.save, "save", false, "persist defaults after resetting; requires --yes")
 	return cmd
 }
 

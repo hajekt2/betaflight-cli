@@ -1,6 +1,10 @@
 package commands
 
-import "testing"
+import (
+	"bytes"
+	"encoding/json"
+	"testing"
+)
 
 func TestDecodeOSDConfig(t *testing.T) {
 	payload := []byte{0x31, 3, 1, 20}
@@ -212,6 +216,37 @@ func TestEncodeOSDCharPixels(t *testing.T) {
 	rows[5][7] = 4
 	if _, err := EncodeOSDCharPixels(rows); err == nil {
 		t.Fatal("EncodeOSDCharPixels() error = nil for pixel value above 3")
+	}
+}
+
+func TestOSDCharBitmapJSONRoundTrip(t *testing.T) {
+	bitmap := make(OSDBitmap, OSDCharVisibleBytes)
+	for i := range bitmap {
+		bitmap[i] = byte(i)
+	}
+	data, err := json.Marshal(&OSDChar{Index: 7, Bitmap: bitmap})
+	if err != nil {
+		t.Fatalf("json.Marshal() error = %v", err)
+	}
+	if !bytes.HasPrefix(data, []byte(`{"index":7,"bitmap":[0,1,2,3`)) || !bytes.HasSuffix(data, []byte(`52,53]}`)) {
+		t.Fatalf("bitmap must marshal as a number array, got %s", data[:min(len(data), 40)])
+	}
+	var decoded OSDChar
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("json.Unmarshal() error = %v", err)
+	}
+	if decoded.Index != 7 || !bytes.Equal(decoded.Bitmap, bitmap) {
+		t.Fatalf("round trip mismatch, character = %+v", decoded)
+	}
+	var config OSDCharSetConfig
+	if err := json.Unmarshal(data, &config); err != nil {
+		t.Fatalf("json.Unmarshal(OSDCharSetConfig) error = %v", err)
+	}
+	if config.Index != 7 || !bytes.Equal(config.Bitmap, bitmap) {
+		t.Fatalf("config round trip mismatch, config = %+v", config)
+	}
+	if err := json.Unmarshal([]byte(`{"index":0,"bitmap":[256]}`), &decoded); err == nil {
+		t.Fatal("json.Unmarshal() error = nil for out-of-range byte")
 	}
 }
 

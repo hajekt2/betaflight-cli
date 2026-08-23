@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -51,7 +53,9 @@ func (e exitError) Error() string {
 func Execute(build BuildInfo) int {
 	a := &app{build: build, out: os.Stdout, in: os.Stdin, connect: connection.Connect}
 	root := a.rootCommand()
-	if err := root.Execute(); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := root.ExecuteContext(ctx); err != nil {
 		var ee exitError
 		if errors.As(err, &ee) {
 			return int(ee)

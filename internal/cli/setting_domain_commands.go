@@ -1498,11 +1498,7 @@ func (a *app) osdCharGetCommand() *cobra.Command {
 			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
 				character, err := bfcommands.ReadOSDChar(cmd.Context(), client, index)
 				if err != nil {
-					// MSP_OSD_CHAR_READ is answered by external OSD devices only;
-					// degrade to a warning when the target has no handler.
-					return output.Success(commandPath(cmd), &target, map[string]any{
-						"warnings": []string{err.Error()},
-					})
+					return a.failure(commandPath(cmd), &target, err)
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"osd_char": character,
@@ -1558,11 +1554,7 @@ func (a *app) osdVideoConfigCommand() *cobra.Command {
 			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
 				config, err := bfcommands.ReadOSDVideoConfig(cmd.Context(), client)
 				if err != nil {
-					// MSP_OSD_VIDEO_CONFIG is answered by external OSD devices
-					// only; degrade to a warning when the target has no handler.
-					return output.Success(commandPath(cmd), &target, map[string]any{
-						"warnings": []string{err.Error()},
-					})
+					return a.failure(commandPath(cmd), &target, err)
 				}
 				return output.Success(commandPath(cmd), &target, map[string]any{
 					"osd_video_config": config,
@@ -1622,14 +1614,10 @@ func parseOSDCharJSON(data []byte, index uint8) ([]byte, error) {
 	case len(input.Rows) > 0:
 		return bfcommands.EncodeOSDCharPixels(input.Rows)
 	case len(input.Bitmap) > 0:
-		bitmap := make([]byte, len(input.Bitmap))
-		for i, value := range input.Bitmap {
-			if value > 255 {
-				return nil, fmt.Errorf("OSD char bitmap byte %d out of range", i)
-			}
-			bitmap[i] = value
+		if len(input.Bitmap) != bfcommands.OSDCharVisibleBytes {
+			return nil, fmt.Errorf("OSD char bitmap must be exactly %d bytes, got %d", bfcommands.OSDCharVisibleBytes, len(input.Bitmap))
 		}
-		return bitmap, nil
+		return input.Bitmap, nil
 	default:
 		return nil, fmt.Errorf("osd char requires rows or bitmap")
 	}

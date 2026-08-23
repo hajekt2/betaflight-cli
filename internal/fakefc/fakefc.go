@@ -289,6 +289,8 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte("BetaFlight"), false))
 	case msp.MSPFeatureConfig:
 		f.out.Write(response(frame.Code, appendU32(nil, 0x00040488), false))
+	case msp.MSPSetFeatureConfig:
+		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 4))
 	case msp.MSPSetArmingDisabled:
 		// Upstream 2026.6.1 msp.c: u8 command; nonzero sets ARMING_DISABLED_MSP,
 		// zero re-enables arming.

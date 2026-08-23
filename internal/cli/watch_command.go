@@ -95,12 +95,17 @@ func (a *app) runWatch(cmd *cobra.Command, sampler bfcommands.Sampler, opts bfco
 		return nil
 	}
 
-	return bfcommands.RunWatchLoop(ctx, opts, ticker.C, bound, emit)
+	if err := bfcommands.RunWatchLoop(ctx, opts, ticker.C, bound, emit); err != nil {
+		return a.render(output.Failure(commandPath(cmd), &target, "watch_error", err.Error()))
+	}
+	return nil
 }
 
 // watchEnvelope maps one loop event onto the standard envelope schema with a
-// 1-based seq in data; sampling failures become ok=false failure envelopes so
-// the NDJSON stream stays valid line-by-line even on errors.
+// 1-based seq in data and the sampled payload nested under data.sample so
+// consumers always have a stable root key; sampling failures become ok=false
+// failure envelopes so the NDJSON stream stays valid line-by-line even on
+// errors.
 func watchEnvelope(command string, target *output.Target, event *bfcommands.WatchEvent) output.Envelope {
 	if event.Err != nil {
 		env := output.Failure(command, target, "sample_error", event.Err.Error())
@@ -108,20 +113,18 @@ func watchEnvelope(command string, target *output.Target, event *bfcommands.Watc
 		return env
 	}
 	data := map[string]any{"seq": event.Seq}
+	sample := any(event.Value)
 	if event.Value != nil {
 		if fields, ok := flattenJSON(event.Value); ok {
-			for k, v := range fields {
-				data[k] = v
-			}
-		} else {
-			data["value"] = event.Value
+			sample = fields
 		}
 	}
+	data["sample"] = sample
 	return output.Success(command, target, data)
 }
 
-// flattenJSON turns a sampled value into its JSON object fields so they merge
-// alongside data.seq without an extra nesting level.
+// flattenJSON turns a sampled value into its JSON object fields so they nest
+// under data.sample without colliding with data.seq.
 func flattenJSON(value any) (map[string]any, bool) {
 	raw, err := json.Marshal(value)
 	if err != nil {

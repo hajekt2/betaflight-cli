@@ -156,7 +156,6 @@ func ReadGPSStatus(ctx context.Context, client *connection.Client) (*GPSStatus, 
 	}
 	if statistics, err := readGPSStatistics(ctx, client); err == nil {
 		status.Statistics = statistics
-		warnings = append(warnings, "GPS statistics payload layout is not defined by firmware 2026.6.1; raw payload returned")
 	} else {
 		warnings = append(warnings, err.Error())
 	}

@@ -167,8 +167,9 @@ Unknown or unsupported messages should return structured errors with raw payload
 
 The settings layer owns Betaflight CLI setting metadata.
 It is generated from upstream `settings.c`, `settings.h`, and `parameter_names.h`.
-The checked-in generated registry is currently pinned to Betaflight `2025.12.5`.
-Optional MSP commands introduced after that stable baseline are isolated in a small forward-compatibility registry with their exact upstream source version on every command.
+The checked-in generated registry is currently pinned to Betaflight `2026.6.1`.
+An earlier revision isolated optional MSP commands from newer firmware in a small forward-compatibility registry annotated with their exact upstream source version.
+Once the compiled baseline moved to Betaflight `2026.6.1`, those previously forward-ported commands became part of the generated registry and `betaflight-cli version` no longer emits `msp_forward_source_firmware`; the key removal is covered by the documented 0.x breaking-change policy in the README support table.
 The firmware setting read path complements the compiled registry with `MSP2_CLI_SETTING` and `MSP2_CLI_SETTING_INFO`.
 Those messages let agents ask the connected firmware for authoritative setting values and setting-info text without exposing MSP2 write mode directly.
 

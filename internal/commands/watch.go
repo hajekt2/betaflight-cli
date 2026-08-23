@@ -130,7 +130,8 @@ type WatchEvent struct {
 //   - ctx cancellation stops the loop cleanly with a nil error.
 //   - opts.Count > 0 stops after that many emitted events.
 //   - opts.Duration != 0 sets a wall-clock deadline from loop start; once past
-//     it, no further samples are taken.
+//     it, no further samples are taken. The deadline fires independently of
+//     tick arrivals, so the loop never overshoots it by more than one sample.
 //   - Sampling errors emit a *WatchEvent with Err set and the loop CONTINUES;
 //     only emit failures abort the loop (returned wrapped).
 func RunWatchLoop(ctx context.Context, opts LoopOptions, tick <-chan time.Time, sample Sampler, emit func(any) error) error {
@@ -167,6 +168,12 @@ func RunWatchLoop(ctx context.Context, opts LoopOptions, tick <-chan time.Time, 
 		return emit(&WatchEvent{Seq: seq, Value: value})
 	}
 
+	var deadlineTimer *time.Timer
+	if !deadline.IsZero() {
+		deadlineTimer = time.NewTimer(time.Until(deadline))
+		defer deadlineTimer.Stop()
+	}
+
 	for {
 		if ctx.Err() != nil || expired() || (opts.Count > 0 && seq >= opts.Count) {
 			return nil
@@ -180,7 +187,18 @@ func RunWatchLoop(ctx context.Context, opts LoopOptions, tick <-chan time.Time, 
 		select {
 		case <-ctx.Done():
 			return nil
+		case <-deadlineChan(deadlineTimer):
+			return nil
 		case <-tick:
 		}
 	}
+}
+
+// deadlineChan returns the timer's channel, or a nil channel that blocks
+// forever when the loop runs unbounded.
+func deadlineChan(timer *time.Timer) <-chan time.Time {
+	if timer == nil {
+		return nil
+	}
+	return timer.C
 }

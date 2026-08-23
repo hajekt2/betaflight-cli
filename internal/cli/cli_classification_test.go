@@ -20,6 +20,9 @@ func TestClassifyCLI(t *testing.T) {
 		{"save", cliDangerous},
 		{"defaults", cliDangerous},
 		{"motor 0 1000", cliDangerous},
+		{"waypoint clear", cliDangerous},
+		{"waypoint insert 0 -33.5429890 151.6664560 100 0 FLYOVER 0 NONE", cliDangerous},
+		{"waypoint list", cliDangerous},
 		{"    ", cliReadOnly},
 	}
 	for _, tt := range tests {
@@ -55,6 +58,8 @@ func TestIsKnownCLICommand(t *testing.T) {
 		"impossible line":     false,
 		"":                    false,
 		"   ":                 false,
+		"waypoint list":       true,
+		"waypoint clear":      true,
 	}
 	for line, want := range tests {
 		if got := isKnownCLICommand(line); got != want {
@@ -75,7 +80,8 @@ func TestIsBatchAllowed(t *testing.T) {
 		"beeper 1":            true,
 		"map 1 2 3":           true,
 		"timer 2":             true,
-		"dma 1":               true,
+		"waypoint list":       true,
+		"waypoint clear":      true,
 	}
 	for line, want := range tests {
 		if got := isBatchAllowed(line); got != want {

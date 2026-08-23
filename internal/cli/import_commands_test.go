@@ -290,6 +290,33 @@ func TestRestoreApplyWithFakeFC(t *testing.T) {
 	}
 }
 
+func TestRestoreApplyWithSaveChainsSave(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--yes", "--save"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", nil)
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true || data["saved"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(data["save_response_lines"].([]any)) == 0 {
+		t.Fatalf("save response lines = %+v", data["save_response_lines"])
+	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["applied"] != true || changePlan["saved"] != true {
+		t.Fatalf("change_plan = %+v", changePlan)
+	}
+	if len(env.SideEffects) != 3 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+	if env.SideEffects[2].Type != "save" || env.SideEffects[2].Command != "save" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}
+
 func TestRestoreApplyReportsPartialSideEffects(t *testing.T) {
 	env, err := runTestCommandWithInput(t, []string{"restore", "apply", "--yes"}, "feature GPS\nset gyro_lpf1_static_hz = 0\n", failingCLIConnector(2))
 	if err == nil || env.OK {

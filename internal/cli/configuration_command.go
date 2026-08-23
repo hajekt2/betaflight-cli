@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 
 	bfcommands "github.com/hajekt2/betaflight-cli/internal/commands"
@@ -18,6 +19,7 @@ func (a *app) configurationCommand() *cobra.Command {
 	cmd := &cobra.Command{Use: "configuration", Short: "Inspect configuration state and write readiness"}
 	cmd.AddCommand(a.configurationValidateCommand())
 	cmd.AddCommand(a.configurationPlanCommand())
+	cmd.AddCommand(a.configurationResetCommand())
 	cmd.AddCommand(a.configurationApplyCommand())
 	cmd.AddCommand(a.configurationCompareCommand())
 	cmd.AddCommand(a.configurationExportCommand())
@@ -121,6 +123,77 @@ func (a *app) configurationApplyCommand() *cobra.Command {
 		},
 	}
 	addImportFlags(cmd, &opts, true)
+	return cmd
+}
+
+func (a *app) configurationResetCommand() *cobra.Command {
+	var save bool
+	cmd := &cobra.Command{
+		Use:   "reset",
+		Short: "Reset flight controller configuration to factory defaults",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "configuration reset requires --yes because it erases all configuration on the flight controller"))
+			}
+			imported, err := batch.ImportCLI([]byte("defaults nosave\n"), batch.ImportOptions{
+				Kind:            "restore",
+				SourceFormat:    "configuration_text",
+				IncludeDefaults: true,
+			})
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "validation_error", err.Error()))
+			}
+			if env, ok := a.validateChangePlan(cmd, imported.Plan, planValidationOptions{allowDefaultsNoSave: true}); !ok {
+				return a.render(env)
+			}
+			opts := importCommandOptions{includeDefaults: true, save: save}
+			data := importPlanData(imported, opts, false)
+			connect := a.connect
+			if connect == nil {
+				connect = connection.Connect
+			}
+			client, targetInfo, err := connect(cmd.Context(), a.connectionConfig(), connection.Dangerous)
+			target := toOutputTarget(targetInfo)
+			if err != nil {
+				env := a.failure(commandPath(cmd), &target, err)
+				env.Data = data
+				return a.render(env)
+			}
+			defer client.Close()
+			renderConnected := func(env output.Envelope) error {
+				a.addUnsupportedFirmwareWarning(&env, targetInfo)
+				return a.render(env)
+			}
+			responses, appliedLines, failedLine, err := executeCLIPlan(cmd.Context(), client, imported.Plan.CLILines)
+			data["response_lines"] = responses
+			data["applied_cli_lines"] = appliedLines
+			if err != nil {
+				data["partially_applied"] = len(appliedLines) > 0
+				data["failed_cli_line"] = failedLine
+				refreshChangePlan(data)
+				env := a.failure(commandPath(cmd), &target, err)
+				env.Data = data
+				addCLIApplySideEffects(&env, appliedLines)
+				return renderConnected(env)
+			}
+			data["applied"] = true
+			refreshChangePlan(data)
+			env := output.Success(commandPath(cmd), &target, data)
+			addCLIApplySideEffects(&env, appliedLines)
+			if save {
+				saveLines, err := client.ExecCLI(cmd.Context(), "save")
+				if err != nil {
+					addStringWarnings(&env, []string{fmt.Sprintf("save command may have rebooted or disconnected before response completed: %v", err)})
+				}
+				data["saved"] = true
+				data["save_response_lines"] = saveLines
+				env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
+			}
+			addStringWarnings(&env, []string{"factory reset erases all configuration on the flight controller; run 'backup create --raw-cli' beforehand to keep a restorable copy"})
+			return renderConnected(env)
+		},
+	}
+	cmd.Flags().BoolVar(&save, "save", false, "persist defaults after resetting; requires --yes")
 	return cmd
 }
 

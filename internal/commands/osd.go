@@ -694,3 +694,226 @@ func lookupOSDUnits(v uint8) string {
 		return ""
 	}
 }
+
+// OSD character constants from src/main/drivers/osd.h (2026.6.1):
+// OSD_CHAR_WIDTH 12, OSD_CHAR_HEIGHT 18, OSD_CHAR_BITS_PER_PIXEL 2
+// (drivers/osd.h:27-29), so one visible character bitmap is
+// 12*18*2/8 = OSDCharVisibleBytes bytes (drivers/osd.h:30).
+// Some drivers accept OSD_CHAR_BYTES = 64 bytes where the extra
+// 10 bytes carry driver metadata (drivers/osd.h:31-33).
+const (
+	OSDCharVisibleBytes = 54
+	OSDCharFullBytes    = 64
+	osdCharRows         = 18
+	osdCharColumns      = 12
+)
+
+// OSDChar is one OSD font character. Bitmap holds the visible
+// OSDCharVisibleBytes bytes, two bits per pixel, row-major.
+type OSDChar struct {
+	Index  uint8  `json:"index"`
+	Bitmap []byte `json:"bitmap"`
+}
+
+// DecodeOSDChar decodes an MSP_OSD_CHAR_READ reply. Upstream note:
+// 2026.6.1 msp.c has no case handler for MSP_OSD_CHAR_READ (code only defined
+// in msp_protocol.h:154); replies come from external OSD devices and mirror
+// the minimal MSP_OSD_CHAR_WRITE form: u8 address followed by the character
+// bitmap (msp.c MSP_OSD_CHAR_WRITE handler, lines 4699-4737).
+func DecodeOSDChar(payload []byte) (*OSDChar, error) {
+	r := msp.NewPayloadReader(payload)
+	index, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "OSD char index")
+	}
+	bitmap, err := r.Bytes(r.Remaining())
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "OSD char bitmap")
+	}
+	switch len(bitmap) {
+	case OSDCharVisibleBytes, OSDCharFullBytes:
+	default:
+		return nil, fmt.Errorf("OSD char bitmap must be %d or %d bytes, got %d", OSDCharVisibleBytes, OSDCharFullBytes, len(bitmap))
+	}
+	return &OSDChar{
+		Index:  index,
+		Bitmap: bitmap[:OSDCharVisibleBytes],
+	}, nil
+}
+
+// ReadOSDChar requests one font character over MSP_OSD_CHAR_READ.
+func ReadOSDChar(ctx context.Context, client *connection.Client, index uint8) (*OSDChar, error) {
+	frame, err := client.Request(ctx, msp.MSPOSDCharRead, []byte{index})
+	if err != nil {
+		return nil, fmt.Errorf("osd char request failed: %w", err)
+	}
+	character, err := DecodeOSDChar(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("osd char decode failed: %w", err)
+	}
+	return character, nil
+}
+
+// SetOSDChar uploads one font character through MSP_OSD_CHAR_WRITE using the
+// minimal upstream payload form: u8 address plus OSDCharVisibleBytes bitmap
+// bytes (dataSize < OSD_CHAR_VISIBLE_BYTES+2 branch, msp.c:4719-4722).
+func SetOSDChar(ctx context.Context, client *connection.Client, index uint8, bitmap []byte) (*OSDCharSetResult, error) {
+	payload, err := EncodeOSDChar(index, bitmap)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPOSDCharWrite, payload); err != nil {
+		return nil, fmt.Errorf("osd char request failed: %w", err)
+	}
+	stored := make([]byte, OSDCharVisibleBytes)
+	copy(stored, bitmap)
+	return &OSDCharSetResult{
+		Config:       OSDCharSetConfig{Index: index, Bitmap: stored},
+		MSPCode:      msp.MSPOSDCharWrite,
+		MSPName:      "MSP_OSD_CHAR_WRITE",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeOSDChar(index uint8, bitmap []byte) ([]byte, error) {
+	if len(bitmap) != OSDCharVisibleBytes {
+		return nil, fmt.Errorf("OSD char bitmap must be exactly %d bytes, got %d", OSDCharVisibleBytes, len(bitmap))
+	}
+	payload := make([]byte, 0, 1+len(bitmap))
+	payload = append(payload, index)
+	return append(payload, bitmap...), nil
+}
+
+// EncodeOSDCharPixels packs 18 rows of 12 two-bit pixel values (0-3) into the
+// OSDCharVisibleBytes-byte bitmap, four pixels per byte, most significant pair
+// first, matching the MAX7456-style row-major layout implied by
+// drivers/osd.h:27-30.
+func EncodeOSDCharPixels(rows [][]uint8) ([]byte, error) {
+	if len(rows) != osdCharRows {
+		return nil, fmt.Errorf("OSD char requires %d rows, got %d", osdCharRows, len(rows))
+	}
+	bitmap := make([]byte, 0, OSDCharVisibleBytes)
+	for y, row := range rows {
+		if len(row) != osdCharColumns {
+			return nil, fmt.Errorf("OSD char row %d must have %d pixels, got %d", y, osdCharColumns, len(row))
+		}
+		for x := 0; x < osdCharColumns; x += 4 {
+			var packed uint8
+			for k, pixel := range row[x : x+4] {
+				if pixel > 3 {
+					return nil, fmt.Errorf("OSD char pixel value must be 0-3, got %d at row %d column %d", pixel, y, x+k)
+				}
+				packed |= pixel << (6 - 2*k)
+			}
+			bitmap = append(bitmap, packed)
+		}
+	}
+	return bitmap, nil
+}
+
+type OSDCharSetConfig struct {
+	Index  uint8  `json:"index"`
+	Bitmap []byte `json:"bitmap"`
+}
+
+type OSDCharSetResult struct {
+	Config       OSDCharSetConfig `json:"config"`
+	MSPCode      uint16           `json:"msp_code"`
+	MSPName      string           `json:"msp_name"`
+	Acknowledged bool             `json:"acknowledged"`
+	SaveRequired bool             `json:"save_required"`
+}
+
+// OSDVideoConfig carries the MSP_OSD_VIDEO_CONFIG fields. Upstream note:
+// codes MSP_OSD_VIDEO_CONFIG (0xb4) and MSP_SET_OSD_VIDEO_CONFIG (0xb5) are
+// only declared for external OSD devices in msp_protocol.h:224-225; verified
+// that no case handler for either exists anywhere in the 2026.6.1 tree, so the
+// payload cannot be derived from FC handlers. The layout used here is the
+// minimal external-OSD form: u8 video_system followed by u8 units, with no
+// reserved bytes.
+type OSDVideoConfig struct {
+	VideoSystem     uint8  `json:"video_system"`
+	VideoSystemName string `json:"video_system_name,omitempty"`
+	Units           uint8  `json:"units"`
+	UnitsName       string `json:"units_name,omitempty"`
+}
+
+func DecodeOSDVideoConfig(payload []byte) (*OSDVideoConfig, error) {
+	r := msp.NewPayloadReader(payload)
+	videoSystem, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "OSD video config video_system")
+	}
+	units, err := r.U8()
+	if err != nil {
+		return nil, msp.RequireNoShort(err, "OSD video config units")
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("OSD video config returned %d trailing byte(s)", r.Remaining())
+	}
+	return &OSDVideoConfig{
+		VideoSystem:     videoSystem,
+		VideoSystemName: lookupVideoSystem(videoSystem),
+		Units:           units,
+		UnitsName:       lookupOSDUnits(units),
+	}, nil
+}
+
+func ReadOSDVideoConfig(ctx context.Context, client *connection.Client) (*OSDVideoConfig, error) {
+	frame, err := client.Request(ctx, msp.MSPOSDVideoConfig, nil)
+	if err != nil {
+		return nil, fmt.Errorf("osd video config request failed: %w", err)
+	}
+	config, err := DecodeOSDVideoConfig(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("osd video config decode failed: %w", err)
+	}
+	return config, nil
+}
+
+type OSDVideoConfigSetConfig struct {
+	VideoSystem uint8 `json:"video_system"`
+	Units       uint8 `json:"units"`
+}
+
+type OSDVideoConfigSetResult struct {
+	Config       OSDVideoConfigSetConfig `json:"config"`
+	MSPCode      uint16                  `json:"msp_code"`
+	MSPName      string                  `json:"msp_name"`
+	Acknowledged bool                    `json:"acknowledged"`
+	SaveRequired bool                    `json:"save_required"`
+}
+
+func ValidateOSDVideoConfig(config OSDVideoConfigSetConfig) error {
+	if config.VideoSystem > 3 {
+		return fmt.Errorf("video_system must be 0 (AUTO), 1 (PAL), 2 (NTSC), or 3 (HD)")
+	}
+	if config.Units > 2 {
+		return fmt.Errorf("units must be 0 (IMPERIAL), 1 (METRIC), or 2 (BRITISH)")
+	}
+	return nil
+}
+
+// SetOSDVideoConfig writes video system and units through
+// MSP_SET_OSD_VIDEO_CONFIG (see the OSDVideoConfig upstream note for why the
+// layout is u8 video_system + u8 units).
+func SetOSDVideoConfig(ctx context.Context, client *connection.Client, config OSDVideoConfigSetConfig) (*OSDVideoConfigSetResult, error) {
+	if err := ValidateOSDVideoConfig(config); err != nil {
+		return nil, err
+	}
+	if _, err := client.Request(ctx, msp.MSPSetOSDVideoConfig, EncodeOSDVideoConfig(config)); err != nil {
+		return nil, fmt.Errorf("osd video config request failed: %w", err)
+	}
+	return &OSDVideoConfigSetResult{
+		Config:       config,
+		MSPCode:      msp.MSPSetOSDVideoConfig,
+		MSPName:      "MSP_SET_OSD_VIDEO_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}
+
+func EncodeOSDVideoConfig(config OSDVideoConfigSetConfig) []byte {
+	return []byte{config.VideoSystem, config.Units}
+}

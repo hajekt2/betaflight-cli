@@ -136,6 +136,11 @@ func (a *app) rootCommand() *cobra.Command {
 	root.AddCommand(a.saveCommand())
 	root.AddCommand(a.rebootCommand())
 	root.AddCommand(a.mspCommand())
+	root.AddCommand(a.armingCommand())
+	root.AddCommand(a.waypointCommand())
+	root.AddCommand(a.motorReorderCommand())
+	root.AddCommand(a.rxBindCommand())
+	root.AddCommand(a.watchCommand())
 	return root
 }
 

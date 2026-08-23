@@ -486,3 +486,112 @@ func TestConfigurationDiffCommandIncludesParsedSettings(t *testing.T) {
 		t.Fatalf("inventory = %+v", inventory)
 	}
 }
+
+func fakefcTestConnector(t *testing.T, onConnect func(op connection.OperationClass)) connectFunc {
+	t.Helper()
+	return func(_ context.Context, _ connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		if onConnect != nil {
+			onConnect(op)
+		}
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(context.Background())
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	}
+}
+
+func TestConfigurationResetRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"configuration", "reset"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err == nil {
+		t.Fatal("command error = nil, want non-zero exit")
+	}
+	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
+		t.Fatalf("unexpected envelope: %+v", env)
+	}
+	if called {
+		t.Fatal("connector was called after configuration reset confirmation failure")
+	}
+}
+
+func TestConfigurationResetWithYesIssuesDefaultsNoSave(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommand(t, []string{"configuration", "reset", "--yes"}, fakefcTestConnector(t, func(op connection.OperationClass) {
+		gotOp = op
+	}))
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true || data["saved"] != false {
+		t.Fatalf("data = %+v", data)
+	}
+	appliedLines := data["applied_cli_lines"].([]any)
+	if len(appliedLines) != 1 || appliedLines[0] != "defaults nosave" {
+		t.Fatalf("applied lines = %+v", appliedLines)
+	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["cli_lines"].([]any)[0] != "defaults nosave" {
+		t.Fatalf("change plan = %+v", changePlan)
+	}
+	foundBackupWarning := false
+	for _, warning := range env.Warnings {
+		if strings.Contains(warning.Message, "backup create --raw-cli") {
+			foundBackupWarning = true
+		}
+	}
+	if !foundBackupWarning {
+		t.Fatalf("missing backup warning: %+v", env.Warnings)
+	}
+	sideEffects := env.SideEffects
+	if len(sideEffects) != 1 || sideEffects[0].Type != "cli_command" || sideEffects[0].Command != "defaults nosave" {
+		t.Fatalf("side effects = %+v", sideEffects)
+	}
+}
+
+func TestConfigurationResetWithSaveChainsSave(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runTestCommand(t, []string{"configuration", "reset", "--save", "--yes"}, fakefcTestConnector(t, func(op connection.OperationClass) {
+		gotOp = op
+	}))
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != true || data["saved"] != true || data["save_requested"] != true {
+		t.Fatalf("data = %+v", data)
+	}
+	if len(data["save_response_lines"].([]any)) == 0 {
+		t.Fatalf("save response lines = %+v", data["save_response_lines"])
+	}
+	if len(env.SideEffects) != 2 {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+	if env.SideEffects[0].Type != "cli_command" || env.SideEffects[0].Command != "defaults nosave" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+	if env.SideEffects[1].Type != "save" || env.SideEffects[1].Command != "save" {
+		t.Fatalf("side effects = %+v", env.SideEffects)
+	}
+}

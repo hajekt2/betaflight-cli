@@ -9,10 +9,12 @@ import (
 )
 
 type EnvironmentStatus struct {
-	Altitude    *AltitudeReading    `json:"altitude,omitempty"`
-	Rangefinder *RangefinderReading `json:"rangefinder,omitempty"`
-	Analog      *AnalogReading      `json:"analog,omitempty"`
-	Sources     map[string]string   `json:"sources,omitempty"`
+	Altitude      *AltitudeReading      `json:"altitude,omitempty"`
+	Rangefinder   *RangefinderReading   `json:"rangefinder,omitempty"`
+	Analog        *AnalogReading        `json:"analog,omitempty"`
+	OpticalFlow   *OpticalFlowReading   `json:"optical_flow,omitempty"`
+	RangefinderMt *RangefinderMtReading `json:"rangefinder_mt,omitempty"`
+	Sources       map[string]string     `json:"sources,omitempty"`
 }
 
 type AltitudeReading struct {
@@ -32,6 +34,33 @@ type AnalogReading struct {
 	RSSI           uint16  `json:"rssi"`
 	AmperageA      float64 `json:"amperage_a"`
 	VoltageV       float64 `json:"voltage_v"`
+}
+
+// OpticalFlowReading mirrors the MSP2_SENSOR_OPTICALFLOW wire layout.
+//
+// Upstream note (2026.6.1): msp.c defines no OUT handler for 0x300B; the code
+// is used as a sensor-injection message whose payload layout is defined by the
+// receive side in src/main/drivers/rangefinder/rangefinder_lidarmt.c
+// (mtOpticalflowDataMessage_t): packed { uint8 quality [0;255]; int32 motionX;
+// int32 motionY }. Flow scaling per MTF01_OPTICAL_FLOW_SCALE (200, "flow rate
+// is at 100cm") and quality percent per pkt->quality * 100 / 255 in
+// mtOpticalflowReceiveNewData.
+type OpticalFlowReading struct {
+	Quality      uint8   `json:"quality"`         // raw sensor quality, [0;255]
+	QualityPct   float64 `json:"quality_percent"` // quality * 100 / 255
+	MotionX      int32   `json:"motion_x"`
+	MotionY      int32   `json:"motion_y"`
+	FlowRateXRaw float64 `json:"flow_rate_x_raw"` // motionX / MTF01_OPTICAL_FLOW_SCALE; firmware additionally divides by frame dt
+	FlowRateYRaw float64 `json:"flow_rate_y_raw"`
+}
+
+// RangefinderMtReading mirrors the MSP2_SENSOR_RANGEFINDER_LIDARMT wire
+// layout: mspSensorRangefinderLidarMtDataMessage_t in
+// src/main/drivers/rangefinder/rangefinder_lidarmt.c: packed { uint8 quality
+// [0;255]; int32 distanceMm }, negative distanceMm means out of range.
+type RangefinderMtReading struct {
+	Quality    uint8 `json:"quality"`
+	DistanceMm int32 `json:"distance_mm"` // negative value = out of range
 }
 
 func ReadEnvironmentStatus(ctx context.Context, client *connection.Client) (*EnvironmentStatus, []string, error) {
@@ -70,7 +99,29 @@ func ReadEnvironmentStatus(ctx context.Context, client *connection.Client) (*Env
 	} else {
 		warnings = append(warnings, fmt.Sprintf("MSP_ANALOG unavailable: %v", err))
 	}
-	if status.Altitude == nil && status.Rangefinder == nil && status.Analog == nil {
+	if frame, err := client.Request(ctx, msp.MSP2SensorOpticalflow, nil); err == nil {
+		reading, err := DecodeOpticalFlow(frame.Payload)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("MSP2_SENSOR_OPTICALFLOW decode failed: %v", err))
+		} else {
+			status.OpticalFlow = reading
+			status.Sources["optical_flow"] = "MSP2_SENSOR_OPTICALFLOW"
+		}
+	} else {
+		warnings = append(warnings, fmt.Sprintf("optical flow unavailable: MSP2_SENSOR_OPTICALFLOW has no read handler in firmware 2026.6.1 (injection-direction code): %v", err))
+	}
+	if frame, err := client.Request(ctx, msp.MSP2SensorRangefinderLidarmt, nil); err == nil {
+		reading, err := DecodeRangefinderMt(frame.Payload)
+		if err != nil {
+			warnings = append(warnings, fmt.Sprintf("MSP2_SENSOR_RANGEFINDER_LIDARMT decode failed: %v", err))
+		} else {
+			status.RangefinderMt = reading
+			status.Sources["rangefinder_mt"] = "MSP2_SENSOR_RANGEFINDER_LIDARMT"
+		}
+	} else {
+		warnings = append(warnings, fmt.Sprintf("MT rangefinder unavailable: MSP2_SENSOR_RANGEFINDER_LIDARMT has no read handler in firmware 2026.6.1 (injection-direction code): %v", err))
+	}
+	if status.Altitude == nil && status.Rangefinder == nil && status.Analog == nil && status.OpticalFlow == nil && status.RangefinderMt == nil {
 		return nil, warnings, fmt.Errorf("environment status unavailable")
 	}
 	return status, warnings, nil
@@ -155,5 +206,62 @@ func DecodeAnalog(payload []byte) (*AnalogReading, error) {
 		RSSI:           rssi,
 		AmperageA:      float64(amperage) / 100,
 		VoltageV:       float64(voltage) / 100,
+	}, nil
+}
+
+func DecodeOpticalFlow(payload []byte) (*OpticalFlowReading, error) {
+	const length = 9
+	if len(payload) < length {
+		return nil, fmt.Errorf("payload length %d is shorter than MSP2_SENSOR_OPTICALFLOW size %d", len(payload), length)
+	}
+	r := msp.NewPayloadReader(payload)
+	quality, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	motionXRaw, err := r.U32()
+	if err != nil {
+		return nil, err
+	}
+	motionYRaw, err := r.U32()
+	if err != nil {
+		return nil, err
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP2_SENSOR_OPTICALFLOW returned %d trailing byte(s)", r.Remaining())
+	}
+	motionX := int32(motionXRaw)
+	motionY := int32(motionYRaw)
+	const flowScale = 200.0 // MTF01_OPTICAL_FLOW_SCALE
+	return &OpticalFlowReading{
+		Quality:      quality,
+		QualityPct:   float64(quality) * 100 / 255,
+		MotionX:      motionX,
+		MotionY:      motionY,
+		FlowRateXRaw: float64(motionX) / flowScale,
+		FlowRateYRaw: float64(motionY) / flowScale,
+	}, nil
+}
+
+func DecodeRangefinderMt(payload []byte) (*RangefinderMtReading, error) {
+	const length = 5
+	if len(payload) < length {
+		return nil, fmt.Errorf("payload length %d is shorter than MSP2_SENSOR_RANGEFINDER_LIDARMT size %d", len(payload), length)
+	}
+	r := msp.NewPayloadReader(payload)
+	quality, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	distanceRaw, err := r.U32()
+	if err != nil {
+		return nil, err
+	}
+	if r.Remaining() != 0 {
+		return nil, fmt.Errorf("MSP2_SENSOR_RANGEFINDER_LIDARMT returned %d trailing byte(s)", r.Remaining())
+	}
+	return &RangefinderMtReading{
+		Quality:    quality,
+		DistanceMm: int32(distanceRaw),
 	}, nil
 }

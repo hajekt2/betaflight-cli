@@ -2,7 +2,13 @@ package commands
 
 import (
 	"bytes"
+	"context"
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/internal/fakefc"
 )
 
 func TestDecodeGPSStatusParts(t *testing.T) {
@@ -125,4 +131,44 @@ func TestDecodeGPSRescuePIDAndSatellites(t *testing.T) {
 
 func appendS32Test(dst []byte, v int32) []byte {
 	return appendU32Test(dst, uint32(v))
+}
+
+func TestDecodeGPSStatistics(t *testing.T) {
+	stats, err := DecodeGPSStatistics([]byte{0x01, 0x02, 0xff})
+	if err != nil {
+		t.Fatalf("DecodeGPSStatistics() error = %v", err)
+	}
+	if stats.PayloadLen != 3 || stats.PayloadHex != "0102ff" {
+		t.Fatalf("statistics = %+v", stats)
+	}
+}
+
+func TestDecodeGPSStatisticsRejectsEmptyPayload(t *testing.T) {
+	if _, err := DecodeGPSStatistics(nil); err == nil {
+		t.Fatal("DecodeGPSStatistics() error = nil, want empty payload error")
+	}
+}
+
+func TestReadGPSStatusWithFakeFC(t *testing.T) {
+	client, err := connection.NewClient(fakefc.New(), time.Second)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	status, warnings, err := ReadGPSStatus(context.Background(), client)
+	if err != nil {
+		t.Fatalf("ReadGPSStatus() error = %v", err)
+	}
+	if len(status.Satellites) != 2 {
+		t.Fatalf("len(status.Satellites) = %d, want 2 (status = %+v)", len(status.Satellites), status)
+	}
+	var found bool
+	for _, warning := range warnings {
+		if strings.Contains(warning, "gps statistics unavailable") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("warnings %v do not report gps statistics unavailability", warnings)
+	}
 }

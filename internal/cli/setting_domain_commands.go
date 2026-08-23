@@ -95,6 +95,10 @@ func (a *app) settingDomainCommand(domain settingDomain) *cobra.Command {
 		cmd.AddCommand(a.osdSetStatJSONCommand())
 		cmd.AddCommand(a.osdSetTimerCommand())
 		cmd.AddCommand(a.osdSetTimerJSONCommand())
+		cmd.AddCommand(a.osdCharGetCommand())
+		cmd.AddCommand(a.osdCharSetCommand())
+		cmd.AddCommand(a.osdVideoConfigCommand())
+		cmd.AddCommand(a.osdSetVideoConfigJSONCommand())
 	}
 	if domain.use == "pid" {
 		cmd.AddCommand(a.pidStatusCommand())
@@ -1479,6 +1483,184 @@ func parseOSDVideoSystemJSON(data []byte) (uint8, error) {
 		return 0, fmt.Errorf("video_system must be 0 (AUTO), 1 (PAL), 2 (NTSC), or 3 (HD)")
 	}
 	return *videoSystem, nil
+}
+
+func (a *app) osdCharGetCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "char-get INDEX",
+		Short: "Read one OSD font character over MSP_OSD_CHAR_READ",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				character, err := bfcommands.ReadOSDChar(cmd.Context(), client, index)
+				if err != nil {
+					// MSP_OSD_CHAR_READ is answered by external OSD devices only;
+					// degrade to a warning when the target has no handler.
+					return output.Success(commandPath(cmd), &target, map[string]any{
+						"warnings": []string{err.Error()},
+					})
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"osd_char": character,
+				})
+			})
+		},
+	}
+}
+
+func (a *app) osdCharSetCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "char-set INDEX FILE",
+		Short: "Upload one OSD font character from JSON over MSP_OSD_CHAR_WRITE",
+		Args:  cobra.ExactArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			index, err := parseUint8Arg("index", args[0])
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			data, err := a.readInput(args[1])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			bitmap, err := parseOSDCharJSON(data, index)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD character writes update the font immediately on the target; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDChar(cmd.Context(), client, index, bitmap)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_char": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "osd_char",
+					Command: "MSP_OSD_CHAR_WRITE",
+					Detail:  "font character replaced in volatile OSD memory; re-upload after reboot",
+				})
+				return env
+			})
+		},
+	}
+}
+
+func (a *app) osdVideoConfigCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "video-config",
+		Short: "Read OSD video system and units over MSP_OSD_VIDEO_CONFIG",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.ReadOnly, func(client *connection.Client, target output.Target) output.Envelope {
+				config, err := bfcommands.ReadOSDVideoConfig(cmd.Context(), client)
+				if err != nil {
+					// MSP_OSD_VIDEO_CONFIG is answered by external OSD devices
+					// only; degrade to a warning when the target has no handler.
+					return output.Success(commandPath(cmd), &target, map[string]any{
+						"warnings": []string{err.Error()},
+					})
+				}
+				return output.Success(commandPath(cmd), &target, map[string]any{
+					"osd_video_config": config,
+				})
+			})
+		},
+	}
+}
+
+func (a *app) osdSetVideoConfigJSONCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   "set-video-config-json FILE",
+		Short: "Set OSD video system and units from JSON through MSP_SET_OSD_VIDEO_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			config, err := parseOSDVideoConfigJSON(data)
+			if err != nil {
+				return validationFailure(a, cmd, err)
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "OSD video config changes alter video system and unit rendering; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				result, err := bfcommands.SetOSDVideoConfig(cmd.Context(), client, config)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{"osd_video_config": result})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "osd_video_config",
+					Command: "MSP_SET_OSD_VIDEO_CONFIG",
+					Detail:  "OSD video config changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+}
+
+// parseOSDCharJSON accepts {"index":n,"rows":[[...18 rows x 12 pixels...]]} or
+// {"index":n,"bitmap":[...54 bytes...]}; an explicit INDEX argument wins over
+// the JSON index field. Pixel values are two-bit (0-3).
+func parseOSDCharJSON(data []byte, index uint8) ([]byte, error) {
+	var input struct {
+		Index  *uint8    `json:"index"`
+		Rows   [][]uint8 `json:"rows"`
+		Bitmap []uint8   `json:"bitmap"`
+	}
+	if err := json.Unmarshal(data, &input); err != nil {
+		return nil, err
+	}
+	switch {
+	case len(input.Rows) > 0:
+		return bfcommands.EncodeOSDCharPixels(input.Rows)
+	case len(input.Bitmap) > 0:
+		bitmap := make([]byte, len(input.Bitmap))
+		for i, value := range input.Bitmap {
+			if value > 255 {
+				return nil, fmt.Errorf("OSD char bitmap byte %d out of range", i)
+			}
+			bitmap[i] = value
+		}
+		return bitmap, nil
+	default:
+		return nil, fmt.Errorf("osd char requires rows or bitmap")
+	}
+}
+
+func parseOSDVideoConfigJSON(data []byte) (bfcommands.OSDVideoConfigSetConfig, error) {
+	var wrapped struct {
+		OSDVideoConfig *bfcommands.OSDVideoConfigSetConfig `json:"osd_video_config"`
+		VideoConfig    *bfcommands.OSDVideoConfigSetConfig `json:"video_config"`
+		Config         *bfcommands.OSDVideoConfigSetConfig `json:"config"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return bfcommands.OSDVideoConfigSetConfig{}, err
+	}
+	var config bfcommands.OSDVideoConfigSetConfig
+	switch {
+	case wrapped.OSDVideoConfig != nil:
+		config = *wrapped.OSDVideoConfig
+	case wrapped.VideoConfig != nil:
+		config = *wrapped.VideoConfig
+	case wrapped.Config != nil:
+		config = *wrapped.Config
+	default:
+		if err := json.Unmarshal(data, &config); err != nil {
+			return bfcommands.OSDVideoConfigSetConfig{}, err
+		}
+	}
+	if err := bfcommands.ValidateOSDVideoConfig(config); err != nil {
+		return bfcommands.OSDVideoConfigSetConfig{}, err
+	}
+	return config, nil
 }
 
 func (a *app) osdSetPositionCommand() *cobra.Command {

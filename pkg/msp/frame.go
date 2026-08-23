@@ -15,10 +15,6 @@ type Frame struct {
 	Unsupported bool
 }
 
-// maxMSPv2Payload is the largest payload MSPv2 can encode: the wire
-// length field is uint16.
-const maxMSPv2Payload = int(^uint16(0))
-
 func EncodeRequest(code uint16, payload []byte) []byte {
 	if code <= 254 && len(payload) < 255 {
 		return encodeV1(byte(code), payload)
@@ -39,14 +35,10 @@ func encodeV1(code byte, payload []byte) []byte {
 }
 
 func encodeV2(code uint16, payload []byte) []byte {
-	// MSPv2 carries the payload length in a uint16 field; callers pass
-	// typed payloads far below this bound. Clamping keeps the size
-	// arithmetic provably in range for the allocation below.
-	n := len(payload)
-	if n > maxMSPv2Payload {
-		n = maxMSPv2Payload
-	}
-	frame := make([]byte, 0, n+9)
+	// Capacity grows via append rather than computed up front: the MSPv2
+	// wire length field is uint16, and avoiding explicit size arithmetic
+	// here keeps allocation provably overflow-free.
+	var frame []byte
 	frame = append(frame, '$', 'X', '<', 0)
 	var tmp [2]byte
 	binary.LittleEndian.PutUint16(tmp[:], code)

@@ -1,7 +1,8 @@
 package msp
 
-func CRC8DVB(data []byte) byte {
-	var crc byte
+// CRC8DVBUpdate advances the DVB-S2 CRC8 accumulator over data, allowing
+// checksums over frame parts without concatenating them into one buffer.
+func CRC8DVBUpdate(crc byte, data []byte) byte {
 	for _, b := range data {
 		crc ^= b
 		for range 8 {
@@ -13,4 +14,8 @@ func CRC8DVB(data []byte) byte {
 		}
 	}
 	return crc
+}
+
+func CRC8DVB(data []byte) byte {
+	return CRC8DVBUpdate(0, data)
 }

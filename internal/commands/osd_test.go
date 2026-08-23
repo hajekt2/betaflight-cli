@@ -2,8 +2,13 @@ package commands
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
+	"time"
+
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/internal/fakefc"
 )
 
 func TestDecodeOSDConfig(t *testing.T) {
@@ -279,5 +284,26 @@ func TestValidateAndEncodeOSDVideoConfig(t *testing.T) {
 	payload := EncodeOSDVideoConfig(OSDVideoConfigSetConfig{VideoSystem: 2, Units: 1})
 	if string(payload) != string([]byte{2, 1}) {
 		t.Fatalf("payload = %v", payload)
+	}
+}
+
+func TestSetOSDCharDoesNotRequireSave(t *testing.T) {
+	client, err := connection.NewClient(fakefc.New(), time.Second)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	bitmap := make([]byte, OSDCharVisibleBytes)
+	result, err := SetOSDChar(context.Background(), client, 7, bitmap)
+	if err != nil {
+		t.Fatalf("SetOSDChar() error = %v", err)
+	}
+	if !result.Acknowledged {
+		t.Fatal("Acknowledged = false, want true")
+	}
+	if result.SaveRequired {
+		t.Fatal("SaveRequired = true for a volatile OSD character write; font writes cannot be persisted by a save")
+	}
+	if result.Config.Index != 7 {
+		t.Fatalf("Config.Index = %d, want 7", result.Config.Index)
 	}
 }

@@ -46,3 +46,13 @@ func TestReadFrameRejectsBadChecksum(t *testing.T) {
 		t.Fatal("ReadFrame() error = nil, want checksum error")
 	}
 }
+
+func TestCRC8DVBStreamingMatchesConcatenated(t *testing.T) {
+	a := []byte{0x21, 0x01, 0x02, 0x03}
+	b := []byte{0x04, 0x05, 0x06}
+	want := CRC8DVB(append(append([]byte{}, a...), b...))
+	got := CRC8DVBUpdate(CRC8DVBUpdate(0, a), b)
+	if got != want {
+		t.Fatalf("streaming crc = %#x, want %#x", got, want)
+	}
+}

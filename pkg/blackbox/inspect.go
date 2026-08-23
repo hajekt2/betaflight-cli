@@ -346,7 +346,7 @@ func scanDecodedCandidates(data []byte, headerBytes int64, headers map[string]st
 	}
 	ctx := newDecodeContext(headers, definitions)
 	for pos := 0; pos < len(data); {
-		candidate, nextPos, nextCtx, ok := findNextDecodedCandidate(data, pos, headerBytes, definitions, ctx, maxFrameLength)
+		candidate, _, nextPos, nextCtx, ok := findNextDecodedCandidate(data, pos, headerBytes, definitions, ctx, maxFrameLength)
 		if !ok {
 			pos++
 			continue
@@ -379,17 +379,17 @@ func scanDecodedCandidates(data []byte, headerBytes int64, headers map[string]st
 	return summary
 }
 
-func findNextDecodedCandidate(data []byte, pos int, headerBytes int64, definitions map[string]FieldDefinition, ctx decodeContext, maxFrameLength int) (FrameCandidate, int, decodeContext, bool) {
+func findNextDecodedCandidate(data []byte, pos int, headerBytes int64, definitions map[string]FieldDefinition, ctx decodeContext, maxFrameLength int) (FrameCandidate, DecodedFrame, int, decodeContext, bool) {
 	if pos < 0 || pos >= len(data) {
-		return FrameCandidate{}, pos, ctx, false
+		return FrameCandidate{}, DecodedFrame{}, pos, ctx, false
 	}
 	frameType := string(data[pos])
 	if !isRecognizedFrameType(frameType) {
-		return FrameCandidate{}, pos, ctx, false
+		return FrameCandidate{}, DecodedFrame{}, pos, ctx, false
 	}
 	if frameType != "E" {
 		if _, ok := definitionForFrame(frameType, definitions); !ok {
-			return FrameCandidate{}, pos, ctx, false
+			return FrameCandidate{}, DecodedFrame{}, pos, ctx, false
 		}
 	}
 	maxEnd := pos + maxFrameLength + 1
@@ -414,16 +414,17 @@ func findNextDecodedCandidate(data []byte, pos int, headerBytes int64, definitio
 		nextCtx := ctx.clone()
 		if frameType == "E" {
 			if _, err := decodeEventPayload(candidate, payload); err == nil {
-				return candidate, end, nextCtx, true
+				return candidate, DecodedFrame{}, end, nextCtx, true
 			}
 			continue
 		}
 		def, _ := definitionForFrame(frameType, definitions)
-		if _, err := decodeFramePayload(&nextCtx, frameType, candidate, payload, def); err == nil {
-			return candidate, end, nextCtx, true
+		frame, err := decodeFramePayload(&nextCtx, frameType, candidate, payload, def)
+		if err == nil {
+			return candidate, frame, end, nextCtx, true
 		}
 	}
-	return FrameCandidate{}, pos, ctx, false
+	return FrameCandidate{}, DecodedFrame{}, pos, ctx, false
 }
 
 func isRecognizedFrameType(frameType string) bool {

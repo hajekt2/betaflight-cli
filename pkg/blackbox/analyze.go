@@ -157,9 +157,8 @@ func decodeAllMainFrames(data []byte, headers map[string]string, definitions map
 	pos := 0
 	sampleCount := 0
 	var warnings []string
-	failed := 0
 	for pos < len(data) {
-		candidate, next, nextCtx, ok := findNextDecodedCandidate(data, pos, 0, definitions, ctx, 256)
+		candidate, frame, next, nextCtx, ok := findNextDecodedCandidate(data, pos, 0, definitions, ctx, 256)
 		if !ok {
 			pos++
 			continue
@@ -173,19 +172,6 @@ func decodeAllMainFrames(data []byte, headers map[string]string, definitions map
 			warnings = append(warnings, fmt.Sprintf("analysis covers only the first %d main frames (MaxSamples cap); remaining frames ignored", maxSamples))
 			break
 		}
-		payload, ok := candidatePayload(data, candidate)
-		if !ok {
-			continue
-		}
-		def, ok := definitionForFrame(candidate.Type, definitions)
-		if !ok {
-			continue
-		}
-		frame, err := decodeFramePayload(&ctx, candidate.Type, candidate, payload, def)
-		if err != nil {
-			failed++
-			continue
-		}
 		sampleCount++
 		fields := make([]string, 0, len(frame.Values))
 		for field := range frame.Values {
@@ -195,9 +181,6 @@ func decodeAllMainFrames(data []byte, headers map[string]string, definitions map
 		for _, field := range fields {
 			series[field] = append(series[field], float64(frame.Values[field]))
 		}
-	}
-	if failed > 0 {
-		warnings = append(warnings, fmt.Sprintf("%d main frame(s) failed to decode and were excluded", failed))
 	}
 	return series, sampleCount, warnings
 }
@@ -503,13 +486,18 @@ func dominantSpectralPeak(psd []float64, fs float64, effectiveSegSize int) (freq
 // spectralBands sums Welch PSD power into fixed bands: <100, 100-300, 300-600,
 // >600 Hz. The PSD is a power density (unit-amplitude sine at bin center yields
 // ~A^2/2 peak density), so each bin contributes density x binWidth to report
-// approximate band power; DC and the conjugate mirror above N/2 are excluded.
+// approximate band power. The two-sided density is folded into one-sided form:
+// DC and the conjugate mirror above N/2 are excluded, non-DC/non-Nyquist bins
+// are doubled, and the Nyquist bin (even-length transforms) is kept as-is.
 func spectralBands(psd []float64, fs float64, effectiveSegSize int) SpectralBands {
 	var bands SpectralBands
 	binWidth := fs / float64(effectiveSegSize)
 	for k, power := range psd {
 		if k == 0 || k > len(psd)/2 {
 			continue // exclude DC and the conjugate mirror above N/2
+		}
+		if 2*k < len(psd) {
+			power *= 2 // fold the negative-frequency mirror into one-sided power
 		}
 		freq := float64(k) * binWidth
 		switch {

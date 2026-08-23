@@ -799,11 +799,12 @@ func SetOSDChar(ctx context.Context, client *connection.Client, index uint8, bit
 	stored := make([]byte, OSDCharVisibleBytes)
 	copy(stored, bitmap)
 	return &OSDCharSetResult{
-		Config:       OSDCharSetConfig{Index: index, Bitmap: OSDBitmap(stored)},
-		MSPCode:      msp.MSPOSDCharWrite,
-		MSPName:      "MSP_OSD_CHAR_WRITE",
+		Config:  OSDCharSetConfig{Index: index, Bitmap: OSDBitmap(stored)},
+		MSPCode: msp.MSPOSDCharWrite,
+		MSPName: "MSP_OSD_CHAR_WRITE",
+		// MSP_OSD_CHAR_WRITE only updates the volatile font buffer on the
+		// OSD device; nothing persists across reboot, so no save applies.
 		Acknowledged: true,
-		SaveRequired: true,
 	}, nil
 }
 
@@ -848,6 +849,9 @@ type OSDCharSetConfig struct {
 	Bitmap OSDBitmap `json:"bitmap"`
 }
 
+// OSDCharSetResult reports an MSP_OSD_CHAR_WRITE. Character writes land in
+// volatile OSD memory and cannot be persisted by a save, so SaveRequired is
+// always false.
 type OSDCharSetResult struct {
 	Config       OSDCharSetConfig `json:"config"`
 	MSPCode      uint16           `json:"msp_code"`

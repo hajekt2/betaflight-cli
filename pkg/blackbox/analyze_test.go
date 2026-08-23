@@ -111,15 +111,16 @@ func TestSpectralBandsTwoToneNumericBandPower(t *testing.T) {
 	}
 	bands := spectralBands(psd, fs, effSeg)
 	// Each unit-amplitude tone lands inside its band. Under welchPSD's
-	// density normalization (fs x sum(w^2)), integrating density x binWidth
-	// over the tone's band recovers ~A^2/4; without the binWidth factor the
-	// result would be ~0.03, so this pins the scaling numerically.
+	// density normalization (fs x sum(w^2)), folding the conjugate mirror into
+	// a one-sided spectrum and integrating density x binWidth over the tone's
+	// band recovers ~A^2/2; without the mirror doubling it would be ~A^2/4,
+	// so this pins the one-sided scaling numerically.
 	for name, got := range map[string]float64{
 		"below_100":  bands.Below100Hz,
 		"300_to_600": bands.Hz300To600,
 	} {
-		if got < 0.18 || got > 0.32 {
-			t.Fatalf("%s band power = %f, want ~0.25 (density x binWidth scaling)", name, got)
+		if got < 0.4 || got > 0.6 {
+			t.Fatalf("%s band power = %f, want ~0.5 (one-sided density x binWidth scaling)", name, got)
 		}
 	}
 	// Bands without a tone stay near zero; leakage must not reach 5% of a tone.
@@ -505,6 +506,81 @@ func TestAnalyzeCaveatsWhenStreamsAbsent(t *testing.T) {
 	}
 }
 
+func TestAnalyzePreviousPredictorGyroSeriesReconstruction(t *testing.T) {
+	const n = 128
+	type prevRow struct {
+		time  int
+		gyro0 int
+		gyro1 int
+	}
+	rows := make([]prevRow, n)
+	for k := range n {
+		rows[k] = prevRow{
+			time:  k * 1000,
+			gyro0: 1000 + 7*k,
+			gyro1: int(math.Round(300 * math.Sin(2*math.Pi*125*float64(k)/1000))),
+		}
+	}
+	// The fixture must store deltas, not raw values, so the 'previous'
+	// predictor is genuinely exercised.
+	if rows[10].gyro0-rows[9].gyro0 == rows[10].gyro0 || rows[10].gyro1-rows[9].gyro1 == rows[10].gyro1 {
+		t.Fatal("fixture deltas equal raw values; previous-predictor coverage lost")
+	}
+
+	header := strings.Join([]string{
+		"H Product:Blackbox flight data recorder by Nicholas Sherlock",
+		"H looptime:1000",
+		"H Field I name:time,gyroADC[0],gyroADC[1]",
+		"H Field I signed:0,1,1",
+		"H Field I predictor:0,0,0",
+		"H Field I encoding:1,1,1",
+		"H Field P name:time,gyroADC[0],gyroADC[1]",
+		"H Field P signed:0,1,1",
+		"H Field P predictor:1,1,1",
+		"H Field P encoding:1,1,1",
+	}, "\n")
+	var body []byte
+	for k, v := range rows {
+		prev := prevRow{}
+		if k > 0 {
+			prev = rows[k-1]
+		}
+		marker := byte('P')
+		if k == 0 {
+			marker = 'I'
+		}
+		body = append(body, marker)
+		body = append(body, encVB(uint32(v.time-prev.time))...)
+		body = append(body, encSignedVB(v.gyro0-prev.gyro0)...)
+		body = append(body, encSignedVB(v.gyro1-prev.gyro1)...)
+	}
+	log := header + "\n" + string(body)
+
+	data := []byte(log)
+	inspection := Inspection{
+		Headers:          map[string]string{},
+		FieldDefinitions: map[string]FieldDefinition{},
+	}
+	headerEnd, err := parseHeaders(data, &inspection)
+	if err != nil {
+		t.Fatalf("parseHeaders() error = %v", err)
+	}
+	series, count, warnings := decodeAllMainFrames(data[headerEnd:], inspection.Headers, inspection.FieldDefinitions, 0)
+	if count != n {
+		t.Fatalf("sample count = %d, want %d", count, n)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %+v, want none", warnings)
+	}
+	for k, v := range rows {
+		for field, want := range map[string]int{"time": v.time, "gyroADC[0]": v.gyro0, "gyroADC[1]": v.gyro1} {
+			got := series[field][k]
+			if got != float64(want) {
+				t.Fatalf("%s[%d] = %f, want %d (previous-predictor reconstruction diverged)", field, k, got, want)
+			}
+		}
+	}
+}
 func buildMinimalMotorOnlyLog(rows []sampleRow) string {
 	header := strings.Join([]string{
 		"H Product:Blackbox flight data recorder by Nicholas Sherlock",

@@ -69,8 +69,14 @@ type MotorReorderSetResult struct {
 	SaveRequired bool       `json:"save_required"`
 }
 
-// ValidateMotorReordering rejects empty orders, duplicate targets, and values
-// outside [0, motorCount).
+// ValidateMotorReordering rejects empty orders, duplicate targets, values
+// outside [0, motorCount), and partial orders whose firmware-side identity
+// padding would collide with a supplied entry.
+//
+// The FC pads entries beyond the sent arraySize with identity mapping
+// (value == i, msp.c:3818), so validation builds the complete padded map
+// first (supplied prefix + identity tail up to motorCount) and then requires
+// it to be a full permutation: every index present exactly once.
 func ValidateMotorReordering(order []uint8, motorCount int) error {
 	if len(order) == 0 {
 		return fmt.Errorf("motor reordering requires at least one entry")
@@ -78,13 +84,23 @@ func ValidateMotorReordering(order []uint8, motorCount int) error {
 	if len(order) > motorCount {
 		return fmt.Errorf("motor reordering has %d entries but the target supports %d", len(order), motorCount)
 	}
-	seen := make(map[uint8]bool, len(order))
 	for _, value := range order {
 		if int(value) >= motorCount {
 			return fmt.Errorf("motor reordering target %d out of range (motor count %d)", value, motorCount)
 		}
+	}
+	padded := make([]uint8, motorCount)
+	copy(padded, order)
+	for i := len(order); i < motorCount; i++ {
+		padded[i] = uint8(i)
+	}
+	seen := make(map[uint8]bool, motorCount)
+	for i, value := range padded {
 		if seen[value] {
-			return fmt.Errorf("motor reordering target %d appears more than once", value)
+			if i < len(order) {
+				return fmt.Errorf("motor reordering target %d appears more than once", value)
+			}
+			return fmt.Errorf("motor reordering has only %d entries; the firmware fills the remaining positions with identity mapping, which routes motor %d twice; supply the full %d-entry mapping", len(order), value, motorCount)
 		}
 		seen[value] = true
 	}

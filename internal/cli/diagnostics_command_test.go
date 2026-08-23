@@ -34,7 +34,7 @@ func TestVersionIncludesCompiledMetadata(t *testing.T) {
 	if data["schema_version"] != output.SchemaVersion {
 		t.Fatalf("schema_version = %v", data["schema_version"])
 	}
-	if data["msp_source_firmware"] != "2025.12.5" || data["msp_forward_source_firmware"] != "2026.6.0-rc2" || data["settings_source_firmware"] != "2025.12.5" {
+	if data["msp_source_firmware"] != "2026.6.1" || data["settings_source_firmware"] != "2026.6.1" {
 		t.Fatalf("metadata versions = %+v", data)
 	}
 	if data["settings_generated"] != true || data["settings_count"].(float64) < 100 {
@@ -301,7 +301,7 @@ func TestFirmwareStatusWithFakeFC(t *testing.T) {
 		t.Fatalf("target = %+v", target)
 	}
 	metadata := firmware["metadata"].(map[string]any)
-	if metadata["settings_source_firmware"] != "2025.12.5" || metadata["settings_count"].(float64) < 100 {
+	if metadata["settings_source_firmware"] != "2026.6.1" || metadata["settings_count"].(float64) < 100 {
 		t.Fatalf("metadata = %+v", metadata)
 	}
 	capabilities := firmware["capabilities"].(map[string]any)
@@ -349,7 +349,7 @@ func TestProbeSupportAndMetadata(t *testing.T) {
 		t.Fatalf("support = %+v", support)
 	}
 	metadata := probeMetadata()
-	if metadata["settings_source_firmware"] != "2025.12.5" || metadata["settings_count"].(int) < 100 {
+	if metadata["settings_source_firmware"] != "2026.6.1" || metadata["settings_count"].(int) < 100 {
 		t.Fatalf("metadata = %+v", metadata)
 	}
 	files := metadata["settings_source_files"].([]string)

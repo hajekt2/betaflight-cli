@@ -9,7 +9,7 @@ RELEASE_ARTIFACTS := \
 	$(BINARY)-windows-amd64.exe \
 	$(BINARY)-windows-arm64.exe
 
-BETAFLIGHT_VERSION ?= 2025.12.5
+BETAFLIGHT_VERSION ?= 2026.6.1
 VULNCHECK_VERSION ?= v1.6.0
 ACTIONLINT_VERSION ?= v1.7.12
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)

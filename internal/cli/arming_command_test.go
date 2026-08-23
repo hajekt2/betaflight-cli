@@ -110,4 +110,83 @@ func TestArmingUnlockRequiresConfirmationBeforeConnect(t *testing.T) {
 	if env.OK || len(env.Errors) != 1 || env.Errors[0].Code != "confirmation_required" {
 		t.Fatalf("env = %+v", env)
 	}
+	foundPropsOff := false
+	for _, warning := range env.Warnings {
+		if strings.Contains(warning.Message, "remove propellers") {
+			foundPropsOff = true
+		}
+	}
+	if !foundPropsOff {
+		t.Fatalf("missing props-off warning: %+v", env.Warnings)
+	}
+}
+
+func TestArmingUnlockUsesDangerousOperationWithWarning(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runArmingTestCommand(t, []string{"arming", "unlock", "--yes"}, func(ctx context.Context, cfg connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(ctx)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	foundPropsOff := false
+	for _, warning := range env.Warnings {
+		if strings.Contains(warning.Message, "remove propellers") {
+			foundPropsOff = true
+		}
+	}
+	if !foundPropsOff {
+		t.Fatalf("missing props-off warning: %+v", env.Warnings)
+	}
+}
+
+func TestArmingLockUsesDangerousOperationWithDisarmWarning(t *testing.T) {
+	var gotOp connection.OperationClass
+	env, err := runArmingTestCommand(t, []string{"arming", "lock", "--yes"}, func(ctx context.Context, cfg connection.Config, op connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		gotOp = op
+		client, err := connection.NewClient(fakefc.New(), time.Second)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target, err := client.Handshake(ctx)
+		if err != nil {
+			return nil, connection.TargetInfo{}, err
+		}
+		target.Port = "fake"
+		return client, target, nil
+	})
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if gotOp != connection.Dangerous {
+		t.Fatalf("operation = %v, want Dangerous", gotOp)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	foundDisarm := false
+	for _, warning := range env.Warnings {
+		if strings.Contains(warning.Message, "disarms immediately") {
+			foundDisarm = true
+		}
+	}
+	if !foundDisarm {
+		t.Fatalf("missing immediate-disarm warning: %+v", env.Warnings)
+	}
 }

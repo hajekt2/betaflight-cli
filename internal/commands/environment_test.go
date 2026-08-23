@@ -1,6 +1,42 @@
 package commands
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/hajekt2/betaflight-cli/internal/connection"
+	"github.com/hajekt2/betaflight-cli/internal/fakefc"
+)
+
+func TestReadEnvironmentStatusWithFakeFC(t *testing.T) {
+	client, err := connection.NewClient(fakefc.New(), time.Second)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	status, warnings, err := ReadEnvironmentStatus(context.Background(), client)
+	if err != nil {
+		t.Fatalf("ReadEnvironmentStatus() error = %v", err)
+	}
+	if status.Altitude == nil || status.Rangefinder == nil || status.Analog == nil {
+		t.Fatalf("status = %+v, want altitude, rangefinder and analog readings", status)
+	}
+	if status.OpticalFlow != nil || status.RangefinderMt != nil {
+		t.Fatalf("optical flow / MT rangefinder populated without a probe: %+v", status)
+	}
+	for _, key := range []string{"optical_flow", "rangefinder_mt"} {
+		if _, ok := status.Sources[key]; ok {
+			t.Fatalf("sources[%q] set without a probe: %v", key, status.Sources)
+		}
+	}
+	for _, warning := range warnings {
+		if strings.Contains(warning, "OPTICALFLOW") || strings.Contains(warning, "RANGEFINDER_LIDARMT") ||
+			strings.Contains(warning, "optical flow") || strings.Contains(warning, "MT rangefinder") {
+			t.Fatalf("warnings %v mention optical flow or MT rangefinder", warnings)
+		}
+	}
+}
 
 func TestDecodeAltitude(t *testing.T) {
 	payload := appendU32Test(nil, 12345)

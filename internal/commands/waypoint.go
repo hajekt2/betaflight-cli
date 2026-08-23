@@ -153,6 +153,9 @@ func ParseDecimalCoordinate(s string) (int64, error) {
 		if c < '0' || c > '9' {
 			return 0, fmt.Errorf("invalid coordinate format")
 		}
+		if value > (1<<63-1-int64(c-'0'))/10 {
+			return 0, fmt.Errorf("coordinate integer part out of range")
+		}
 		value = value*10 + int64(c-'0')
 	}
 	digits := 0
@@ -320,16 +323,16 @@ func ValidateWaypoints(points []Waypoint) error {
 			return fmt.Errorf("waypoint numbers must be contiguous starting at 0: entry %d has number %d", i, wp.Number)
 		}
 	}
-	for i := range points {
-		wp := &points[i]
-		if wp.Pattern == "" {
+	for _, wp := range points {
+		pattern := wp.Pattern
+		if pattern == "" {
 			// Firmware defaults pattern to waypointPattern_e 0 (NONE).
-			wp.Pattern = "NONE"
+			pattern = "NONE"
 		}
 		if _, err := ParseWaypointType(wp.Type); err != nil {
 			return fmt.Errorf("waypoint %d: %v", wp.Number, err)
 		}
-		if _, err := ParseWaypointPattern(wp.Pattern); err != nil {
+		if _, err := ParseWaypointPattern(pattern); err != nil {
 			return fmt.Errorf("waypoint %d: %v", wp.Number, err)
 		}
 		if wp.LatitudeE7 < -maxLatitudeE7 || wp.LatitudeE7 > maxLatitudeE7 {
@@ -350,17 +353,23 @@ func BuildWaypointSetPlan(points []Waypoint) ([]string, error) {
 	if err := ValidateWaypoints(points); err != nil {
 		return nil, err
 	}
+	if len(points) == 0 {
+		return nil, fmt.Errorf("at least one waypoint is required; use 'wp clear' to remove the mission")
+	}
+	if err := ValidateWaypoints(points); err != nil {
+		return nil, err
+	}
 	lines := make([]string, 0, len(points)+1)
 	lines = append(lines, "waypoint clear")
 	for _, wp := range points {
+		if wp.Pattern == "" {
+			wp.Pattern = "NONE"
+		}
 		lines = append(lines, FormatWaypointInsertLine(wp))
 	}
 	return lines, nil
 }
 
-// BuildWaypointClearPlan renders the plan that empties the mission; upstream
-// implements it by resetting waypointCount to zero (src/main/cli/cli.c
-// :2825-2829).
 func BuildWaypointClearPlan() []string {
 	return []string{"waypoint clear"}
 }

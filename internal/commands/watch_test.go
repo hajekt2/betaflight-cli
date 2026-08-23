@@ -204,6 +204,28 @@ func TestRunWatchLoopExpiredDurationTakesNoSamples(t *testing.T) {
 	}
 }
 
+// TestRunWatchLoopDurationDeadlineFiresWithoutTicks verifies the deadline
+// fires on its own timer: with a tick channel that never delivers, the loop
+// must still return shortly after the duration instead of blocking forever.
+func TestRunWatchLoopDurationDeadlineFiresWithoutTicks(t *testing.T) {
+	ctx := context.Background()
+	s := &seqSampler{}
+	var events []*WatchEvent
+	ticks := make(chan time.Time) // never sends
+
+	start := time.Now()
+	err := RunWatchLoop(ctx, LoopOptions{Duration: 50 * time.Millisecond}, ticks, s.sample, collectEvents(t, &events))
+	if err != nil {
+		t.Fatalf("RunWatchLoop = %v", err)
+	}
+	if s.calls != 1 || len(events) != 1 {
+		t.Fatalf("calls=%d events=%d, want exactly the immediate first sample", s.calls, len(events))
+	}
+	if elapsed := time.Since(start); elapsed > 500*time.Millisecond {
+		t.Fatalf("loop returned after %v, want deadline to fire without ticks", elapsed)
+	}
+}
+
 func TestRunWatchLoopEmitErrorAborts(t *testing.T) {
 	ctx := context.Background()
 	s := &seqSampler{}

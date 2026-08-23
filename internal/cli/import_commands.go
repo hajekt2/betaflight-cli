@@ -297,6 +297,7 @@ func (a *app) applyImportPlan(cmd *cobra.Command, imported batch.ImportResult, o
 		data["saved"] = true
 		data["save_response_lines"] = saveLines
 		env.SideEffects = append(env.SideEffects, output.SideEffect{Type: "save", Command: "save", Detail: "configuration persisted; flight controller may reboot or disconnect"})
+		refreshChangePlan(data)
 	}
 	return renderConnected(env)
 }

@@ -202,3 +202,42 @@ func TestValidateWaypointsRejectsBadMissions(t *testing.T) {
 		t.Fatalf("ValidateWaypoints(edge) = %v", err)
 	}
 }
+
+func TestValidateWaypointsDoesNotMutateInput(t *testing.T) {
+	points := []Waypoint{
+		{Number: 0, Type: "FLYOVER", LatitudeE7: -335429890, LongitudeE7: 1516664560},
+		{Number: 1, Type: "HOLD", Pattern: "ORBIT", LatitudeE7: 0, LongitudeE7: 0},
+	}
+	want := append([]Waypoint(nil), points...)
+	if err := ValidateWaypoints(points); err != nil {
+		t.Fatalf("ValidateWaypoints() error = %v", err)
+	}
+	if !reflect.DeepEqual(points, want) {
+		t.Fatalf("ValidateWaypoints mutated input: got %+v, want %+v", points, want)
+	}
+}
+
+func TestBuildWaypointSetPlanRejectsEmptyMission(t *testing.T) {
+	_, err := BuildWaypointSetPlan(nil)
+	if err == nil || !strings.Contains(err.Error(), "use 'wp clear' to remove the mission") {
+		t.Fatalf("BuildWaypointSetPlan(empty) = %v", err)
+	}
+}
+
+func TestBuildWaypointSetPlanDefaultsPatternWithoutMutatingInput(t *testing.T) {
+	points := []Waypoint{{Number: 0, Type: "FLYOVER", LatitudeE7: -335429890, LongitudeE7: 1516664560}}
+	lines, err := BuildWaypointSetPlan(points)
+	if err != nil {
+		t.Fatalf("BuildWaypointSetPlan() error = %v", err)
+	}
+	want := []string{
+		"waypoint clear",
+		"waypoint insert 0 -33.5429890 151.6664560 0 0 FLYOVER 0 NONE",
+	}
+	if !reflect.DeepEqual(lines, want) {
+		t.Fatalf("lines = %+v, want %+v", lines, want)
+	}
+	if points[0].Pattern != "" {
+		t.Fatalf("BuildWaypointSetPlan mutated input pattern to %q", points[0].Pattern)
+	}
+}

@@ -506,9 +506,34 @@ func fakefcTestConnector(t *testing.T, onConnect func(op connection.OperationCla
 	}
 }
 
-func TestConfigurationResetRequiresYesDoesNotConnect(t *testing.T) {
+func TestConfigurationResetWithoutApplyRendersOfflinePlan(t *testing.T) {
 	called := false
 	env, err := runTestCommand(t, []string{"configuration", "reset"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		called = true
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil {
+		t.Fatalf("command error = %v", err)
+	}
+	if !env.OK {
+		t.Fatalf("env.OK = false: %+v", env.Errors)
+	}
+	if called {
+		t.Fatal("connector was called for offline configuration reset plan")
+	}
+	data := env.Data.(map[string]any)
+	if data["applied"] != false || data["saved"] != false || data["save_requested"] != false {
+		t.Fatalf("data = %+v", data)
+	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["cli_lines"].([]any)[0] != "defaults nosave" {
+		t.Fatalf("change plan = %+v", changePlan)
+	}
+}
+
+func TestConfigurationResetApplyRequiresYesDoesNotConnect(t *testing.T) {
+	called := false
+	env, err := runTestCommand(t, []string{"configuration", "reset", "--apply"}, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
 		called = true
 		return nil, connection.TargetInfo{}, nil
 	})
@@ -525,7 +550,7 @@ func TestConfigurationResetRequiresYesDoesNotConnect(t *testing.T) {
 
 func TestConfigurationResetWithYesIssuesDefaultsNoSave(t *testing.T) {
 	var gotOp connection.OperationClass
-	env, err := runTestCommand(t, []string{"configuration", "reset", "--yes"}, fakefcTestConnector(t, func(op connection.OperationClass) {
+	env, err := runTestCommand(t, []string{"configuration", "reset", "--apply", "--yes"}, fakefcTestConnector(t, func(op connection.OperationClass) {
 		gotOp = op
 	}))
 	if err != nil {
@@ -566,7 +591,7 @@ func TestConfigurationResetWithYesIssuesDefaultsNoSave(t *testing.T) {
 
 func TestConfigurationResetWithSaveChainsSave(t *testing.T) {
 	var gotOp connection.OperationClass
-	env, err := runTestCommand(t, []string{"configuration", "reset", "--save", "--yes"}, fakefcTestConnector(t, func(op connection.OperationClass) {
+	env, err := runTestCommand(t, []string{"configuration", "reset", "--apply", "--yes", "--save"}, fakefcTestConnector(t, func(op connection.OperationClass) {
 		gotOp = op
 	}))
 	if err != nil {
@@ -584,6 +609,10 @@ func TestConfigurationResetWithSaveChainsSave(t *testing.T) {
 	}
 	if len(data["save_response_lines"].([]any)) == 0 {
 		t.Fatalf("save response lines = %+v", data["save_response_lines"])
+	}
+	changePlan := data["change_plan"].(map[string]any)
+	if changePlan["saved"] != true {
+		t.Fatalf("change plan = %+v", changePlan)
 	}
 	if len(env.SideEffects) != 2 {
 		t.Fatalf("side effects = %+v", env.SideEffects)

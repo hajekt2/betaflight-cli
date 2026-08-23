@@ -265,6 +265,7 @@ func TestWPSetJSONValidationErrors(t *testing.T) {
 		input string
 	}{
 		{name: "empty mission", input: `{"waypoints":[]}`},
+		{name: "bare empty array", input: `[]`},
 		{name: "missing coordinates", input: `{"waypoints":[{"number":0,"type":"FLYOVER"}]}`},
 		{name: "unknown type", input: `{"waypoints":[{"number":0,"type":"LOITER","latitude_e7":0,"longitude_e7":0}]}`},
 		{name: "non-contiguous numbering", input: `{"waypoints":[
@@ -287,6 +288,16 @@ func TestWPSetJSONValidationErrors(t *testing.T) {
 				t.Fatal("validation failure connected to the flight controller")
 			}
 		})
+	}
+}
+
+func TestWPSetJSONEmptyMissionNamesWPClear(t *testing.T) {
+	for _, input := range []string{`[]`, `{"waypoints":[]}`} {
+		env, err := runWaypointTestCommand(t, []string{"wp", "set-json", "-"}, input, nil)
+		requireOK(t, err)
+		if env.OK || len(env.Errors) != 1 || !strings.Contains(env.Errors[0].Message, "use 'wp clear' to remove the mission") {
+			t.Fatalf("input %s: env = %+v", input, env.Errors)
+		}
 	}
 }
 

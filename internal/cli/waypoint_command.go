@@ -126,15 +126,15 @@ func parseWaypointRowsJSON(data []byte) ([]bfcommands.Waypoint, error) {
 	case wrapped.Waypoint != nil:
 		return convertWaypointRows([]waypointRow{*wrapped.Waypoint})
 	case wrapped.Waypoints != nil:
-		if len(wrapped.Waypoints) == 0 {
-			return nil, fmt.Errorf("at least one waypoint is required; use 'wp clear' to remove the mission")
-		}
 		return convertWaypointRows(wrapped.Waypoints)
 	}
 	return nil, fmt.Errorf("no waypoints found; provide {\"waypoints\":[...]}")
 }
 
 func convertWaypointRows(rows []waypointRow) ([]bfcommands.Waypoint, error) {
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("at least one waypoint is required; use 'wp clear' to remove the mission")
+	}
 	points := make([]bfcommands.Waypoint, 0, len(rows))
 	for i, row := range rows {
 		wp := bfcommands.Waypoint{

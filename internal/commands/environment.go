@@ -99,29 +99,7 @@ func ReadEnvironmentStatus(ctx context.Context, client *connection.Client) (*Env
 	} else {
 		warnings = append(warnings, fmt.Sprintf("MSP_ANALOG unavailable: %v", err))
 	}
-	if frame, err := client.Request(ctx, msp.MSP2SensorOpticalflow, nil); err == nil {
-		reading, err := DecodeOpticalFlow(frame.Payload)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("MSP2_SENSOR_OPTICALFLOW decode failed: %v", err))
-		} else {
-			status.OpticalFlow = reading
-			status.Sources["optical_flow"] = "MSP2_SENSOR_OPTICALFLOW"
-		}
-	} else {
-		warnings = append(warnings, fmt.Sprintf("optical flow unavailable: MSP2_SENSOR_OPTICALFLOW has no read handler in firmware 2026.6.1 (injection-direction code): %v", err))
-	}
-	if frame, err := client.Request(ctx, msp.MSP2SensorRangefinderLidarmt, nil); err == nil {
-		reading, err := DecodeRangefinderMt(frame.Payload)
-		if err != nil {
-			warnings = append(warnings, fmt.Sprintf("MSP2_SENSOR_RANGEFINDER_LIDARMT decode failed: %v", err))
-		} else {
-			status.RangefinderMt = reading
-			status.Sources["rangefinder_mt"] = "MSP2_SENSOR_RANGEFINDER_LIDARMT"
-		}
-	} else {
-		warnings = append(warnings, fmt.Sprintf("MT rangefinder unavailable: MSP2_SENSOR_RANGEFINDER_LIDARMT has no read handler in firmware 2026.6.1 (injection-direction code): %v", err))
-	}
-	if status.Altitude == nil && status.Rangefinder == nil && status.Analog == nil && status.OpticalFlow == nil && status.RangefinderMt == nil {
+	if status.Altitude == nil && status.Rangefinder == nil && status.Analog == nil {
 		return nil, warnings, fmt.Errorf("environment status unavailable")
 	}
 	return status, warnings, nil

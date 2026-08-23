@@ -46,18 +46,35 @@ func TestOSDCharSetValidationBeforeConnect(t *testing.T) {
 	}
 }
 
-func TestOSDCharGetDegradesToWarningWithoutHandler(t *testing.T) {
-	env, err := runTestCommand(t, []string{"osd", "char-get", "5"}, nil)
-	if err != nil {
+func TestOSDCharSetRejectsInvalidBitmapLengthBeforeConnect(t *testing.T) {
+	env, err := runTestCommandWithInput(t, []string{"osd", "char-set", "5", "-", "--yes"}, `{"index":5,"bitmap":[0,1,2]}`, func(context.Context, connection.Config, connection.OperationClass) (*connection.Client, connection.TargetInfo, error) {
+		t.Fatal("connector should not be called for invalid bitmap length")
+		return nil, connection.TargetInfo{}, nil
+	})
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if !env.OK {
-		t.Fatalf("char-get should degrade to warnings, envelope = %+v", env)
+	if env.OK || env.Errors[0].Code != "validation_error" {
+		t.Fatalf("envelope = %+v", env)
 	}
-	data := env.Data.(map[string]any)
-	warnings, ok := data["warnings"].([]any)
-	if !ok || len(warnings) == 0 {
-		t.Fatalf("warnings missing from data = %+v", data)
+}
+
+func TestOSDCharGetFailsWithoutHandler(t *testing.T) {
+	env, err := runTestCommand(t, []string{"osd", "char-get", "5"}, nil)
+	if err != nil && !isExitError(err) {
+		t.Fatalf("command error = %v", err)
+	}
+	if env.OK {
+		t.Fatalf("char-get should fail when the read fails, envelope = %+v", env)
+	}
+	if len(env.Errors) == 0 || env.Errors[0].Code == "" {
+		t.Fatalf("expected coded error, envelope = %+v", env)
+	}
+	data, ok := env.Data.(map[string]any)
+	if ok {
+		if _, present := data["osd_char"]; present {
+			t.Fatalf("failed read must not carry osd_char, envelope = %+v", env)
+		}
 	}
 }
 
@@ -87,16 +104,21 @@ func TestOSDVideoConfigValidationBeforeConnect(t *testing.T) {
 	}
 }
 
-func TestOSDVideoConfigReadDegradesToWarningWithoutHandler(t *testing.T) {
+func TestOSDVideoConfigReadFailsWithoutHandler(t *testing.T) {
 	env, err := runTestCommand(t, []string{"osd", "video-config"}, nil)
-	if err != nil {
+	if err != nil && !isExitError(err) {
 		t.Fatalf("command error = %v", err)
 	}
-	if !env.OK {
-		t.Fatalf("video-config should degrade to warnings, envelope = %+v", env)
+	if env.OK {
+		t.Fatalf("video-config should fail when the read fails, envelope = %+v", env)
 	}
-	data := env.Data.(map[string]any)
-	if _, ok := data["warnings"].([]any); !ok {
-		t.Fatalf("warnings missing from data = %+v", data)
+	if len(env.Errors) == 0 || env.Errors[0].Code == "" {
+		t.Fatalf("expected coded error, envelope = %+v", env)
+	}
+	data, ok := env.Data.(map[string]any)
+	if ok {
+		if _, present := data["osd_video_config"]; present {
+			t.Fatalf("failed read must not carry osd_video_config, envelope = %+v", env)
+		}
 	}
 }

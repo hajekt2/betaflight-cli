@@ -32,6 +32,37 @@ func TestFFTRadix2SinePeakBin(t *testing.T) {
 	}
 }
 
+func TestGyroNoiseShortSeriesDominantPeakFrequency(t *testing.T) {
+	const fs = 1000.0
+	// 64 samples of a 12-cycle sine: 12/64 * 1000 = 187.5 Hz.
+	const n = 64
+	const cycles = 12
+	x := make([]float64, n)
+	for i := range n {
+		x[i] = math.Sin(2 * math.Pi * float64(cycles) * float64(i) / float64(n))
+	}
+	analysis, caveat, err := analyzeGyroNoise(map[int]axisSeries{
+		0: {index: 0, field: "gyro[0]", values: x},
+	}, fs, AnalysisOptions{SegmentSize: 256})
+	if err != nil {
+		t.Fatalf("analyzeGyroNoise returned error: %v", err)
+	}
+	if caveat != "" {
+		t.Fatalf("unexpected caveat: %s", caveat)
+	}
+	if analysis == nil || len(analysis.PerAxis) != 1 {
+		t.Fatalf("expected one axis in analysis, got %+v", analysis)
+	}
+	got := analysis.PerAxis["gyro[0]"]
+	wantHz := float64(cycles) / float64(n) * fs
+	if math.Abs(got.DominantPeakHz-wantHz) > fs/n { // within one bin width
+		t.Fatalf("dominant peak = %f Hz, want %f Hz", got.DominantPeakHz, wantHz)
+	}
+	if got.Samples != n {
+		t.Fatalf("samples = %d, want %d", got.Samples, n)
+	}
+}
+
 func TestWelchPSDBandSplitCompositeSine(t *testing.T) {
 	const fs = 2048.0
 	const segment = 256 // bin width 8 Hz
@@ -41,11 +72,11 @@ func TestWelchPSDBandSplitCompositeSine(t *testing.T) {
 		t := float64(i) / fs
 		x[i] = 2*math.Sin(2*math.Pi*48*t) + math.Sin(2*math.Pi*400*t) + math.Sin(2*math.Pi*896*t)
 	}
-	psd, segments := welchPSD(x, fs, segment)
-	if segments == 0 {
-		t.Fatal("welchPSD produced no segments")
+	psd, effSeg := welchPSD(x, fs, segment)
+	if effSeg != segment {
+		t.Fatalf("effective segment = %d, want %d", effSeg, segment)
 	}
-	bands := spectralBands(psd, fs, segment)
+	bands := spectralBands(psd, fs, effSeg)
 	if bands.Below100Hz <= 5*bands.Hz100To300 {
 		t.Fatalf("below-100Hz band should dominate 100-300Hz: %+v", bands)
 	}
@@ -58,10 +89,42 @@ func TestWelchPSDBandSplitCompositeSine(t *testing.T) {
 	if bands.Hz300To600 <= 5*bands.Hz100To300 {
 		t.Fatalf("300-600Hz band should dominate 100-300Hz leakage: %+v", bands)
 	}
-	peakHz, _ := dominantSpectralPeak(psd, fs, segment)
+	peakHz, _ := dominantSpectralPeak(psd, fs, effSeg)
 	// The doubled-amplitude 48 Hz tone must dominate; leakage must not.
 	if peakHz < 40 || peakHz > 56 {
 		t.Fatalf("dominant peak = %f Hz, want near 48 Hz", peakHz)
+	}
+}
+
+func TestSpectralBandsTwoToneNumericBandPower(t *testing.T) {
+	const fs = 2048.0
+	const segment = 256 // bin width 8 Hz
+	n := 4096
+	x := make([]float64, n)
+	for i := range n {
+		t := float64(i) / fs
+		x[i] = math.Sin(2*math.Pi*48*t) + math.Sin(2*math.Pi*400*t)
+	}
+	psd, effSeg := welchPSD(x, fs, segment)
+	if effSeg != segment {
+		t.Fatalf("effective segment = %d, want %d", effSeg, segment)
+	}
+	bands := spectralBands(psd, fs, effSeg)
+	// Each unit-amplitude tone lands inside its band. Under welchPSD's
+	// density normalization (fs x sum(w^2)), integrating density x binWidth
+	// over the tone's band recovers ~A^2/4; without the binWidth factor the
+	// result would be ~0.03, so this pins the scaling numerically.
+	for name, got := range map[string]float64{
+		"below_100":  bands.Below100Hz,
+		"300_to_600": bands.Hz300To600,
+	} {
+		if got < 0.18 || got > 0.32 {
+			t.Fatalf("%s band power = %f, want ~0.25 (density x binWidth scaling)", name, got)
+		}
+	}
+	// Bands without a tone stay near zero; leakage must not reach 5% of a tone.
+	if bands.Hz100To300 > 0.05*bands.Below100Hz || bands.Above600Hz > 0.05*bands.Hz300To600 {
+		t.Fatalf("empty bands picked up leakage: %+v", bands)
 	}
 }
 
@@ -88,6 +151,64 @@ func TestStepResponseOvershootOnIdealSecondOrderArray(t *testing.T) {
 	}
 }
 
+func TestAnalyzeStepResponseSettleMsConversion(t *testing.T) {
+	const n = 256
+	post := []float64{
+		0.25, 0.55, 0.85, 1.08, 1.24, 1.30, 1.18, 1.12,
+		1.03, 1.01, 0.99, 1.0, 1.0, 1.0,
+	}
+	setpoint := make([]float64, n)
+	fillRange(setpoint, 80, n, 500)
+	// Gyro mirrors the ideal second-order step from TestStepResponseOvershoot-
+	// OnIdealSecondOrderArray, scaled to the 500 setpoint jump so the +/-10%
+	// settle band is meaningful. The step starts exactly at the edge sample.
+	response := make([]float64, 0, len(post))
+	for _, v := range post {
+		response = append(response, v*500)
+	}
+	gyro := make([]float64, n) // baseline zeros before the edge at 80
+	copy(gyro[80:], response)
+	fillRange(gyro, 80+len(response), n, 500)
+	axes := map[int]axisSeries{
+		0: {index: 0, field: "gyroADC[0]", values: gyro},
+	}
+	setpoints := map[int]axisSeries{
+		0: {index: 0, field: "setpoint[0]", values: setpoint},
+	}
+	opts := AnalysisOptions{MinStepEdges: 1}
+
+	step, caveat := analyzeStepResponse(setpoints, axes, 1000, opts)
+	if step == nil || caveat != "" {
+		t.Fatalf("step = %+v, caveat = %q", step, caveat)
+	}
+	// Settles at sample 8 after the edge; 8 / 1000 Hz * 1000 = 8 ms.
+	if step.MedianSettleMs == nil || math.Abs(*step.MedianSettleMs-8) > 1e-9 {
+		t.Fatalf("median settle = %v ms, want 8", step.MedianSettleMs)
+	}
+	if axis := step.PerAxis["gyroADC[0]"]; axis.SettleMs == nil || math.Abs(*axis.SettleMs-8) > 1e-9 {
+		t.Fatalf("per-axis settle = %+v, want 8 ms", axis.SettleMs)
+	}
+
+	step, _ = analyzeStepResponse(setpoints, axes, 250, opts)
+	if step == nil || step.MedianSettleMs == nil || math.Abs(*step.MedianSettleMs-32) > 1e-9 {
+		t.Fatalf("median settle at 250 Hz = %v, want 32 ms", step.MedianSettleMs)
+	}
+
+	step, caveat = analyzeStepResponse(setpoints, axes, 0, opts)
+	if step == nil {
+		t.Fatal("step analysis missing at unknown rate")
+	}
+	if step.MedianOvershootPercent == nil {
+		t.Fatal("overshoot should still be reported at unknown rate")
+	}
+	if step.MedianSettleMs != nil || step.PerAxis["gyroADC[0]"].SettleMs != nil {
+		t.Fatal("settle_ms fields must stay nil when the frame rate is unknown")
+	}
+	if !strings.Contains(caveat, "settle times reported in samples") {
+		t.Fatalf("caveat = %q, want settle-times-in-samples notice", caveat)
+	}
+}
+
 func TestFindStepEdgesDetectsTransitions(t *testing.T) {
 	setpoint := make([]float64, 600)
 	fillRange(setpoint, 80, 240, 500)
@@ -105,6 +226,46 @@ func TestFindStepEdgesDetectsTransitions(t *testing.T) {
 		if edges[i].sampleIndex != want {
 			t.Fatalf("edge %d at %d, want %d", i, edges[i].sampleIndex, want)
 		}
+	}
+}
+
+func TestAxisRateTimeStreamPrecedenceOverLooptime(t *testing.T) {
+	// Monotonic time stream wins over the looptime header: median delta 500us
+	// = 2000 Hz even though looptime says 1000.
+	timeSeries := make([]float64, 10)
+	for i := range timeSeries {
+		timeSeries[i] = float64(i) * 500
+	}
+	meta := buildMeta(map[string][]float64{"time": timeSeries}, 10, map[string]string{"looptime": "1000"})
+	if math.Abs(meta.AxisRateHz-2000) > 1e-9 {
+		t.Fatalf("axis rate = %f, want 2000 from time stream", meta.AxisRateHz)
+	}
+
+	// Without a usable time stream, looptime is scaled by 'P interval:num/denom'.
+	headers := map[string]string{"looptime": "1000", "P interval": "1/2"}
+	meta = buildMeta(nil, 10, headers)
+	if math.Abs(meta.AxisRateHz-500) > 1e-9 {
+		t.Fatalf("axis rate = %f, want 500 from looptime x P interval", meta.AxisRateHz)
+	}
+
+	// Bare integer 'P interval' means every Nth loop frame is logged.
+	headers = map[string]string{"looptime": "1000", "P interval": "4"}
+	meta = buildMeta(nil, 10, headers)
+	if math.Abs(meta.AxisRateHz-250) > 1e-9 {
+		t.Fatalf("axis rate = %f, want 250 from bare P interval", meta.AxisRateHz)
+	}
+
+	// Plain looptime fallback is unchanged when no P-interval header exists.
+	meta = buildMeta(nil, 10, map[string]string{"looptime": "1000"})
+	if math.Abs(meta.AxisRateHz-1000) > 1e-9 {
+		t.Fatalf("axis rate = %f, want 1000 from plain looptime", meta.AxisRateHz)
+	}
+
+	// Non-monotonic time stream falls back to header-based derivation.
+	jumbled := []float64{0, 500, 250, 750, 1000}
+	meta = buildMeta(map[string][]float64{"time": jumbled}, 5, map[string]string{"looptime": "2000"})
+	if math.Abs(meta.AxisRateHz-500) > 1e-9 {
+		t.Fatalf("axis rate = %f, want 500 via looptime fallback for non-monotonic time", meta.AxisRateHz)
 	}
 }
 

@@ -51,13 +51,13 @@ Configurator files are useful when payload interpretation or workflow behavior i
 8. Run unit tests and command contract tests.
 9. Update docs that mention supported Betaflight versions.
 
-The current generated registries are produced from official Betaflight `2025.12.5`.
+The current generated registries are produced from official Betaflight `2026.6.1`.
 Use a pinned upstream tag, not a moving branch, when updating checked-in generated files.
 
 Example:
 
 ```sh
-export BETAFLIGHT_VERSION=2025.12.5
+export BETAFLIGHT_VERSION=2026.6.1
 export BETAFLIGHT_SRC="$(opensrc path betaflight/betaflight@${BETAFLIGHT_VERSION})"
 go generate ./pkg/msp
 go test ./...

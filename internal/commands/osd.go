@@ -2,7 +2,10 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/pkg/msp"
@@ -708,11 +711,39 @@ const (
 	osdCharColumns      = 12
 )
 
+// OSDBitmap is an OSD character bitmap. It marshals as a JSON number array;
+// a plain []byte would encode as a base64 string.
+type OSDBitmap []byte
+
+func (b OSDBitmap) MarshalJSON() ([]byte, error) {
+	parts := make([]string, len(b))
+	for i, value := range b {
+		parts[i] = strconv.Itoa(int(value))
+	}
+	return []byte("[" + strings.Join(parts, ",") + "]"), nil
+}
+
+func (b *OSDBitmap) UnmarshalJSON(data []byte) error {
+	var values []int
+	if err := json.Unmarshal(data, &values); err != nil {
+		return err
+	}
+	bitmap := make(OSDBitmap, len(values))
+	for i, value := range values {
+		if value < 0 || value > 255 {
+			return fmt.Errorf("osd char bitmap byte %d out of byte range", i)
+		}
+		bitmap[i] = uint8(value)
+	}
+	*b = bitmap
+	return nil
+}
+
 // OSDChar is one OSD font character. Bitmap holds the visible
 // OSDCharVisibleBytes bytes, two bits per pixel, row-major.
 type OSDChar struct {
-	Index  uint8  `json:"index"`
-	Bitmap []byte `json:"bitmap"`
+	Index  uint8     `json:"index"`
+	Bitmap OSDBitmap `json:"bitmap"`
 }
 
 // DecodeOSDChar decodes an MSP_OSD_CHAR_READ reply. Upstream note:
@@ -737,7 +768,7 @@ func DecodeOSDChar(payload []byte) (*OSDChar, error) {
 	}
 	return &OSDChar{
 		Index:  index,
-		Bitmap: bitmap[:OSDCharVisibleBytes],
+		Bitmap: OSDBitmap(bitmap[:OSDCharVisibleBytes]),
 	}, nil
 }
 
@@ -768,7 +799,7 @@ func SetOSDChar(ctx context.Context, client *connection.Client, index uint8, bit
 	stored := make([]byte, OSDCharVisibleBytes)
 	copy(stored, bitmap)
 	return &OSDCharSetResult{
-		Config:       OSDCharSetConfig{Index: index, Bitmap: stored},
+		Config:       OSDCharSetConfig{Index: index, Bitmap: OSDBitmap(stored)},
 		MSPCode:      msp.MSPOSDCharWrite,
 		MSPName:      "MSP_OSD_CHAR_WRITE",
 		Acknowledged: true,
@@ -813,8 +844,8 @@ func EncodeOSDCharPixels(rows [][]uint8) ([]byte, error) {
 }
 
 type OSDCharSetConfig struct {
-	Index  uint8  `json:"index"`
-	Bitmap []byte `json:"bitmap"`
+	Index  uint8     `json:"index"`
+	Bitmap OSDBitmap `json:"bitmap"`
 }
 
 type OSDCharSetResult struct {

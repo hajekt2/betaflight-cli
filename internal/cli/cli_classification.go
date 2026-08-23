@@ -57,6 +57,10 @@ var cliCommandPolicies = map[string]cliCommandPolicy{
 	"map":             {class: cliWrite, batchAllowed: true},
 	"timer":           {class: cliWrite, batchAllowed: true},
 	"dma":             {class: cliWrite, batchAllowed: true},
+	// Firmware-CLI waypoint surface (list/get reads plus insert/clear writes)
+	// must validate in batch and imported configs; inserts rebuild the mission,
+	// so the whole verb stays dangerous-classed.
+	"waypoint": {class: cliDangerous, batchAllowed: true},
 }
 
 var cliBatchResourceAllowed = true

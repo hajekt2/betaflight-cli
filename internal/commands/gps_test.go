@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
 	"github.com/hajekt2/betaflight-cli/internal/fakefc"
+	"github.com/hajekt2/betaflight-cli/pkg/msp"
 )
 
 func TestDecodeGPSStatusParts(t *testing.T) {
@@ -170,5 +172,63 @@ func TestReadGPSStatusWithFakeFC(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("warnings %v do not report gps statistics unavailability", warnings)
+	}
+}
+
+// gpsStatisticsPort wraps a fake FC and answers MSP_GPSSTATISTICS locally,
+// letting ReadGPSStatus exercise its statistics success path (the base fake
+// FC does not implement that code).
+type gpsStatisticsPort struct {
+	inner   *fakefc.FC
+	mu      sync.Mutex
+	pending bytes.Buffer
+}
+
+func (p *gpsStatisticsPort) Write(data []byte) (int, error) {
+	if len(data) >= 6 && data[0] == '$' && data[1] == 'M' && uint16(data[4]) == msp.MSPGpsstatistics {
+		frame := msp.EncodeRequest(msp.MSPGpsstatistics, []byte{1, 2, 3, 4})
+		frame[2] = '>'
+		p.mu.Lock()
+		defer p.mu.Unlock()
+		p.pending.Write(frame)
+		return len(data), nil
+	}
+	return p.inner.Write(data)
+}
+
+func (p *gpsStatisticsPort) Read(buf []byte) (int, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.pending.Len() > 0 {
+		return p.pending.Read(buf)
+	}
+	return p.inner.Read(buf)
+}
+
+func (p *gpsStatisticsPort) ResetInputBuffer() error            { return nil }
+func (p *gpsStatisticsPort) ResetOutputBuffer() error           { return nil }
+func (p *gpsStatisticsPort) SetReadTimeout(time.Duration) error { return nil }
+func (p *gpsStatisticsPort) Close() error                       { return p.inner.Close() }
+
+func TestReadGPSStatusStatisticsSuccessPath(t *testing.T) {
+	port := &gpsStatisticsPort{inner: fakefc.New()}
+	client, err := connection.NewClient(port, time.Second)
+	if err != nil {
+		t.Fatalf("NewClient() error = %v", err)
+	}
+	status, warnings, err := ReadGPSStatus(context.Background(), client)
+	if err != nil {
+		t.Fatalf("ReadGPSStatus() error = %v", err)
+	}
+	if status.Statistics == nil {
+		t.Fatalf("status.Statistics = nil, want raw statistics (status = %+v)", status)
+	}
+	if status.Statistics.PayloadLen != 4 || status.Statistics.PayloadHex != "01020304" {
+		t.Fatalf("statistics = %+v", status.Statistics)
+	}
+	for _, warning := range warnings {
+		if strings.Contains(warning, "layout") || strings.Contains(warning, "gps statistics") {
+			t.Fatalf("warnings %v contain statistics layout noise", warnings)
+		}
 	}
 }

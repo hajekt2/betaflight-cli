@@ -218,7 +218,66 @@ func (a *app) serialCommand() *cobra.Command {
 		},
 	}
 	addChangeFlags(set, &flags)
-	cmd.AddCommand(set, a.serialSetJSONCommand(), a.serialApplyConfigJSONCommand())
+	v2Apply := &cobra.Command{
+		Use:   "apply-config-v2-json FILE",
+		Short: "Apply a complete serial port table from JSON through MSP2_COMMON_SET_SERIAL_CONFIG",
+		Args:  cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			data, err := a.readInput(args[0])
+			if err != nil {
+				return a.render(output.Failure(commandPath(cmd), nil, "read_failed", err.Error()))
+			}
+			var input struct {
+				Ports []bfcommands.SerialPort `json:"ports"`
+			}
+			if err := json.Unmarshal(data, &input); err != nil || len(input.Ports) == 0 {
+				var legacyPorts []bfcommands.SerialPort
+				if unmarshalErr := json.Unmarshal(data, &legacyPorts); unmarshalErr != nil || len(legacyPorts) == 0 {
+					if err != nil {
+						return validationFailure(a, cmd, fmt.Errorf("serial config must be {\"ports\":[...]}: %w", err))
+					}
+					return validationFailure(a, cmd, fmt.Errorf("serial config must include at least one port"))
+				}
+				input.Ports = legacyPorts
+			}
+			if !a.opts.yes {
+				return a.render(output.Failure(commandPath(cmd), nil, "confirmation_required", "serial port configuration changes port settings; pass --yes"))
+			}
+			return a.withClient(cmd.Context(), commandPath(cmd), connection.Write, func(client *connection.Client, target output.Target) output.Envelope {
+				current, warnings, err := bfcommands.ReadSerialPortStatus(cmd.Context(), client)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				records := make([]bfcommands.CommonSerialPortRecord, len(input.Ports))
+				for i, port := range input.Ports {
+					records[i] = bfcommands.CommonSerialPortRecord{
+						Identifier:         port.Identifier,
+						FunctionMask:       port.FunctionMask,
+						MSPBaudRateIndex:   port.MSPBaudRateIndex,
+						GPSBaudRateIndex:   port.GPSBaudRateIndex,
+						TelemetryBaudIndex: port.TelemetryBaudIndex,
+						BlackboxBaudIndex:  port.BlackboxBaudIndex,
+					}
+				}
+				result, err := bfcommands.SetCommonSerialConfig(cmd.Context(), client, records)
+				if err != nil {
+					return a.failure(commandPath(cmd), &target, err)
+				}
+				env := output.Success(commandPath(cmd), &target, map[string]any{
+					"common_serial_config": result,
+					"current_source":       current.Source,
+					"warnings":             warnings,
+				})
+				env.SideEffects = append(env.SideEffects, output.SideEffect{
+					Type:    "serial_config",
+					Command: "MSP2_COMMON_SET_SERIAL_CONFIG",
+					Detail:  "configuration changed but not saved",
+				})
+				return env
+			})
+		},
+	}
+	cmd.AddCommand(set, a.serialSetJSONCommand(), a.serialApplyConfigJSONCommand(), v2Apply)
 	return cmd
 }
 

@@ -192,3 +192,123 @@ func serialPortWithDecodedNames(port SerialPort) SerialPort {
 	port.BlackboxBaudRate = bfserial.BaudRateName(port.BlackboxBaudIndex)
 	return port
 }
+
+// CommonSerialPortRecord is one per-port record of the MSP v2 common serial
+// config payload. Layout per upstream Betaflight 2026.6.1
+// src/main/msp/msp.c: MSP2_COMMON_SERIAL_CONFIG read handler (sbufWriteU8
+// identifier, sbufWriteU32 functionMask little-endian, then msp_baudrateIndex,
+// gps_baudrateIndex, telemetry_baudrateIndex, blackbox_baudrateIndex as U8)
+// and MSP2_COMMON_SET_SERIAL_CONFIG write handler (same order; minimum record
+// size 9 bytes, trailing unknown bytes are skipped by the FC).
+type CommonSerialPortRecord struct {
+	Identifier         uint8  `json:"identifier"`
+	FunctionMask       uint32 `json:"function_mask"`
+	MSPBaudRateIndex   uint8  `json:"msp_baudrate_index"`
+	GPSBaudRateIndex   uint8  `json:"gps_baudrate_index"`
+	TelemetryBaudIndex uint8  `json:"telemetry_baudrate_index"`
+	BlackboxBaudIndex  uint8  `json:"blackbox_baudrate_index"`
+}
+
+type CommonSerialConfigSetResult struct {
+	Ports        []CommonSerialPortRecord `json:"ports"`
+	MSPCode      uint16                   `json:"msp_code"`
+	MSPName      string                   `json:"msp_name"`
+	Acknowledged bool                     `json:"acknowledged"`
+	SaveRequired bool                     `json:"save_required"`
+}
+
+// EncodeCommonSerialConfig renders the MSP2_COMMON_SET_SERIAL_CONFIG payload:
+// one U8 port count followed by per-port records (identifier U8, functionMask
+// U32 LE, four baud indexes U8) exactly as parsed by upstream msp.c.
+func EncodeCommonSerialConfig(records []CommonSerialPortRecord) []byte {
+	payload := make([]byte, 0, len(records)*9)
+	payload = append(payload, byte(len(records)))
+	for _, record := range records {
+		payload = append(payload, record.Identifier)
+		payload = appendU32Payload(payload, record.FunctionMask)
+		payload = append(payload, record.MSPBaudRateIndex, record.GPSBaudRateIndex, record.TelemetryBaudIndex, record.BlackboxBaudIndex)
+	}
+	return payload
+}
+
+// DecodeCommonSerialConfig parses an MSP2_COMMON_SERIAL_CONFIG payload into
+// per-port records. The count prefix and record layout mirror the upstream
+// read handler; extra bytes inside a record (future fields) are skipped so a
+// larger FC-side record still decodes.
+func DecodeCommonSerialConfig(payload []byte) ([]CommonSerialPortRecord, error) {
+	r := msp.NewPayloadReader(payload)
+	count, err := r.U8()
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return []CommonSerialPortRecord{}, nil
+	}
+	if r.Remaining()%int(count) != 0 {
+		return nil, fmt.Errorf("payload has %d bytes for %d serial ports", r.Remaining(), count)
+	}
+	size := r.Remaining() / int(count)
+	if size < 9 {
+		return nil, fmt.Errorf("serial port entry size %d is smaller than MSPv2 minimum 9", size)
+	}
+	records := make([]CommonSerialPortRecord, 0, int(count))
+	for range count {
+		startRemaining := r.Remaining()
+		identifier, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		mask, err := r.U32()
+		if err != nil {
+			return nil, err
+		}
+		mspBaud, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		gpsBaud, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		telemetryBaud, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		blackboxBaud, err := r.U8()
+		if err != nil {
+			return nil, err
+		}
+		for startRemaining-r.Remaining() < size && r.Remaining() > 0 {
+			if _, err := r.U8(); err != nil {
+				return nil, err
+			}
+		}
+		records = append(records, CommonSerialPortRecord{
+			Identifier:         identifier,
+			FunctionMask:       mask,
+			MSPBaudRateIndex:   mspBaud,
+			GPSBaudRateIndex:   gpsBaud,
+			TelemetryBaudIndex: telemetryBaud,
+			BlackboxBaudIndex:  blackboxBaud,
+		})
+	}
+	return records, nil
+}
+
+// SetCommonSerialConfig sends the full replacement port table through
+// MSP2_COMMON_SET_SERIAL_CONFIG. Upstream applies each record immediately;
+// persisting still requires an MSP_EEPROM_WRITE afterwards.
+func SetCommonSerialConfig(ctx context.Context, client *connection.Client, records []CommonSerialPortRecord) (*CommonSerialConfigSetResult, error) {
+	if _, err := client.Request(ctx, msp.MSP2CommonSetSerialConfig, EncodeCommonSerialConfig(records)); err != nil {
+		return nil, fmt.Errorf("common serial config request failed: %w", err)
+	}
+	copied := make([]CommonSerialPortRecord, len(records))
+	copy(copied, records)
+	return &CommonSerialConfigSetResult{
+		Ports:        copied,
+		MSPCode:      msp.MSP2CommonSetSerialConfig,
+		MSPName:      "MSP2_COMMON_SET_SERIAL_CONFIG",
+		Acknowledged: true,
+		SaveRequired: true,
+	}, nil
+}

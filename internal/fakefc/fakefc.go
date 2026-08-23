@@ -23,10 +23,12 @@ type FC struct {
 	DataflashUsedBytes uint32
 	DataflashData      []byte
 	CameraKeys         []uint8
+	armingDisableFlags uint32
 }
 
 func New() *FC {
 	return &FC{
+		armingDisableFlags: 0x1234,
 		CLI: map[string][]string{
 			"version": {
 				"# Betaflight / STM32F405 (F405) 2025.12.1 Jan 01 2026 / 00:00:00 (fake) MSP API: 1.48",
@@ -287,8 +289,20 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, []byte("BetaFlight"), false))
 	case msp.MSPFeatureConfig:
 		f.out.Write(response(frame.Code, appendU32(nil, 0x00040488), false))
-	case msp.MSPSetFeatureConfig:
-		f.out.Write(response(frame.Code, nil, len(frame.Payload) != 4))
+	case msp.MSPSetArmingDisabled:
+		// Upstream 2026.6.1 msp.c: u8 command; nonzero sets ARMING_DISABLED_MSP,
+		// zero re-enables arming.
+		if len(frame.Payload) != 1 {
+			f.out.Write(response(frame.Code, nil, true))
+			break
+		}
+		const mspArmingDisable = uint32(1) << 16
+		if frame.Payload[0] != 0 {
+			f.armingDisableFlags |= mspArmingDisable
+		} else {
+			f.armingDisableFlags &^= mspArmingDisable
+		}
+		f.out.Write(response(frame.Code, nil, false))
 	case msp.MSPStatusEx:
 		payload := make([]byte, 0, 32)
 		payload = appendU16(payload, 250)
@@ -298,7 +312,7 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		payload = append(payload, 0)
 		payload = appendU16(payload, 42)
 		payload = append(payload, 4, 0, 4, 0, 0, 0, 0, 29)
-		payload = appendU32(payload, 0x1234)
+		payload = appendU32(payload, f.armingDisableFlags)
 		payload = append(payload, 0)
 		payload = appendU16(payload, 425)
 		payload = append(payload, 6, 3, 1)
@@ -895,6 +909,14 @@ func (f *FC) handleMSP(frame msp.Frame) {
 		f.out.Write(response(frame.Code, payload, false))
 	case msp.MSPSetCFSerialConfig:
 		f.out.Write(response(frame.Code, nil, len(frame.Payload)%7 != 0))
+	case msp.MSP2CommonSetSerialConfig:
+		// Upstream 2026.6.1 msp.c: u8 port count then count x 9-byte records
+		// (identifier u8, function mask u32le, four baud index bytes).
+		payload := frame.Payload
+		invalid := len(payload) < 1 || payload[0] == 0 ||
+			(len(payload)-1)%int(payload[0]) != 0 ||
+			(len(payload)-1)/int(payload[0]) < 9
+		f.out.Write(response(frame.Code, nil, invalid))
 	case msp.MSPOSDConfig:
 		payload := []byte{0x31, 3, 1, 20}
 		payload = appendU16(payload, 1500)

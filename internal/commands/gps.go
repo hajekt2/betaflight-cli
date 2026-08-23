@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 
 	"github.com/hajekt2/betaflight-cli/internal/connection"
@@ -15,6 +16,7 @@ type GPSStatus struct {
 	Rescue     *GPSRescue     `json:"rescue,omitempty"`
 	RescuePID  *GPSRescuePID  `json:"rescue_pid,omitempty"`
 	Satellites []GPSSatellite `json:"satellites,omitempty"`
+	Statistics *GPSStatistics `json:"statistics,omitempty"`
 }
 
 type GPSConfig struct {
@@ -104,6 +106,17 @@ type GPSSatellite struct {
 	CNO     uint8 `json:"cno"`
 }
 
+// GPSStatistics surfaces an uninterpreted MSP_GPSSTATISTICS (0xA6) payload.
+//
+// Upstream note (2026.6.1): msp_protocol.h defines the code ("Get GPS
+// debugging data", line 220) but src/main/msp/msp.c contains no case handler
+// for it, so no field layout is derivable from firmware; the payload is
+// surfaced raw rather than guessed.
+type GPSStatistics struct {
+	PayloadLen int    `json:"payload_len"`
+	PayloadHex string `json:"payload_hex"`
+}
+
 func ReadGPSStatus(ctx context.Context, client *connection.Client) (*GPSStatus, []string, error) {
 	status := &GPSStatus{}
 	warnings := []string{}
@@ -138,6 +151,12 @@ func ReadGPSStatus(ctx context.Context, client *connection.Client) (*GPSStatus, 
 	}
 	if satellites, err := readGPSSatellites(ctx, client); err == nil {
 		status.Satellites = satellites
+	} else {
+		warnings = append(warnings, err.Error())
+	}
+	if statistics, err := readGPSStatistics(ctx, client); err == nil {
+		status.Statistics = statistics
+		warnings = append(warnings, "GPS statistics payload layout is not defined by firmware 2026.6.1; raw payload returned")
 	} else {
 		warnings = append(warnings, err.Error())
 	}
@@ -527,4 +546,28 @@ func readGPSSatellites(ctx context.Context, client *connection.Client) ([]GPSSat
 		return nil, fmt.Errorf("gps satellite info unavailable: %w", err)
 	}
 	return DecodeGPSSatellites(frame.Payload)
+}
+
+func readGPSStatistics(ctx context.Context, client *connection.Client) (*GPSStatistics, error) {
+	frame, err := client.Request(ctx, msp.MSPGpsstatistics, nil)
+	if err != nil {
+		return nil, fmt.Errorf("gps statistics unavailable: %w", err)
+	}
+	stats, err := DecodeGPSStatistics(frame.Payload)
+	if err != nil {
+		return nil, fmt.Errorf("gps statistics unavailable: %w", err)
+	}
+	return stats, nil
+}
+
+// DecodeGPSStatistics wraps a raw MSP_GPSSTATISTICS payload without
+// interpreting fields; see GPSStatistics for why no layout is applied.
+func DecodeGPSStatistics(payload []byte) (*GPSStatistics, error) {
+	if len(payload) == 0 {
+		return nil, fmt.Errorf("MSP_GPSSTATISTICS returned empty payload")
+	}
+	return &GPSStatistics{
+		PayloadLen: len(payload),
+		PayloadHex: hex.EncodeToString(payload),
+	}, nil
 }

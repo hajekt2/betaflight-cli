@@ -133,3 +133,116 @@ func TestDecodeOSDWarnings(t *testing.T) {
 		t.Fatalf("warnings = %+v", warnings)
 	}
 }
+
+func TestEncodeOSDCharRoundTrip(t *testing.T) {
+	bitmap := make([]byte, OSDCharVisibleBytes)
+	for i := range bitmap {
+		bitmap[i] = byte(i)
+	}
+	payload, err := EncodeOSDChar(7, bitmap)
+	if err != nil {
+		t.Fatalf("EncodeOSDChar() error = %v", err)
+	}
+	if len(payload) != OSDCharVisibleBytes+1 || payload[0] != 7 {
+		t.Fatalf("payload = %v", payload[:min(len(payload), 4)])
+	}
+	character, err := DecodeOSDChar(payload)
+	if err != nil {
+		t.Fatalf("DecodeOSDChar() error = %v", err)
+	}
+	if character.Index != 7 || string(character.Bitmap) != string(bitmap) {
+		t.Fatalf("character index = %d", character.Index)
+	}
+}
+
+func TestDecodeOSDCharAcceptsFullBitmap(t *testing.T) {
+	payload := []byte{9}
+	payload = append(payload, make([]byte, OSDCharFullBytes)...)
+	payload[len(payload)-1] = 0xaa
+	character, err := DecodeOSDChar(payload)
+	if err != nil {
+		t.Fatalf("DecodeOSDChar() error = %v", err)
+	}
+	if character.Index != 9 || len(character.Bitmap) != OSDCharVisibleBytes {
+		t.Fatalf("character = %+v", character)
+	}
+}
+
+func TestDecodeOSDCharRejectsShortBitmap(t *testing.T) {
+	payload := append([]byte{3}, make([]byte, OSDCharVisibleBytes-1)...)
+	if _, err := DecodeOSDChar(payload); err == nil {
+		t.Fatal("DecodeOSDChar() error = nil for short bitmap")
+	}
+	if _, err := DecodeOSDChar(nil); err == nil {
+		t.Fatal("DecodeOSDChar() error = nil for empty payload")
+	}
+}
+
+func TestSetOSDCharPayloadLength(t *testing.T) {
+	bitmap := make([]byte, OSDCharVisibleBytes+1)
+	if _, err := EncodeOSDChar(0, bitmap); err == nil {
+		t.Fatal("EncodeOSDChar() error = nil for oversized bitmap")
+	}
+}
+
+func TestEncodeOSDCharPixels(t *testing.T) {
+	rows := make([][]uint8, osdCharRows)
+	for y := range rows {
+		row := make([]uint8, osdCharColumns)
+		for x := range row {
+			row[x] = uint8((x + y) % 4)
+		}
+		rows[y] = row
+	}
+	bitmap, err := EncodeOSDCharPixels(rows)
+	if err != nil {
+		t.Fatalf("EncodeOSDCharPixels() error = %v", err)
+	}
+	if len(bitmap) != OSDCharVisibleBytes {
+		t.Fatalf("bitmap length = %d", len(bitmap))
+	}
+	// First four pixels of row 0 pack into one byte, most significant pair first.
+	want := rows[0][0]<<6 | rows[0][1]<<4 | rows[0][2]<<2 | rows[0][3]
+	if bitmap[0] != want {
+		t.Fatalf("bitmap[0] = %#02x, want %#02x", bitmap[0], want)
+	}
+	if _, err := EncodeOSDCharPixels(rows[:17]); err == nil {
+		t.Fatal("EncodeOSDCharPixels() error = nil for short row count")
+	}
+	rows[5][7] = 4
+	if _, err := EncodeOSDCharPixels(rows); err == nil {
+		t.Fatal("EncodeOSDCharPixels() error = nil for pixel value above 3")
+	}
+}
+
+func TestDecodeOSDVideoConfig(t *testing.T) {
+	config, err := DecodeOSDVideoConfig([]byte{3, 1})
+	if err != nil {
+		t.Fatalf("DecodeOSDVideoConfig() error = %v", err)
+	}
+	if config.VideoSystem != 3 || config.VideoSystemName != "HD" {
+		t.Fatalf("video system = %+v", config)
+	}
+	if config.Units != 1 || config.UnitsName != "METRIC" {
+		t.Fatalf("units = %+v", config)
+	}
+	if _, err := DecodeOSDVideoConfig([]byte{3}); err == nil {
+		t.Fatal("DecodeOSDVideoConfig() error = nil for short payload")
+	}
+	if _, err := DecodeOSDVideoConfig([]byte{3, 1, 0}); err == nil {
+		t.Fatal("DecodeOSDVideoConfig() error = nil for trailing bytes")
+	}
+}
+
+func TestValidateAndEncodeOSDVideoConfig(t *testing.T) {
+	if err := ValidateOSDVideoConfig(OSDVideoConfigSetConfig{VideoSystem: 4, Units: 1}); err == nil {
+		t.Fatal("ValidateOSDVideoConfig() error = nil for video_system 4")
+	}
+	if err := ValidateOSDVideoConfig(OSDVideoConfigSetConfig{VideoSystem: 2, Units: 3}); err == nil {
+		t.Fatal("ValidateOSDVideoConfig() error = nil for units 3")
+	}
+	payload := EncodeOSDVideoConfig(OSDVideoConfigSetConfig{VideoSystem: 2, Units: 1})
+	if string(payload) != string([]byte{2, 1}) {
+		t.Fatalf("payload = %v", payload)
+	}
+}

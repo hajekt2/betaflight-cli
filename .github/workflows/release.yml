@@ -29,7 +29,7 @@ jobs:
       attestations: write
     steps:
       - name: Check out release tag
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
 
@@ -40,7 +40,7 @@ jobs:
           cache: true
 
       - name: Check out Betaflight metadata source
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: betaflight/betaflight
           ref: ${{ env.BETAFLIGHT_VERSION }}
@@ -75,7 +75,7 @@ jobs:
           make release VERSION="$GITHUB_REF_NAME" COMMIT="$GITHUB_SHA" DATE="$release_date"
 
       - name: Attest release archives
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4.2.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: |
             dist/release/*.tar.gz
